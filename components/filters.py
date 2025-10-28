@@ -7,7 +7,7 @@ from managers.supabase_config import get_supabase_client
 def get_users() -> List[Dict[str, Any]]:
     """Busca lista de usuários disponíveis"""
     try:
-        supabase = get_client()
+        supabase = get_supabase_client()
         response = supabase.table("profiles").select("email, full_name, role").order("full_name").execute()
         return response.data
     except Exception as e:

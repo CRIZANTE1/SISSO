@@ -22,7 +22,7 @@ def upload_evidence(file_bytes: bytes,
             st.error("Usuário não identificado para upload")
             return None
             
-        supabase = get_client()
+        supabase = get_supabase_client()
         bucket = "evidencias"
         
         # Gera path único baseado no timestamp
@@ -63,7 +63,7 @@ def upload_evidence(file_bytes: bytes,
 def get_attachments(entity_type: str, entity_id: str) -> List[Dict[str, Any]]:
     """Busca anexos de uma entidade"""
     try:
-        supabase = get_client()
+        supabase = get_supabase_client()
         response = supabase.table("attachments").select("*").eq("entity_type", entity_type).eq("entity_id", entity_id).execute()
         return response.data
     except Exception as e:
@@ -73,7 +73,7 @@ def get_attachments(entity_type: str, entity_id: str) -> List[Dict[str, Any]]:
 def download_attachment(bucket: str, path: str) -> Optional[bytes]:
     """Download de anexo do Supabase Storage"""
     try:
-        supabase = get_client()
+        supabase = get_supabase_client()
         response = supabase.storage.from_(bucket).download(path)
         return response
     except Exception as e:
@@ -83,7 +83,7 @@ def download_attachment(bucket: str, path: str) -> Optional[bytes]:
 def delete_attachment(attachment_id: str) -> bool:
     """Remove anexo do banco e storage"""
     try:
-        supabase = get_client()
+        supabase = get_supabase_client()
         
         # Busca dados do anexo
         attachment = supabase.table("attachments").select("*").eq("id", attachment_id).execute()
@@ -107,7 +107,7 @@ def delete_attachment(attachment_id: str) -> bool:
 def import_hours_csv(df: pd.DataFrame, site_mapping: Dict[str, str]) -> bool:
     """Importa dados de horas trabalhadas de CSV"""
     try:
-        supabase = get_client()
+        supabase = get_supabase_client()
         
         # Valida colunas necessárias
         required_cols = ['site_code', 'year', 'month', 'hours']
@@ -155,7 +155,7 @@ def import_hours_csv(df: pd.DataFrame, site_mapping: Dict[str, str]) -> bool:
 def import_accidents_csv(df: pd.DataFrame, site_mapping: Dict[str, str]) -> bool:
     """Importa dados de acidentes de CSV"""
     try:
-        supabase = get_client()
+        supabase = get_supabase_client()
         
         # Valida colunas necessárias
         required_cols = ['site_code', 'date', 'severity', 'description']
