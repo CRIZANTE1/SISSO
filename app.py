@@ -11,12 +11,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-
 def main():
-    # Header principal
-    st.title("🛡️ Sistema de Monitoramento SSO")
-    st.markdown("Segurança e Saúde Ocupacional - Análise de Acidentes e KPIs")
-    
     logger = get_logger()
     logger.info("Iniciando aplicação principal")
     
@@ -29,38 +24,35 @@ def main():
     # Cria filtros na sidebar
     filters = create_filter_sidebar()
     
-    # Define as páginas disponíveis
-    page_options = {
-        "📊 Visão Geral": "pages/1_Visao_Geral.py",
-        "🚨 Acidentes": "pages/2_Acidentes.py", 
-        "⚠️ Quase-Acidentes": "pages/3_Quase_Acidentes.py",
-        "📋 Não Conformidades": "pages/4_Nao_Conformidades.py",
-        "📈 KPIs e Controles": "pages/5_KPIs_e_Controles.py",
-        "⚙️ Dados Básicos": "pages/6_Admin_Dados_Basicos.py",
-        "📝 Logs do Sistema": "pages/7_Logs_Sistema.py"
+    # Define as páginas disponíveis com seções organizadas
+    pages = {
+        "📊 Análise": [
+            st.Page("pages/1_Visao_Geral.py", title="Visão Geral", icon="📊"),
+            st.Page("pages/2_Acidentes.py", title="Acidentes", icon="🚨"),
+            st.Page("pages/3_Quase_Acidentes.py", title="Quase-Acidentes", icon="⚠️"),
+            st.Page("pages/4_Nao_Conformidades.py", title="Não Conformidades", icon="📋"),
+        ],
+        "📈 Controles": [
+            st.Page("pages/5_KPIs_e_Controles.py", title="KPIs e Controles", icon="📈"),
+        ],
+        "⚙️ Administração": [
+            st.Page("pages/6_Admin_Dados_Basicos.py", title="Dados Básicos", icon="⚙️"),
+            st.Page("pages/7_Logs_Sistema.py", title="Logs do Sistema", icon="📝"),
+        ]
     }
     
-    # Cria navegação por seleção
-    col1, col2, col3 = st.columns([1, 2, 1])
-    
-    with col2:
-        selected_page = st.selectbox(
-            "Selecione uma página:",
-            options=list(page_options.keys()),
-            index=0,
-            key="page_selector"
-        )
+    # Cria navegação no topo
+    pg = st.navigation(pages, position="top", expanded=True)
     
     # Executa a página selecionada
     try:
-        page_path = page_options[selected_page]
-        logger.info(f"Carregando página: {page_path}")
+        logger.info(f"Executando página: {pg}")
         
         # Importa e executa a página
         import importlib.util
-        spec = importlib.util.spec_from_file_location("page_module", page_path)
+        spec = importlib.util.spec_from_file_location("page_module", pg)
         if spec is None or spec.loader is None:
-            error_msg = f"Não foi possível carregar o módulo {page_path}"
+            error_msg = f"Não foi possível carregar o módulo {pg}"
             logger.error(error_msg)
             raise ImportError(error_msg)
         page_module = importlib.util.module_from_spec(spec)
@@ -68,10 +60,10 @@ def main():
         
         # Executa a função app() da página passando os filtros
         if hasattr(page_module, 'app'):
-            logger.info(f"Executando página: {page_path}")
+            logger.info(f"Executando página: {pg}")
             page_module.app(filters)
         else:
-            error_msg = f"Página {page_path} não possui função 'app'"
+            error_msg = f"Página {pg} não possui função 'app'"
             logger.error(error_msg)
             st.error(error_msg)
             
