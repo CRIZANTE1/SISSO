@@ -1,10 +1,10 @@
 # Este arquivo foi substituído pela nova arquitetura OIDC
 # Use auth/auth_utils.py e auth/login_page.py
 
+import streamlit as st
 from auth.auth_utils import (
     require_login,
     show_user_info,
-    get_current_user,
     get_user_id,
     get_user_info,
     get_user_role,
@@ -18,7 +18,7 @@ from auth.auth_utils import (
 def require_role(required_roles: list[str]):
     """Middleware que exige papel específico"""
     require_login()
-    user = get_current_user()
+    user = get_user_info()
     if user and user.get('role') not in required_roles:
         st.error("❌ Acesso negado. Papel insuficiente.")
         st.stop()
