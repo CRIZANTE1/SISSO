@@ -52,7 +52,7 @@ def main():
     # Executa a página selecionada
     try:
         # Obtém o caminho do arquivo da página
-        page_path = str(page)
+        page_path = page.script_path
         logger.info(f"Carregando página: {page_path}")
         
         # Importa e executa a página

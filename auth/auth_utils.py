@@ -67,9 +67,9 @@ def check_user_in_database(email: str) -> Optional[Dict[str, Any]]:
                 "role": profile.get("role", "viewer")
             }
         
-        # Se não encontrou perfil, cria um novo com role viewer
-        logger.info(f"Perfil não encontrado para {email}, criando novo perfil")
-        return create_user_profile(email)
+        # Se não encontrou perfil, NÃO cria automaticamente - bloqueia acesso
+        logger.warning(f"Usuário {email} não está cadastrado no sistema")
+        return None
         
     except Exception as e:
         logger.error(f"Erro ao verificar usuário na base de dados: {str(e)}")
@@ -77,84 +77,10 @@ def check_user_in_database(email: str) -> Optional[Dict[str, Any]]:
         return None
 
 def create_user_profile(email: str) -> Optional[Dict[str, Any]]:
-    """Cria um novo perfil de usuário com role viewer usando Service Role."""
+    """Cria um novo perfil de usuário - APENAS para administradores."""
     logger = get_logger()
-    try:
-        logger.info(f"Criando perfil para usuário: {email}")
-        from managers.supabase_config import get_service_role_client
-        
-        # Usa Service Role para bypass RLS
-        supabase = get_service_role_client()
-        
-        if not supabase:
-            error_msg = "Service Role não configurado. Contate o administrador."
-            logger.error(error_msg)
-            st.error(f"Erro: {error_msg}")
-            return None
-        
-        # Verifica se o perfil já existe antes de tentar criar
-        existing_profile = supabase.table("profiles").select("*").eq("email", email).execute()
-        
-        if existing_profile.data:
-            # Perfil já existe, retorna os dados existentes
-            profile = existing_profile.data[0]
-            logger.info(f"Perfil já existe para {email}, retornando dados existentes")
-            return {
-                "id": profile["email"],  # Usa email como ID
-                "email": profile.get("email", email),
-                "full_name": profile.get("full_name", get_user_display_name()),
-                "role": profile.get("role", "viewer")
-            }
-        
-        # Cria perfil básico
-        profile_data = {
-            "email": email,
-            "full_name": get_user_display_name(),
-            "role": "viewer",
-            "status": "ativo"
-        }
-        
-        logger.info(f"Criando novo perfil com dados: {profile_data}")
-        response = supabase.table("profiles").insert(profile_data).execute()
-        
-        if response.data:
-            logger.info(f"Perfil criado com sucesso para {email}")
-            return {
-                "id": email,  # Usa email como ID
-                "email": email,
-                "full_name": get_user_display_name(),
-                "role": "viewer"
-            }
-        
-        logger.warning(f"Perfil não foi criado para {email} - resposta vazia")
-        return None
-        
-    except Exception as e:
-        # Se o erro for de chave duplicada, tenta buscar o perfil existente
-        if "duplicate key value violates unique constraint" in str(e):
-            logger.warning(f"Chave duplicada detectada para {email}, buscando perfil existente")
-            try:
-                from managers.supabase_config import get_service_role_client
-                supabase = get_service_role_client()
-                
-                if supabase:
-                    existing_profile = supabase.table("profiles").select("*").eq("email", email).execute()
-                    if existing_profile.data:
-                        profile = existing_profile.data[0]
-                        logger.info(f"Perfil existente encontrado para {email} após erro de duplicata")
-                        return {
-                            "id": profile["email"],
-                            "email": profile.get("email", email),
-                            "full_name": profile.get("full_name", get_user_display_name()),
-                            "role": profile.get("role", "viewer")
-                        }
-            except Exception as retry_error:
-                logger.error(f"Erro ao buscar perfil existente: {str(retry_error)}")
-                st.error(f"Erro ao buscar perfil existente: {str(retry_error)}")
-        
-        logger.error(f"Erro ao criar perfil do usuário: {str(e)}")
-        st.error(f"Erro ao criar perfil do usuário: {str(e)}")
-        return None
+    logger.warning(f"Tentativa de criação de perfil para {email} - função desabilitada para criação automática")
+    return None
 
 def get_user_role() -> str:
     """Retorna o papel do usuário."""

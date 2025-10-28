@@ -39,8 +39,8 @@ def show_login_page():
         **Instruções:**
         1. Clique no botão acima para fazer login
         2. Autorize o acesso com sua conta Google
-        3. Se for seu primeiro acesso, um perfil será criado automaticamente
-        4. Administradores podem gerenciar permissões na seção Admin
+        3. Apenas usuários previamente cadastrados podem acessar
+        4. Entre em contato com o administrador para solicitar acesso
         """)
 
 def show_access_denied_page():
@@ -69,8 +69,8 @@ def show_access_denied_page():
         st.error("""
         **Motivo do bloqueio:**
         - Seu e-mail não está cadastrado no sistema
-        - Sua conta pode ter sido desativada
-        - Você pode não ter as permissões necessárias
+        - Apenas usuários previamente cadastrados podem acessar
+        - Sua conta pode ter sido desativada pelo administrador
         """)
         
         st.markdown("---")
