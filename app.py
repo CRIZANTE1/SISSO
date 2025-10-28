@@ -82,6 +82,9 @@ def main():
     
     # Define as páginas organizadas em seções
     pages = {
+        "🔧 Debug": [
+            st.Page("pages/0_Debug_Supabase.py", title="Debug Supabase", icon="🔧"),
+        ],
         "📊 Análises": [
             st.Page("pages/1_Visao_Geral.py", title="Visão Geral", icon="📊"),
             st.Page("pages/2_Acidentes.py", title="Acidentes", icon="🚨"),
