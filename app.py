@@ -29,30 +29,31 @@ def main():
     # Cria filtros na sidebar
     filters = create_filter_sidebar()
     
-    # Define as páginas organizadas em seções
-    pages = {
-        "📊 Análises": [
-            st.Page("pages/1_Visao_Geral.py", title="Visão Geral", icon="📊"),
-            st.Page("pages/2_Acidentes.py", title="Acidentes", icon="🚨"),
-            st.Page("pages/3_Quase_Acidentes.py", title="Quase-Acidentes", icon="⚠️"),
-            st.Page("pages/4_Nao_Conformidades.py", title="Não Conformidades", icon="📋"),
-        ],
-        "📈 Controles": [
-            st.Page("pages/5_KPIs_e_Controles.py", title="KPIs e Controles", icon="📈"),
-        ],
-        "⚙️ Administração": [
-            st.Page("pages/6_Admin_Dados_Basicos.py", title="Dados Básicos", icon="⚙️"),
-            st.Page("pages/7_Logs_Sistema.py", title="Logs do Sistema", icon="📝"),
-        ]
+    # Define as páginas disponíveis
+    page_options = {
+        "📊 Visão Geral": "pages/1_Visao_Geral.py",
+        "🚨 Acidentes": "pages/2_Acidentes.py", 
+        "⚠️ Quase-Acidentes": "pages/3_Quase_Acidentes.py",
+        "📋 Não Conformidades": "pages/4_Nao_Conformidades.py",
+        "📈 KPIs e Controles": "pages/5_KPIs_e_Controles.py",
+        "⚙️ Dados Básicos": "pages/6_Admin_Dados_Basicos.py",
+        "📝 Logs do Sistema": "pages/7_Logs_Sistema.py"
     }
     
-    # Cria navegação com posição superior
-    page = st.navigation(pages, position="top", expanded=True)
+    # Cria navegação por seleção
+    col1, col2, col3 = st.columns([1, 2, 1])
+    
+    with col2:
+        selected_page = st.selectbox(
+            "Selecione uma página:",
+            options=list(page_options.keys()),
+            index=0,
+            key="page_selector"
+        )
     
     # Executa a página selecionada
     try:
-        # Obtém o caminho do arquivo da página
-        page_path = page.script_path
+        page_path = page_options[selected_page]
         logger.info(f"Carregando página: {page_path}")
         
         # Importa e executa a página
