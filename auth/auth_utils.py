@@ -71,9 +71,16 @@ def check_user_in_database(email: str) -> Optional[Dict[str, Any]]:
         return None
 
 def create_user_profile(email: str) -> Optional[Dict[str, Any]]:
-    """Cria um novo perfil de usuário com role viewer."""
+    """Cria um novo perfil de usuário com role viewer usando Service Role."""
     try:
-        supabase = get_supabase_client()
+        from managers.supabase_config import get_service_role_client
+        
+        # Usa Service Role para bypass RLS
+        supabase = get_service_role_client()
+        
+        if not supabase:
+            st.error("Erro: Service Role não configurado. Contate o administrador.")
+            return None
         
         # Cria perfil básico
         profile_data = {

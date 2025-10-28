@@ -30,6 +30,13 @@ CREATE POLICY "Users can update their own profile" ON profiles
 ```
 **Descrição**: Usuários podem atualizar apenas seu próprio perfil baseado no email do JWT.
 
+#### Política de Criação Própria
+```sql
+CREATE POLICY "Users can create their own profile" ON profiles
+    FOR INSERT WITH CHECK (auth.jwt() ->> 'email' = email);
+```
+**Descrição**: Usuários podem criar apenas seu próprio perfil baseado no email do JWT.
+
 #### Política de Visualização para Admins
 ```sql
 CREATE POLICY "Admins can view all profiles" ON profiles
@@ -42,6 +49,19 @@ CREATE POLICY "Admins can view all profiles" ON profiles
     );
 ```
 **Descrição**: Administradores podem visualizar todos os perfis baseado no email do JWT.
+
+#### Política de Criação para Admins
+```sql
+CREATE POLICY "Admins can create any profile" ON profiles
+    FOR INSERT WITH CHECK (
+        EXISTS (
+            SELECT 1 FROM profiles 
+            WHERE email = auth.jwt() ->> 'email'
+            AND role = 'admin'
+        )
+    );
+```
+**Descrição**: Administradores podem criar perfis de qualquer usuário.
 
 ### 2. **Tabela `hours_worked_monthly`**
 
@@ -162,11 +182,23 @@ CREATE POLICY "Users can view their own profile" ON profiles
 CREATE POLICY "Users can update their own profile" ON profiles
     FOR UPDATE USING (auth.jwt() ->> 'email' = id);
 
+CREATE POLICY "Users can create their own profile" ON profiles
+    FOR INSERT WITH CHECK (auth.jwt() ->> 'email' = email);
+
 CREATE POLICY "Admins can view all profiles" ON profiles
     FOR SELECT USING (
         EXISTS (
             SELECT 1 FROM profiles 
             WHERE id = auth.jwt() ->> 'email' 
+            AND role = 'admin'
+        )
+    );
+
+CREATE POLICY "Admins can create any profile" ON profiles
+    FOR INSERT WITH CHECK (
+        EXISTS (
+            SELECT 1 FROM profiles 
+            WHERE email = auth.jwt() ->> 'email'
             AND role = 'admin'
         )
     );

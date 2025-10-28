@@ -10,66 +10,11 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# CSS personalizado
-st.markdown("""
-<style>
-    .main-header {
-        background: linear-gradient(90deg, #1f77b4 0%, #17a2b8 100%);
-        padding: 1rem;
-        border-radius: 10px;
-        color: white;
-        text-align: center;
-        margin-bottom: 2rem;
-    }
-    
-    .metric-card {
-        background: white;
-        padding: 1rem;
-        border-radius: 10px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        border-left: 4px solid #1f77b4;
-    }
-    
-    .alert-box {
-        background: #fff3cd;
-        border: 1px solid #ffeaa7;
-        border-radius: 5px;
-        padding: 1rem;
-        margin: 1rem 0;
-    }
-    
-    .success-box {
-        background: #d4edda;
-        border: 1px solid #c3e6cb;
-        border-radius: 5px;
-        padding: 1rem;
-        margin: 1rem 0;
-    }
-    
-    /* Estilos para navegação superior */
-    .stApp > header {
-        background-color: #1f77b4;
-    }
-    
-    .stApp > header .css-1d391kg {
-        background-color: #1f77b4;
-    }
-    
-    /* Ajustes para o conteúdo principal */
-    .main .block-container {
-        padding-top: 2rem;
-    }
-</style>
-""", unsafe_allow_html=True)
 
 def main():
     # Header principal
-    st.markdown("""
-    <div class="main-header">
-        <h1>🛡️ Sistema de Monitoramento SSO</h1>
-        <p>Segurança e Saúde Ocupacional - Análise de Acidentes e KPIs</p>
-    </div>
-    """, unsafe_allow_html=True)
+    st.title("🛡️ Sistema de Monitoramento SSO")
+    st.markdown("Segurança e Saúde Ocupacional - Análise de Acidentes e KPIs")
     
     # Verifica autenticação
     require_login()
