@@ -8,23 +8,19 @@ from components.cards import create_metric_row, create_bar_chart, create_pie_cha
 from components.filters import apply_filters_to_df
 from managers.supabase_config import get_supabase_client
 
-def fetch_near_misses(site_codes=None, start_date=None, end_date=None):
+def fetch_near_misses(start_date=None, end_date=None):
     """Busca dados de quase-acidentes"""
     try:
-        supabase = get_supabase_client()
+        from managers.supabase_config import get_service_role_client
+        supabase = get_service_role_client()
         query = supabase.table("near_misses").select("*")
         
-        if site_codes:
-            sites_response = supabase.table("sites").select("id, code").in_("code", site_codes).execute()
-            site_ids = [site['id'] for site in sites_response.data]
-            query = query.in_("site_id", site_ids)
-        
         if start_date:
-            query = query.gte("date", start_date.isoformat())
+            query = query.gte("occurred_at", start_date.isoformat())
         if end_date:
-            query = query.lte("date", end_date.isoformat())
+            query = query.lte("occurred_at", end_date.isoformat())
             
-        data = query.order("date", desc=True).execute().data
+        data = query.order("occurred_at", desc=True).execute().data
         return pd.DataFrame(data)
     except Exception as e:
         st.error(f"Erro ao buscar quase-acidentes: {str(e)}")
@@ -42,7 +38,6 @@ def app(filters):
         # Busca dados
         with st.spinner("Carregando dados de quase-acidentes..."):
             df = fetch_near_misses(
-                site_codes=filters.get("sites"),
                 start_date=filters.get("start_date"),
                 end_date=filters.get("end_date")
             )
@@ -55,9 +50,9 @@ def app(filters):
             
             # Métricas principais
             total_near_misses = len(df)
-            high_risk = len(df[df['risk_level'] == 'high']) if 'risk_level' in df.columns else 0
-            medium_risk = len(df[df['risk_level'] == 'medium']) if 'risk_level' in df.columns else 0
-            low_risk = len(df[df['risk_level'] == 'low']) if 'risk_level' in df.columns else 0
+            high_risk = len(df[df['potential_severity'] == 'high']) if 'potential_severity' in df.columns else 0
+            medium_risk = len(df[df['potential_severity'] == 'medium']) if 'potential_severity' in df.columns else 0
+            low_risk = len(df[df['potential_severity'] == 'low']) if 'potential_severity' in df.columns else 0
             
             metrics = [
                 {
@@ -92,24 +87,24 @@ def app(filters):
             col1, col2 = st.columns(2)
             
             with col1:
-                # Distribuição por nível de risco
-                if 'risk_level' in df.columns:
-                    risk_counts = df['risk_level'].value_counts()
+                # Distribuição por severidade potencial
+                if 'potential_severity' in df.columns:
+                    severity_counts = df['potential_severity'].value_counts()
                     fig1 = create_pie_chart(
                         pd.DataFrame({
-                            'risk_level': risk_counts.index,
-                            'count': risk_counts.values
+                            'potential_severity': severity_counts.index,
+                            'count': severity_counts.values
                         }),
-                        'risk_level',
+                        'potential_severity',
                         'count',
-                        'Distribuição por Nível de Risco'
+                        'Distribuição por Severidade Potencial'
                     )
                     st.plotly_chart(fig1, use_container_width=True)
             
             with col2:
                 # Quase-acidentes por mês
-                if 'date' in df.columns:
-                    df['month'] = pd.to_datetime(df['date']).dt.to_period('M')
+                if 'occurred_at' in df.columns:
+                    df['month'] = pd.to_datetime(df['occurred_at']).dt.to_period('M')
                     monthly_counts = df.groupby('month').size().reset_index(name='count')
                     monthly_counts['month'] = monthly_counts['month'].astype(str)
                     
@@ -121,37 +116,21 @@ def app(filters):
                     )
                     st.plotly_chart(fig2, use_container_width=True)
             
-            # Análise por categoria
-            if 'category' in df.columns:
-                st.subheader("Análise por Categoria")
-                category_counts = df['category'].value_counts()
+            # Análise por status
+            if 'status' in df.columns:
+                st.subheader("Análise por Status")
+                status_counts = df['status'].value_counts()
                 
                 fig3 = create_bar_chart(
                     pd.DataFrame({
-                        'category': category_counts.index,
-                        'count': category_counts.values
+                        'status': status_counts.index,
+                        'count': status_counts.values
                     }),
-                    'category',
+                    'status',
                     'count',
-                    'Quase-Acidentes por Categoria'
+                    'Quase-Acidentes por Status'
                 )
                 st.plotly_chart(fig3, use_container_width=True)
-            
-            # Análise por causa raiz
-            if 'root_cause' in df.columns:
-                st.subheader("Análise por Causa Raiz")
-                root_cause_counts = df['root_cause'].value_counts()
-                
-                fig4 = create_bar_chart(
-                    pd.DataFrame({
-                        'root_cause': root_cause_counts.index,
-                        'count': root_cause_counts.values
-                    }),
-                    'root_cause',
-                    'count',
-                    'Quase-Acidentes por Causa Raiz'
-                )
-                st.plotly_chart(fig4, use_container_width=True)
     
     with tab2:
         st.subheader("Registros de Quase-Acidentes")
@@ -161,17 +140,17 @@ def app(filters):
             col1, col2, col3 = st.columns(3)
             
             with col1:
-                risk_filter = st.selectbox(
-                    "Filtrar por Nível de Risco",
-                    options=["Todos"] + list(df['risk_level'].unique()) if 'risk_level' in df.columns else ["Todos"],
-                    key="near_miss_risk_filter"
+                severity_filter = st.selectbox(
+                    "Filtrar por Severidade Potencial",
+                    options=["Todas"] + list(df['potential_severity'].unique()) if 'potential_severity' in df.columns else ["Todas"],
+                    key="near_miss_severity_filter"
                 )
             
             with col2:
-                category_filter = st.selectbox(
-                    "Filtrar por Categoria",
-                    options=["Todas"] + list(df['category'].unique()) if 'category' in df.columns else ["Todas"],
-                    key="near_miss_category_filter"
+                status_filter = st.selectbox(
+                    "Filtrar por Status",
+                    options=["Todos"] + list(df['status'].unique()) if 'status' in df.columns else ["Todos"],
+                    key="near_miss_status_filter"
                 )
             
             with col3:
@@ -180,17 +159,17 @@ def app(filters):
             # Aplica filtros
             filtered_df = df.copy()
             
-            if risk_filter != "Todos" and 'risk_level' in filtered_df.columns:
-                filtered_df = filtered_df[filtered_df['risk_level'] == risk_filter]
+            if severity_filter != "Todas" and 'potential_severity' in filtered_df.columns:
+                filtered_df = filtered_df[filtered_df['potential_severity'] == severity_filter]
             
-            if category_filter != "Todas" and 'category' in filtered_df.columns:
-                filtered_df = filtered_df[filtered_df['category'] == category_filter]
+            if status_filter != "Todos" and 'status' in filtered_df.columns:
+                filtered_df = filtered_df[filtered_df['status'] == status_filter]
             
             if search_term and 'description' in filtered_df.columns:
                 filtered_df = filtered_df[filtered_df['description'].str.contains(search_term, case=False, na=False)]
             
             # Exibe tabela
-            display_cols = ['date', 'risk_level', 'category', 'description', 'root_cause', 'preventive_actions']
+            display_cols = ['occurred_at', 'potential_severity', 'description', 'status']
             available_cols = [col for col in display_cols if col in filtered_df.columns]
             
             if available_cols:
@@ -213,7 +192,7 @@ def app(filters):
             for idx, row in df.iterrows():
                 near_miss_id = row.get('id', idx)
                 description = row.get('description', f'Quase-acidente {near_miss_id}')[:50]
-                date_str = row.get('date', 'Data não informada')
+                date_str = row.get('occurred_at', 'Data não informada')
                 near_miss_options[f"{date_str} - {description}..."] = near_miss_id
             
             selected_near_miss = st.selectbox(
@@ -268,8 +247,8 @@ def app(filters):
             
             with col1:
                 date_input = st.date_input("Data do Quase-Acidente", value=date.today())
-                risk_level = st.selectbox(
-                    "Nível de Risco",
+                potential_severity = st.selectbox(
+                    "Severidade Potencial",
                     options=["low", "medium", "high"],
                     format_func=lambda x: {
                         "low": "Baixo",
@@ -277,22 +256,15 @@ def app(filters):
                         "high": "Alto"
                     }[x]
                 )
-                category = st.selectbox(
-                    "Categoria",
-                    options=["Queda", "Choque", "Corte", "Queimadura", "Outros"]
-                )
             
             with col2:
-                # Busca sites disponíveis
-                sites = get_sites()
-                site_options = {f"{site['code']} - {site['name']}": site['id'] for site in sites}
-                selected_site = st.selectbox("Site", options=list(site_options.keys()))
-                site_id = site_options[selected_site] if selected_site else None
-                
-                root_cause = st.selectbox(
-                    "Causa Raiz",
-                    options=["Fator Humano", "Fator Material", "Fator Ambiental", 
-                            "Fator Organizacional", "Fator Técnico", "Outros"]
+                status = st.selectbox(
+                    "Status",
+                    options=["aberto", "fechado"],
+                    format_func=lambda x: {
+                        "aberto": "Aberto",
+                        "fechado": "Fechado"
+                    }[x]
                 )
             
             description = st.text_area("Descrição do Quase-Acidente", height=100)
@@ -308,23 +280,19 @@ def app(filters):
             submitted = st.form_submit_button("💾 Salvar Quase-Acidente", type="primary")
             
             if submitted:
-                if not site_id:
-                    st.error("Selecione um site.")
-                elif not description.strip():
+                if not description.strip():
                     st.error("Descrição é obrigatória.")
                 else:
                     try:
-                        supabase = get_supabase_client()
+                        from managers.supabase_config import get_service_role_client
+                        supabase = get_service_role_client()
                         
                         # Insere quase-acidente
                         near_miss_data = {
-                            "site_id": site_id,
-                            "date": date_input.isoformat(),
-                            "risk_level": risk_level,
-                            "category": category,
+                            "occurred_at": date_input.isoformat(),
+                            "potential_severity": potential_severity,
                             "description": description,
-                            "root_cause": root_cause,
-                            "preventive_actions": preventive_actions
+                            "status": status
                         }
                         
                         result = supabase.table("near_misses").insert(near_miss_data).execute()
@@ -353,14 +321,6 @@ def app(filters):
                     except Exception as e:
                         st.error(f"Erro: {str(e)}")
 
-def get_sites():
-    """Busca sites disponíveis"""
-    try:
-        supabase = get_supabase_client()
-        response = supabase.table("sites").select("id, code, name").execute()
-        return response.data
-    except:
-        return []
 
 def download_attachment(bucket, path):
     """Download de anexo"""

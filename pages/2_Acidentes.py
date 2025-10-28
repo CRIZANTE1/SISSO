@@ -9,24 +9,19 @@ from components.cards import create_metric_row, create_bar_chart, create_pie_cha
 from components.filters import apply_filters_to_df
 from managers.supabase_config import get_supabase_client
 
-def fetch_accidents(site_codes=None, start_date=None, end_date=None):
+def fetch_accidents(start_date=None, end_date=None):
     """Busca dados de acidentes"""
     try:
-        supabase = get_supabase_client()
+        from managers.supabase_config import get_service_role_client
+        supabase = get_service_role_client()
         query = supabase.table("accidents").select("*")
         
-        if site_codes:
-            # Busca site_ids baseado nos códigos
-            sites_response = supabase.table("sites").select("id, code").in_("code", site_codes).execute()
-            site_ids = [site['id'] for site in sites_response.data]
-            query = query.in_("site_id", site_ids)
-        
         if start_date:
-            query = query.gte("date", start_date.isoformat())
+            query = query.gte("occurred_at", start_date.isoformat())
         if end_date:
-            query = query.lte("date", end_date.isoformat())
+            query = query.lte("occurred_at", end_date.isoformat())
             
-        data = query.order("date", desc=True).execute().data
+        data = query.order("occurred_at", desc=True).execute().data
         return pd.DataFrame(data)
     except Exception as e:
         st.error(f"Erro ao buscar acidentes: {str(e)}")
@@ -44,7 +39,6 @@ def app(filters):
         # Busca dados
         with st.spinner("Carregando dados de acidentes..."):
             df = fetch_accidents(
-                site_codes=filters.get("sites"),
                 start_date=filters.get("start_date"),
                 end_date=filters.get("end_date")
             )
@@ -57,9 +51,9 @@ def app(filters):
             
             # Métricas principais
             total_accidents = len(df)
-            fatal_accidents = len(df[df['severity'] == 'fatal'])
-            with_injury = len(df[df['severity'] == 'with_injury'])
-            without_injury = len(df[df['severity'] == 'without_injury'])
+            fatal_accidents = len(df[df['type'] == 'fatal'])
+            with_injury = len(df[df['type'] == 'lesao'])
+            without_injury = len(df[df['type'] == 'sem_lesao'])
             total_lost_days = df['lost_days'].sum() if 'lost_days' in df.columns else 0
             
             metrics = [
@@ -95,24 +89,24 @@ def app(filters):
             col1, col2 = st.columns(2)
             
             with col1:
-                # Distribuição por severidade
-                if 'severity' in df.columns:
-                    severity_counts = df['severity'].value_counts()
+                # Distribuição por tipo
+                if 'type' in df.columns:
+                    type_counts = df['type'].value_counts()
                     fig1 = create_pie_chart(
                         pd.DataFrame({
-                            'severity': severity_counts.index,
-                            'count': severity_counts.values
+                            'type': type_counts.index,
+                            'count': type_counts.values
                         }),
-                        'severity',
+                        'type',
                         'count',
-                        'Distribuição por Severidade'
+                        'Distribuição por Tipo'
                     )
                     st.plotly_chart(fig1, use_container_width=True)
             
             with col2:
                 # Acidentes por mês
-                if 'date' in df.columns:
-                    df['month'] = pd.to_datetime(df['date']).dt.to_period('M')
+                if 'occurred_at' in df.columns:
+                    df['month'] = pd.to_datetime(df['occurred_at']).dt.to_period('M')
                     monthly_counts = df.groupby('month').size().reset_index(name='count')
                     monthly_counts['month'] = monthly_counts['month'].astype(str)
                     
@@ -148,17 +142,17 @@ def app(filters):
             col1, col2, col3 = st.columns(3)
             
             with col1:
-                severity_filter = st.selectbox(
-                    "Filtrar por Severidade",
-                    options=["Todas"] + list(df['severity'].unique()) if 'severity' in df.columns else ["Todas"],
-                    key="accident_severity_filter"
+                type_filter = st.selectbox(
+                    "Filtrar por Tipo",
+                    options=["Todos"] + list(df['type'].unique()) if 'type' in df.columns else ["Todos"],
+                    key="accident_type_filter"
                 )
             
             with col2:
-                site_filter = st.selectbox(
-                    "Filtrar por Site",
-                    options=["Todos"] + list(df['site_id'].unique()) if 'site_id' in df.columns else ["Todos"],
-                    key="accident_site_filter"
+                status_filter = st.selectbox(
+                    "Filtrar por Status",
+                    options=["Todos"] + list(df['status'].unique()) if 'status' in df.columns else ["Todos"],
+                    key="accident_status_filter"
                 )
             
             with col3:
@@ -167,17 +161,17 @@ def app(filters):
             # Aplica filtros
             filtered_df = df.copy()
             
-            if severity_filter != "Todas" and 'severity' in filtered_df.columns:
-                filtered_df = filtered_df[filtered_df['severity'] == severity_filter]
+            if type_filter != "Todos" and 'type' in filtered_df.columns:
+                filtered_df = filtered_df[filtered_df['type'] == type_filter]
             
-            if site_filter != "Todos" and 'site_id' in filtered_df.columns:
-                filtered_df = filtered_df[filtered_df['site_id'] == site_filter]
+            if status_filter != "Todos" and 'status' in filtered_df.columns:
+                filtered_df = filtered_df[filtered_df['status'] == status_filter]
             
             if search_term and 'description' in filtered_df.columns:
                 filtered_df = filtered_df[filtered_df['description'].str.contains(search_term, case=False, na=False)]
             
             # Exibe tabela
-            display_cols = ['date', 'severity', 'description', 'lost_days', 'root_cause']
+            display_cols = ['occurred_at', 'type', 'description', 'lost_days', 'root_cause', 'status']
             available_cols = [col for col in display_cols if col in filtered_df.columns]
             
             if available_cols:
@@ -200,7 +194,7 @@ def app(filters):
             for idx, row in df.iterrows():
                 accident_id = row.get('id', idx)
                 description = row.get('description', f'Acidente {accident_id}')[:50]
-                date_str = row.get('date', 'Data não informada')
+                date_str = row.get('occurred_at', 'Data não informada')
                 accident_options[f"{date_str} - {description}..."] = accident_id
             
             selected_accident = st.selectbox(
@@ -255,24 +249,20 @@ def app(filters):
             
             with col1:
                 date_input = st.date_input("Data do Acidente", value=date.today())
-                severity = st.selectbox(
-                    "Severidade",
-                    options=["fatal", "with_injury", "without_injury"],
+                accident_type = st.selectbox(
+                    "Tipo",
+                    options=["fatal", "lesao", "sem_lesao"],
                     format_func=lambda x: {
                         "fatal": "Fatal",
-                        "with_injury": "Com Lesão", 
-                        "without_injury": "Sem Lesão"
+                        "lesao": "Com Lesão", 
+                        "sem_lesao": "Sem Lesão"
                     }[x]
                 )
                 lost_days = st.number_input("Dias Perdidos", min_value=0, value=0)
             
             with col2:
-                # Busca sites disponíveis
-                sites = get_sites()
-                site_options = {f"{site['code']} - {site['name']}": site['id'] for site in sites}
-                selected_site = st.selectbox("Site", options=list(site_options.keys()))
-                site_id = site_options[selected_site] if selected_site else None
-                
+                classification = st.text_input("Classificação")
+                body_part = st.text_input("Parte do Corpo Afetada")
                 root_cause = st.selectbox(
                     "Causa Raiz",
                     options=["Fator Humano", "Fator Material", "Fator Ambiental", 
@@ -292,23 +282,23 @@ def app(filters):
             submitted = st.form_submit_button("💾 Salvar Acidente", type="primary")
             
             if submitted:
-                if not site_id:
-                    st.error("Selecione um site.")
-                elif not description.strip():
+                if not description.strip():
                     st.error("Descrição é obrigatória.")
                 else:
                     try:
-                        supabase = get_supabase_client()
+                        from managers.supabase_config import get_service_role_client
+                        supabase = get_service_role_client()
                         
                         # Insere acidente
                         accident_data = {
-                            "site_id": site_id,
-                            "date": date_input.isoformat(),
-                            "severity": severity,
+                            "occurred_at": date_input.isoformat(),
+                            "type": accident_type,
+                            "classification": classification,
+                            "body_part": body_part,
                             "description": description,
                             "lost_days": lost_days,
                             "root_cause": root_cause,
-                            "corrective_actions": corrective_actions
+                            "status": "fechado"
                         }
                         
                         result = supabase.table("accidents").insert(accident_data).execute()
@@ -337,14 +327,6 @@ def app(filters):
                     except Exception as e:
                         st.error(f"Erro: {str(e)}")
 
-def get_sites():
-    """Busca sites disponíveis"""
-    try:
-        supabase = get_supabase_client()
-        response = supabase.table("sites").select("id, code, name").execute()
-        return response.data
-    except:
-        return []
 
 def download_attachment(bucket, path):
     """Download de anexo"""
