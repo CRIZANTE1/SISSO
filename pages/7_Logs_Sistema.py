@@ -6,7 +6,10 @@ from utils.simple_logger import get_logger
 from managers.supabase_config import test_connection
 import json
 
-def app(filters):
+def app(filters=None):
+    # Busca filtros do session state se não foram passados como parâmetro
+    if filters is None:
+        filters = st.session_state.get('filters', {})
     # Verifica se usuário tem permissão de admin
     from auth.auth_utils import check_permission
     check_permission('admin')

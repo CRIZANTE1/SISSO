@@ -30,7 +30,10 @@ def fetch_nonconformities(site_codes=None, start_date=None, end_date=None):
         st.error(f"Erro ao buscar não conformidades: {str(e)}")
         return pd.DataFrame()
 
-def app(filters):
+def app(filters=None):
+    # Busca filtros do session state se não foram passados como parâmetro
+    if filters is None:
+        filters = st.session_state.get('filters', {})
     st.title("📋 Não Conformidades")
     
     # Tabs para diferentes visualizações

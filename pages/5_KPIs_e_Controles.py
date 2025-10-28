@@ -16,13 +16,20 @@ from services.kpi import (
 from components.cards import create_control_chart, create_trend_chart, create_metric_row
 from components.filters import apply_filters_to_df
 
-def app(filters):
+def app(filters=None):
     st.title("📈 KPIs e Controles Estatísticos")
+    
+    # Busca filtros do session state se não foram passados como parâmetro
+    if filters is None:
+        filters = st.session_state.get('filters', {})
     
     # Busca dados
     with st.spinner("Carregando dados de KPIs..."):
+        from auth.auth_utils import get_user_email
+        user_email = get_user_email()
+        
         df = fetch_kpi_data(
-            site_codes=filters.get("sites"),
+            user_email=user_email,
             start_date=filters.get("start_date"),
             end_date=filters.get("end_date")
         )

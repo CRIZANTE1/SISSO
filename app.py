@@ -24,6 +24,9 @@ def main():
     # Cria filtros na sidebar
     filters = create_filter_sidebar()
     
+    # Armazena filtros no session state para as páginas acessarem
+    st.session_state.filters = filters
+    
     # Define as páginas disponíveis com seções organizadas
     pages = {
         "📊 Análise": [
@@ -48,24 +51,8 @@ def main():
     try:
         logger.info(f"Executando página: {pg}")
         
-        # Importa e executa a página
-        import importlib.util
-        spec = importlib.util.spec_from_file_location("page_module", pg)
-        if spec is None or spec.loader is None:
-            error_msg = f"Não foi possível carregar o módulo {pg}"
-            logger.error(error_msg)
-            raise ImportError(error_msg)
-        page_module = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(page_module)
-        
-        # Executa a função app() da página passando os filtros
-        if hasattr(page_module, 'app'):
-            logger.info(f"Executando página: {pg}")
-            page_module.app(filters)
-        else:
-            error_msg = f"Página {pg} não possui função 'app'"
-            logger.error(error_msg)
-            st.error(error_msg)
+        # O st.navigation retorna um objeto StreamlitPage, então usamos .run()
+        pg.run()
             
     except Exception as e:
         logger.error(f"Erro ao carregar página: {str(e)}")

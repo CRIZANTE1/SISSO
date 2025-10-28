@@ -4,7 +4,10 @@ from services.auth import require_role
 from services.uploads import import_hours_csv, import_accidents_csv
 from managers.supabase_config import get_supabase_client
 
-def app(filters):
+def app(filters=None):
+    # Busca filtros do session state se não foram passados como parâmetro
+    if filters is None:
+        filters = st.session_state.get('filters', {})
     # Verifica se usuário tem permissão de admin
     from auth.auth_utils import check_permission
     check_permission('admin')

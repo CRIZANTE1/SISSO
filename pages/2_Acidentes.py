@@ -27,8 +27,12 @@ def fetch_accidents(start_date=None, end_date=None):
         st.error(f"Erro ao buscar acidentes: {str(e)}")
         return pd.DataFrame()
 
-def app(filters):
+def app(filters=None):
     st.title("🚨 Acidentes")
+    
+    # Busca filtros do session state se não foram passados como parâmetro
+    if filters is None:
+        filters = st.session_state.get('filters', {})
     
     # Tabs para diferentes visualizações
     tab1, tab2, tab3, tab4 = st.tabs(["📊 Análise", "📋 Registros", "📎 Evidências", "➕ Novo Acidente"])

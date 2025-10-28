@@ -7,8 +7,12 @@ from services.kpi import fetch_kpi_data, generate_kpi_summary, calculate_poisson
 from components.cards import create_dashboard_summary, create_metric_row, create_trend_chart, create_control_chart
 from components.filters import apply_filters_to_df
 
-def app(filters):
+def app(filters=None):
     st.title("📊 Visão Geral - SSO")
+    
+    # Busca filtros do session state se não foram passados como parâmetro
+    if filters is None:
+        filters = st.session_state.get('filters', {})
     
     # Busca dados do usuário atual
     from auth.auth_utils import get_user_email
