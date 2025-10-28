@@ -190,36 +190,78 @@ def app(filters):
                     try:
                         supabase = get_supabase_client()
                         
-                        # Cria usuário no Auth
-                        auth_response = supabase.auth.admin.create_user({
-                            "email": email,
-                            "password": "temp_password_123",  # Usuário deve alterar no primeiro login
-                            "email_confirm": True
-                        })
+                        # Verifica se o perfil já existe antes de criar
+                        existing_profile = supabase.table("profiles").select("*").eq("email", email).execute()
                         
-                        if auth_response.user:
-                            # Cria perfil do usuário
+                        if existing_profile.data:
+                            st.warning(f"⚠️ Já existe um perfil para o email {email}. Atualizando perfil existente...")
+                            
+                            # Atualiza perfil existente
                             profile_data = {
-                                "user_id": auth_response.user.id,
-                                "email": email,
                                 "role": role,
                                 "site_ids": site_ids,
                                 "is_active": is_active
                             }
                             
-                            result = supabase.table("profiles").insert(profile_data).execute()
+                            result = supabase.table("profiles").update(profile_data).eq("email", email).execute()
                             
                             if result.data:
-                                st.success("✅ Usuário criado com sucesso!")
-                                st.info("🔑 Senha temporária: temp_password_123 (usuário deve alterar no primeiro login)")
+                                st.success("✅ Perfil atualizado com sucesso!")
                                 st.rerun()
                             else:
-                                st.error("Erro ao criar perfil do usuário.")
+                                st.error("Erro ao atualizar perfil do usuário.")
                         else:
-                            st.error("Erro ao criar usuário no sistema de autenticação.")
+                            # Cria usuário no Auth
+                            auth_response = supabase.auth.admin.create_user({
+                                "email": email,
+                                "password": "temp_password_123",  # Usuário deve alterar no primeiro login
+                                "email_confirm": True
+                            })
+                            
+                            if auth_response.user:
+                                # Cria perfil do usuário
+                                profile_data = {
+                                    "user_id": auth_response.user.id,
+                                    "email": email,
+                                    "role": role,
+                                    "site_ids": site_ids,
+                                    "is_active": is_active
+                                }
+                                
+                                result = supabase.table("profiles").insert(profile_data).execute()
+                                
+                                if result.data:
+                                    st.success("✅ Usuário criado com sucesso!")
+                                    st.info("🔑 Senha temporária: temp_password_123 (usuário deve alterar no primeiro login)")
+                                    st.rerun()
+                                else:
+                                    st.error("Erro ao criar perfil do usuário.")
+                            else:
+                                st.error("Erro ao criar usuário no sistema de autenticação.")
                             
                     except Exception as e:
-                        st.error(f"Erro: {str(e)}")
+                        # Se o erro for de chave duplicada, tenta atualizar o perfil existente
+                        if "duplicate key value violates unique constraint" in str(e):
+                            try:
+                                st.warning(f"⚠️ Perfil já existe para {email}. Atualizando perfil existente...")
+                                
+                                profile_data = {
+                                    "role": role,
+                                    "site_ids": site_ids,
+                                    "is_active": is_active
+                                }
+                                
+                                result = supabase.table("profiles").update(profile_data).eq("email", email).execute()
+                                
+                                if result.data:
+                                    st.success("✅ Perfil atualizado com sucesso!")
+                                    st.rerun()
+                                else:
+                                    st.error("Erro ao atualizar perfil do usuário.")
+                            except Exception as update_error:
+                                st.error(f"Erro ao atualizar perfil: {str(update_error)}")
+                        else:
+                            st.error(f"Erro: {str(e)}")
     
     with tab4:
         st.subheader("Importar Dados")

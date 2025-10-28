@@ -82,6 +82,19 @@ def create_user_profile(email: str) -> Optional[Dict[str, Any]]:
             st.error("Erro: Service Role não configurado. Contate o administrador.")
             return None
         
+        # Verifica se o perfil já existe antes de tentar criar
+        existing_profile = supabase.table("profiles").select("*").eq("email", email).execute()
+        
+        if existing_profile.data:
+            # Perfil já existe, retorna os dados existentes
+            profile = existing_profile.data[0]
+            return {
+                "id": profile["email"],  # Usa email como ID
+                "email": profile.get("email", email),
+                "full_name": profile.get("full_name", get_user_display_name()),
+                "role": profile.get("role", "viewer")
+            }
+        
         # Cria perfil básico
         profile_data = {
             "email": email,
@@ -103,6 +116,25 @@ def create_user_profile(email: str) -> Optional[Dict[str, Any]]:
         return None
         
     except Exception as e:
+        # Se o erro for de chave duplicada, tenta buscar o perfil existente
+        if "duplicate key value violates unique constraint" in str(e):
+            try:
+                from managers.supabase_config import get_service_role_client
+                supabase = get_service_role_client()
+                
+                if supabase:
+                    existing_profile = supabase.table("profiles").select("*").eq("email", email).execute()
+                    if existing_profile.data:
+                        profile = existing_profile.data[0]
+                        return {
+                            "id": profile["email"],
+                            "email": profile.get("email", email),
+                            "full_name": profile.get("full_name", get_user_display_name()),
+                            "role": profile.get("role", "viewer")
+                        }
+            except Exception as retry_error:
+                st.error(f"Erro ao buscar perfil existente: {str(retry_error)}")
+        
         st.error(f"Erro ao criar perfil do usuário: {str(e)}")
         return None
 
