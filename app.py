@@ -45,6 +45,20 @@ st.markdown("""
         padding: 1rem;
         margin: 1rem 0;
     }
+    
+    /* Estilos para navegação superior */
+    .stApp > header {
+        background-color: #1f77b4;
+    }
+    
+    .stApp > header .css-1d391kg {
+        background-color: #1f77b4;
+    }
+    
+    /* Ajustes para o conteúdo principal */
+    .main .block-container {
+        padding-top: 2rem;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -66,46 +80,46 @@ def main():
     # Cria filtros na sidebar
     filters = create_filter_sidebar()
     
-    # Menu de navegação
-    st.markdown("---")
-    
-    # Páginas disponíveis
+    # Define as páginas organizadas em seções
     pages = {
-        "📊 Visão Geral": "pages/1_Visao_Geral.py",
-        "🚨 Acidentes": "pages/2_Acidentes.py", 
-        "⚠️ Quase-Acidentes": "pages/3_Quase_Acidentes.py",
-        "📋 Não Conformidades": "pages/4_Nao_Conformidades.py",
-        "📈 KPIs e Controles": "pages/5_KPIs_e_Controles.py",
-        "⚙️ Admin - Dados Básicos": "pages/6_Admin_Dados_Basicos.py"
+        "📊 Análises": [
+            st.Page("pages/1_Visao_Geral.py", title="Visão Geral", icon="📊"),
+            st.Page("pages/2_Acidentes.py", title="Acidentes", icon="🚨"),
+            st.Page("pages/3_Quase_Acidentes.py", title="Quase-Acidentes", icon="⚠️"),
+            st.Page("pages/4_Nao_Conformidades.py", title="Não Conformidades", icon="📋"),
+        ],
+        "📈 Controles": [
+            st.Page("pages/5_KPIs_e_Controles.py", title="KPIs e Controles", icon="📈"),
+        ],
+        "⚙️ Administração": [
+            st.Page("pages/6_Admin_Dados_Basicos.py", title="Dados Básicos", icon="⚙️"),
+        ]
     }
     
-    # Seleção de página
-    selected_page = st.selectbox(
-        "Navegação",
-        options=list(pages.keys()),
-        key="page_selector"
-    )
+    # Cria navegação com posição superior
+    page = st.navigation(pages, position="top", expanded=True)
     
-    # Carrega página selecionada
-    page_file = pages[selected_page]
-    
+    # Executa a página selecionada
     try:
+        # Obtém o caminho do arquivo da página
+        page_path = str(page)
+        
         # Importa e executa a página
         import importlib.util
-        spec = importlib.util.spec_from_file_location("page_module", page_file)
+        spec = importlib.util.spec_from_file_location("page_module", page_path)
         if spec is None or spec.loader is None:
-            raise ImportError(f"Não foi possível carregar o módulo {page_file}")
+            raise ImportError(f"Não foi possível carregar o módulo {page_path}")
         page_module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(page_module)
         
-        # Executa a função app() da página
+        # Executa a função app() da página passando os filtros
         if hasattr(page_module, 'app'):
             page_module.app(filters)
         else:
-            st.error(f"Página {page_file} não possui função 'app'")
+            st.error(f"Página {page_path} não possui função 'app'")
             
     except Exception as e:
-        st.error(f"Erro ao carregar página {selected_page}: {str(e)}")
+        st.error(f"Erro ao carregar página: {str(e)}")
         st.info("Verifique se o arquivo da página existe e está configurado corretamente.")
 
 if __name__ == "__main__":
