@@ -52,10 +52,14 @@ def check_user_in_database(email: str) -> Optional[Dict[str, Any]]:
     logger = get_logger()
     try:
         logger.info(f"Verificando usuário na base de dados: {email}")
-        supabase = get_supabase_client()
+        
+        # Usa sempre Service Role para evitar problemas de RLS
+        logger.info("Usando Service Role para verificação de usuário")
+        from managers.supabase_config import get_service_role_client
+        supabase = get_service_role_client()
         
         if not supabase:
-            logger.error("Cliente Supabase não disponível")
+            logger.error("Cliente Supabase Service Role não disponível")
             st.error("Erro de conexão com o banco de dados. Tente novamente.")
             return None
         
@@ -76,7 +80,7 @@ def check_user_in_database(email: str) -> Optional[Dict[str, Any]]:
                 "role": profile.get("role", "viewer")
             }
         
-        # Se não encontrou perfil, verifica se há algum problema
+        # Se não encontrou perfil, lista todos os emails para debug
         logger.warning(f"Usuário {email} não está cadastrado no sistema")
         logger.info(f"Query executada com sucesso, mas sem resultados para {email}")
         
@@ -86,43 +90,53 @@ def check_user_in_database(email: str) -> Optional[Dict[str, Any]]:
             if all_profiles.data:
                 logger.info(f"Emails cadastrados no sistema: {[p.get('email') for p in all_profiles.data]}")
             else:
-                logger.warning("Tabela profiles está vazia ou não acessível")
+                logger.warning("Tabela profiles está vazia")
         except Exception as debug_error:
             logger.error(f"Erro ao listar perfis para debug: {debug_error}")
         
-        # FUNÇÃO DE EMERGÊNCIA: Se for o email específico do admin, tenta criar
+        # FUNÇÃO DE EMERGÊNCIA: Se for o email específico do admin, tenta criar perfil
         if email == 'bboycrysforever@gmail.com':
             logger.warning("Tentativa de acesso do admin principal - criando perfil de emergência")
             try:
-                from managers.supabase_config import get_service_role_client
-                service_supabase = get_service_role_client()
+                # Tenta criar perfil admin de emergência
+                profile_data = {
+                    "email": email,
+                    "full_name": "Cristian Ferreira",
+                    "role": "admin",
+                    "status": "ativo"
+                }
                 
-                if service_supabase:
-                    # Cria perfil admin de emergência
-                    profile_data = {
+                logger.info(f"Criando perfil de emergência para {email}")
+                response = supabase.table("profiles").insert(profile_data).execute()
+                
+                if response.data:
+                    logger.info(f"Perfil de emergência criado com sucesso para {email}")
+                    return {
+                        "id": email,
                         "email": email,
                         "full_name": "Cristian Ferreira",
-                        "role": "admin",
-                        "status": "ativo"
+                        "role": "admin"
                     }
-                    
-                    logger.info(f"Criando perfil de emergência para {email}")
-                    response = service_supabase.table("profiles").insert(profile_data).execute()
-                    
-                    if response.data:
-                        logger.info(f"Perfil de emergência criado com sucesso para {email}")
-                        return {
-                            "id": email,
-                            "email": email,
-                            "full_name": "Cristian Ferreira",
-                            "role": "admin"
-                        }
-                    else:
-                        logger.error("Falha ao criar perfil de emergência")
                 else:
-                    logger.error("Service Role não disponível para criação de emergência")
+                    logger.error("Falha ao criar perfil de emergência")
             except Exception as emergency_error:
                 logger.error(f"Erro ao criar perfil de emergência: {emergency_error}")
+                # Se for erro de chave duplicada, significa que o perfil já existe
+                if "duplicate key value violates unique constraint" in str(emergency_error):
+                    logger.info("Perfil já existe, tentando buscar dados existentes")
+                    try:
+                        existing_profile = supabase.table("profiles").select("*").eq("email", email).execute()
+                        if existing_profile.data and len(existing_profile.data) > 0:
+                            profile = existing_profile.data[0]
+                            logger.info(f"Perfil encontrado após erro de duplicação: {email}")
+                            return {
+                                "id": email,
+                                "email": profile.get("email", email),
+                                "full_name": profile.get("full_name", "Cristian Ferreira"),
+                                "role": profile.get("role", "admin")
+                            }
+                    except Exception as fallback_error:
+                        logger.error(f"Erro ao buscar perfil existente: {fallback_error}")
         
         return None
         
