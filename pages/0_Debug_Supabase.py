@@ -6,7 +6,6 @@ import os
 import traceback
 from datetime import datetime
 from managers.supabase_config import get_supabase_client, get_service_role_client, test_connection
-from managers.supabase_config import get_supabase_client
 from utils.supabase_debug import get_debugger
 
 def app(filters=None):
