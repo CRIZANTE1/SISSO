@@ -5,6 +5,7 @@ plotly>=5.18.0
 pandas
 openpyxl==3.1.2
 authlib
+scipy>=1.10.0
 
 # Environment & Configuration
 python-dotenv==1.0.1

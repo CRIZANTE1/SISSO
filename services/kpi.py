@@ -2,7 +2,14 @@ import pandas as pd
 import numpy as np
 from typing import List, Optional, Dict, Any
 from managers.supabase_config import get_supabase_client
-from scipy import stats
+
+# Import scipy opcionalmente
+try:
+    from scipy import stats
+    SCIPY_AVAILABLE = True
+except ImportError:
+    SCIPY_AVAILABLE = False
+    print("⚠️ SciPy não está disponível. Algumas funcionalidades estatísticas podem estar limitadas.")
 
 def fetch_kpi_data(user_email: Optional[str] = None,
                    start_date: Optional[str] = None, 
