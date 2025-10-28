@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 from typing import List, Optional, Dict, Any
-from utils.supabase_client import get_client
+from managers.supabase_config import get_supabase_client
 from scipy import stats
 
 def fetch_kpi_data(user_email: Optional[str] = None,
@@ -9,7 +9,7 @@ def fetch_kpi_data(user_email: Optional[str] = None,
                    end_date: Optional[str] = None) -> pd.DataFrame:
     """Busca dados de KPI do Supabase"""
     try:
-        supabase = get_client()
+        supabase = get_supabase_client()
         query = supabase.table("kpi_monthly").select("*")
         
         if user_email:

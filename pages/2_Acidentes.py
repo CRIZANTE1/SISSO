@@ -7,12 +7,12 @@ from services.kpi import fetch_kpi_data
 from services.uploads import upload_evidence, get_attachments
 from components.cards import create_metric_row, create_bar_chart, create_pie_chart
 from components.filters import apply_filters_to_df
-from utils.supabase_client import get_client
+from managers.supabase_config import get_supabase_client
 
 def fetch_accidents(site_codes=None, start_date=None, end_date=None):
     """Busca dados de acidentes"""
     try:
-        supabase = get_client()
+        supabase = get_supabase_client()
         query = supabase.table("accidents").select("*")
         
         if site_codes:
@@ -298,7 +298,7 @@ def app(filters):
                     st.error("Descrição é obrigatória.")
                 else:
                     try:
-                        supabase = get_client()
+                        supabase = get_supabase_client()
                         
                         # Insere acidente
                         accident_data = {
@@ -340,7 +340,7 @@ def app(filters):
 def get_sites():
     """Busca sites disponíveis"""
     try:
-        supabase = get_client()
+        supabase = get_supabase_client()
         response = supabase.table("sites").select("id, code, name").execute()
         return response.data
     except:
@@ -349,7 +349,7 @@ def get_sites():
 def download_attachment(bucket, path):
     """Download de anexo"""
     try:
-        supabase = get_client()
+        supabase = get_supabase_client()
         response = supabase.storage.from_(bucket).download(path)
         return response
     except:
@@ -358,7 +358,7 @@ def download_attachment(bucket, path):
 def delete_attachment(attachment_id):
     """Remove anexo"""
     try:
-        supabase = get_client()
+        supabase = get_supabase_client()
         supabase.table("attachments").delete().eq("id", attachment_id).execute()
         return True
     except:

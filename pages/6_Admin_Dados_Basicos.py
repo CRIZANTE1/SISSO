@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 from services.auth import require_role
 from services.uploads import import_hours_csv, import_accidents_csv
-from utils.supabase_client import get_client
+from managers.supabase_config import get_supabase_client
 
 def app(filters):
     # Verifica se usuário tem permissão de admin
@@ -59,7 +59,7 @@ def app(filters):
                     st.error("Código e nome são obrigatórios.")
                 else:
                     try:
-                        supabase = get_client()
+                        supabase = get_supabase_client()
                         
                         site_data = {
                             "code": site_code.upper(),
@@ -116,7 +116,7 @@ def app(filters):
                     st.error("Nome é obrigatório.")
                 else:
                     try:
-                        supabase = get_client()
+                        supabase = get_supabase_client()
                         
                         contractor_data = {
                             "name": contractor_name,
@@ -188,7 +188,7 @@ def app(filters):
                     st.error("E-mail é obrigatório.")
                 else:
                     try:
-                        supabase = get_client()
+                        supabase = get_supabase_client()
                         
                         # Cria usuário no Auth
                         auth_response = supabase.auth.admin.create_user({
@@ -298,7 +298,7 @@ def app(filters):
         st.subheader("📊 Estatísticas do Sistema")
         
         try:
-            supabase = get_client()
+            supabase = get_supabase_client()
             
             # Conta registros em cada tabela
             stats = {}
@@ -332,7 +332,7 @@ def app(filters):
 def get_sites():
     """Busca sites disponíveis"""
     try:
-        supabase = get_client()
+        supabase = get_supabase_client()
         response = supabase.table("sites").select("*").execute()
         return response.data
     except:
@@ -341,7 +341,7 @@ def get_sites():
 def get_contractors():
     """Busca contratadas disponíveis"""
     try:
-        supabase = get_client()
+        supabase = get_supabase_client()
         response = supabase.table("contractors").select("*").execute()
         return response.data
     except:
@@ -350,7 +350,7 @@ def get_contractors():
 def get_users():
     """Busca usuários disponíveis"""
     try:
-        supabase = get_client()
+        supabase = get_supabase_client()
         response = supabase.table("profiles").select("*").execute()
         return response.data
     except:

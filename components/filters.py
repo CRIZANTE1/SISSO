@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime, date
 from typing import List, Optional, Dict, Any
-from utils.supabase_client import get_client
+from managers.supabase_config import get_supabase_client
 
 def get_users() -> List[Dict[str, Any]]:
     """Busca lista de usuários disponíveis"""

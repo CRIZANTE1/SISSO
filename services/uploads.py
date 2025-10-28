@@ -2,7 +2,7 @@ import io
 import time
 import streamlit as st
 from typing import Optional, List, Dict, Any
-from utils.supabase_client import get_client
+from managers.supabase_config import get_supabase_client
 import pandas as pd
 
 def upload_evidence(file_bytes: bytes, 

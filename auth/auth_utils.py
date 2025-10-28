@@ -1,5 +1,5 @@
 import streamlit as st
-from utils.supabase_client import get_client
+from managers.supabase_config import get_supabase_client
 from typing import Optional, Dict, Any
 
 def is_oidc_available():
@@ -49,7 +49,7 @@ def authenticate_user() -> bool:
 def check_user_in_database(email: str) -> Optional[Dict[str, Any]]:
     """Verifica se o usuário existe na base de dados e retorna suas informações."""
     try:
-        supabase = get_client()
+        supabase = get_supabase_client()
         
         # Busca perfil do usuário
         response = supabase.table("profiles").select("*").eq("email", email).execute()
@@ -73,7 +73,7 @@ def check_user_in_database(email: str) -> Optional[Dict[str, Any]]:
 def create_user_profile(email: str) -> Optional[Dict[str, Any]]:
     """Cria um novo perfil de usuário com role viewer."""
     try:
-        supabase = get_client()
+        supabase = get_supabase_client()
         
         # Cria perfil básico
         profile_data = {
