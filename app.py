@@ -1,6 +1,10 @@
 import streamlit as st
 from auth.auth_utils import require_login, show_user_info
 from components.filters import create_filter_sidebar
+from utils.logger import get_logger
+
+# Inicializa logger
+logger = get_logger()
 
 # Configuração da página
 st.set_page_config(
@@ -16,6 +20,8 @@ def main():
     st.title("🛡️ Sistema de Monitoramento SSO")
     st.markdown("Segurança e Saúde Ocupacional - Análise de Acidentes e KPIs")
     
+    logger.info("Iniciando aplicação principal")
+    
     # Verifica autenticação
     require_login()
     
@@ -27,9 +33,6 @@ def main():
     
     # Define as páginas organizadas em seções
     pages = {
-        "🔧 Debug": [
-            st.Page("pages/0_Debug_Supabase.py", title="Debug Supabase", icon="🔧"),
-        ],
         "📊 Análises": [
             st.Page("pages/1_Visao_Geral.py", title="Visão Geral", icon="📊"),
             st.Page("pages/2_Acidentes.py", title="Acidentes", icon="🚨"),
@@ -41,6 +44,7 @@ def main():
         ],
         "⚙️ Administração": [
             st.Page("pages/6_Admin_Dados_Basicos.py", title="Dados Básicos", icon="⚙️"),
+            st.Page("pages/7_Logs_Sistema.py", title="Logs do Sistema", icon="📝"),
         ]
     }
     
@@ -51,22 +55,29 @@ def main():
     try:
         # Obtém o caminho do arquivo da página
         page_path = str(page)
+        logger.info(f"Carregando página: {page_path}")
         
         # Importa e executa a página
         import importlib.util
         spec = importlib.util.spec_from_file_location("page_module", page_path)
         if spec is None or spec.loader is None:
-            raise ImportError(f"Não foi possível carregar o módulo {page_path}")
+            error_msg = f"Não foi possível carregar o módulo {page_path}"
+            logger.error(error_msg)
+            raise ImportError(error_msg)
         page_module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(page_module)
         
         # Executa a função app() da página passando os filtros
         if hasattr(page_module, 'app'):
+            logger.info(f"Executando página: {page_path}")
             page_module.app(filters)
         else:
-            st.error(f"Página {page_path} não possui função 'app'")
+            error_msg = f"Página {page_path} não possui função 'app'"
+            logger.error(error_msg)
+            st.error(error_msg)
             
     except Exception as e:
+        logger.error(f"Erro ao carregar página: {str(e)}")
         st.error(f"Erro ao carregar página: {str(e)}")
         st.info("Verifique se o arquivo da página existe e está configurado corretamente.")
 
