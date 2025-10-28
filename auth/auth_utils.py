@@ -1,10 +1,7 @@
 import streamlit as st
 from managers.supabase_config import get_supabase_client
 from typing import Optional, Dict, Any
-from utils.logger import get_logger
-
-# Inicializa logger
-logger = get_logger()
+from utils.simple_logger import get_logger
 
 def is_oidc_available():
     """Verifica se o login OIDC está configurado."""
@@ -52,6 +49,7 @@ def authenticate_user() -> bool:
 
 def check_user_in_database(email: str) -> Optional[Dict[str, Any]]:
     """Verifica se o usuário existe na base de dados e retorna suas informações."""
+    logger = get_logger()
     try:
         logger.info(f"Verificando usuário na base de dados: {email}")
         supabase = get_supabase_client()
@@ -80,6 +78,7 @@ def check_user_in_database(email: str) -> Optional[Dict[str, Any]]:
 
 def create_user_profile(email: str) -> Optional[Dict[str, Any]]:
     """Cria um novo perfil de usuário com role viewer usando Service Role."""
+    logger = get_logger()
     try:
         logger.info(f"Criando perfil para usuário: {email}")
         from managers.supabase_config import get_service_role_client

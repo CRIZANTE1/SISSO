@@ -1,10 +1,7 @@
 import streamlit as st
 from auth.auth_utils import require_login, show_user_info
 from components.filters import create_filter_sidebar
-from utils.logger import get_logger
-
-# Inicializa logger
-logger = get_logger()
+from utils.simple_logger import get_logger
 
 # Configuração da página
 st.set_page_config(
@@ -20,6 +17,7 @@ def main():
     st.title("🛡️ Sistema de Monitoramento SSO")
     st.markdown("Segurança e Saúde Ocupacional - Análise de Acidentes e KPIs")
     
+    logger = get_logger()
     logger.info("Iniciando aplicação principal")
     
     # Verifica autenticação

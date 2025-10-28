@@ -4,13 +4,11 @@ Configuração do Supabase para o Sistema SSO
 import os
 from supabase import create_client, Client
 from typing import Optional
-from utils.logger import get_logger
-
-# Inicializa logger
-logger = get_logger()
+from utils.simple_logger import get_logger
 
 def get_supabase_client() -> Optional[Client]:
     """Cria e retorna cliente Supabase configurado"""
+    logger = get_logger()
     try:
         url = os.environ.get("SUPABASE_URL")
         key = os.environ.get("SUPABASE_ANON_KEY")
@@ -39,6 +37,7 @@ def get_supabase_client() -> Optional[Client]:
 
 def get_service_role_client() -> Optional[Client]:
     """Cria cliente Supabase com service role key (apenas para operações admin)"""
+    logger = get_logger()
     try:
         url = os.environ.get("SUPABASE_URL")
         service_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
@@ -67,6 +66,7 @@ def get_service_role_client() -> Optional[Client]:
 
 def test_connection() -> bool:
     """Testa conexão com Supabase"""
+    logger = get_logger()
     try:
         logger.info("Testando conexão com Supabase")
         client = get_supabase_client()

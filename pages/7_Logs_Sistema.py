@@ -2,7 +2,7 @@
 Página de Logs do Sistema
 """
 import streamlit as st
-from utils.logger import get_logger
+from utils.simple_logger import get_logger
 from managers.supabase_config import test_connection
 import json
 
