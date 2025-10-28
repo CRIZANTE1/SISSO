@@ -1,0 +1,225 @@
+import streamlit as st
+import pandas as pd
+from datetime import datetime, date
+from typing import List, Optional, Dict, Any
+from utils.supabase_client import get_client
+
+def get_users() -> List[Dict[str, Any]]:
+    """Busca lista de usuários disponíveis"""
+    try:
+        supabase = get_client()
+        response = supabase.table("profiles").select("email, full_name, role").order("full_name").execute()
+        return response.data
+    except Exception as e:
+        st.error(f"Erro ao buscar usuários: {str(e)}")
+        return []
+
+def user_filter(allow_multiple: bool = True, 
+                default_all: bool = True,
+                key_prefix: str = "") -> List[str]:
+    """Filtro de usuários"""
+    users = get_users()
+    
+    if not users:
+        return []
+    
+    user_options = {f"{user['full_name'] or 'Usuário'} ({user['role']})": user['email'] for user in users}
+    
+    if allow_multiple:
+        if default_all:
+            default_selection = list(user_options.keys())
+        else:
+            default_selection = []
+        
+        selected_users = st.multiselect(
+            "👥 Usuários",
+            options=list(user_options.keys()),
+            default=default_selection,
+            key=f"{key_prefix}_users"
+        )
+        
+        return [user_options[user] for user in selected_users]
+    else:
+        selected_user = st.selectbox(
+            "👥 Usuário",
+            options=["Todos"] + list(user_options.keys()),
+            key=f"{key_prefix}_user"
+        )
+        
+        if selected_user == "Todos":
+            return [user_options[user] for user in user_options.keys()]
+        else:
+            return [user_options[selected_user]]
+
+def date_range_filter(key_prefix: str = "") -> tuple[Optional[date], Optional[date]]:
+    """Filtro de período"""
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        start_date = st.date_input(
+            "📅 Data Inicial",
+            value=None,
+            key=f"{key_prefix}_start_date"
+        )
+    
+    with col2:
+        end_date = st.date_input(
+            "📅 Data Final",
+            value=None,
+            key=f"{key_prefix}_end_date"
+        )
+    
+    return start_date, end_date
+
+def severity_filter(key_prefix: str = "") -> List[str]:
+    """Filtro de severidade"""
+    severity_options = {
+        "Fatal": "fatal",
+        "Com Lesão": "with_injury", 
+        "Sem Lesão": "without_injury",
+        "Quase-Acidente": "near_miss",
+        "Não Conformidade": "nonconformity"
+    }
+    
+    selected_severities = st.multiselect(
+        "⚠️ Severidade",
+        options=list(severity_options.keys()),
+        default=list(severity_options.keys()),
+        key=f"{key_prefix}_severity"
+    )
+    
+    return [severity_options[sev] for sev in selected_severities]
+
+def event_type_filter(key_prefix: str = "") -> List[str]:
+    """Filtro de tipo de evento"""
+    event_types = [
+        "Acidente Fatal",
+        "Acidente com Lesão",
+        "Acidente sem Lesão", 
+        "Quase-Acidente",
+        "Não Conformidade"
+    ]
+    
+    selected_types = st.multiselect(
+        "📋 Tipo de Evento",
+        options=event_types,
+        default=event_types,
+        key=f"{key_prefix}_event_type"
+    )
+    
+    return selected_types
+
+def root_cause_filter(key_prefix: str = "") -> List[str]:
+    """Filtro de causa raiz"""
+    root_causes = [
+        "Fator Humano",
+        "Fator Material", 
+        "Fator Ambiental",
+        "Fator Organizacional",
+        "Fator Técnico",
+        "Outros"
+    ]
+    
+    selected_causes = st.multiselect(
+        "🔍 Causa Raiz",
+        options=root_causes,
+        default=root_causes,
+        key=f"{key_prefix}_root_cause"
+    )
+    
+    return selected_causes
+
+def period_filter(key_prefix: str = "") -> str:
+    """Filtro de período (últimos N meses)"""
+    period_options = {
+        "Últimos 3 meses": 3,
+        "Últimos 6 meses": 6,
+        "Últimos 12 meses": 12,
+        "Últimos 24 meses": 24,
+        "Todos os períodos": 0
+    }
+    
+    selected_period = st.selectbox(
+        "📊 Período",
+        options=list(period_options.keys()),
+        key=f"{key_prefix}_period"
+    )
+    
+    return period_options[selected_period]
+
+def create_filter_sidebar() -> Dict[str, Any]:
+    """Cria sidebar com todos os filtros"""
+    with st.sidebar:
+        st.header("🔍 Filtros")
+        
+        # Usuários
+        selected_users = user_filter()
+        
+        # Período
+        months_back = period_filter()
+        
+        # Data específica
+        start_date, end_date = date_range_filter()
+        
+        # Severidade
+        selected_severities = severity_filter()
+        
+        # Tipo de evento
+        selected_event_types = event_type_filter()
+        
+        # Causa raiz
+        selected_root_causes = root_cause_filter()
+        
+        return {
+            "users": selected_users,
+            "months_back": months_back,
+            "start_date": start_date,
+            "end_date": end_date,
+            "severities": selected_severities,
+            "event_types": selected_event_types,
+            "root_causes": selected_root_causes
+        }
+
+def apply_filters_to_df(df: pd.DataFrame, filters: Dict[str, Any]) -> pd.DataFrame:
+    """Aplica filtros a um DataFrame"""
+    filtered_df = df.copy()
+    
+    # Filtro por usuários
+    if filters.get("users") and "created_by" in filtered_df.columns:
+        filtered_df = filtered_df[filtered_df["created_by"].isin(filters["users"])]
+    
+    # Filtro por período (últimos N meses)
+    if filters.get("months_back", 0) > 0:
+        if "period" in filtered_df.columns:
+            # Assume que period está no formato YYYY-MM-DD
+            latest_period = pd.to_datetime(filtered_df["period"]).max()
+            cutoff_date = latest_period - pd.DateOffset(months=filters["months_back"])
+            filtered_df = filtered_df[pd.to_datetime(filtered_df["period"]) >= cutoff_date]
+    
+    # Filtro por data
+    if filters.get("start_date") and "occurred_at" in filtered_df.columns:
+        filtered_df = filtered_df[filtered_df["occurred_at"] >= filters["start_date"]]
+    
+    if filters.get("end_date") and "occurred_at" in filtered_df.columns:
+        filtered_df = filtered_df[filtered_df["occurred_at"] <= filters["end_date"]]
+    
+    # Filtro por data para não conformidades
+    if filters.get("start_date") and "opened_at" in filtered_df.columns:
+        filtered_df = filtered_df[filtered_df["opened_at"] >= filters["start_date"]]
+    
+    if filters.get("end_date") and "opened_at" in filtered_df.columns:
+        filtered_df = filtered_df[filtered_df["opened_at"] <= filters["end_date"]]
+    
+    # Filtro por tipo de acidente
+    if filters.get("severities") and "type" in filtered_df.columns:
+        filtered_df = filtered_df[filtered_df["type"].isin(filters["severities"])]
+    
+    # Filtro por severidade de não conformidade
+    if filters.get("severities") and "severity" in filtered_df.columns:
+        filtered_df = filtered_df[filtered_df["severity"].isin(filters["severities"])]
+    
+    # Filtro por causa raiz
+    if filters.get("root_causes") and "root_cause" in filtered_df.columns:
+        filtered_df = filtered_df[filtered_df["root_cause"].isin(filters["root_causes"])]
+    
+    return filtered_df

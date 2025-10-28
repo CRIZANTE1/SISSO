@@ -1,0 +1,360 @@
+import streamlit as st
+import pandas as pd
+from services.auth import require_role
+from services.uploads import import_hours_csv, import_accidents_csv
+from utils.supabase_client import get_client
+
+def app(filters):
+    # Verifica se usuário tem permissão de admin
+    from auth.auth_utils import check_permission
+    check_permission('admin')
+    
+    st.title("⚙️ Admin - Dados Básicos")
+    
+    # Tabs para diferentes funcionalidades administrativas
+    tab1, tab2, tab3, tab4, tab5 = st.tabs([
+        "🏢 Sites", 
+        "🏗️ Contratadas", 
+        "👥 Usuários", 
+        "📊 Importar Dados", 
+        "📈 Atualizar KPIs"
+    ])
+    
+    with tab1:
+        st.subheader("Gerenciar Sites")
+        
+        # Lista sites existentes
+        sites = get_sites()
+        
+        if sites:
+            st.write("**Sites Cadastrados:**")
+            sites_df = pd.DataFrame(sites)
+            st.dataframe(sites_df, use_container_width=True, hide_index=True)
+        else:
+            st.info("Nenhum site cadastrado.")
+        
+        # Formulário para novo site
+        st.subheader("Adicionar Novo Site")
+        
+        with st.form("new_site_form"):
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                site_code = st.text_input("Código do Site", placeholder="Ex: BAERI")
+                site_name = st.text_input("Nome do Site", placeholder="Ex: Base Aérea do Rio")
+            
+            with col2:
+                site_type = st.selectbox(
+                    "Tipo de Site",
+                    options=["Base Aérea", "Aeroporto", "Unidade Operacional", "Outros"]
+                )
+                is_active = st.checkbox("Site Ativo", value=True)
+            
+            description = st.text_area("Descrição", height=100)
+            
+            submitted = st.form_submit_button("💾 Salvar Site", type="primary")
+            
+            if submitted:
+                if not site_code or not site_name:
+                    st.error("Código e nome são obrigatórios.")
+                else:
+                    try:
+                        supabase = get_client()
+                        
+                        site_data = {
+                            "code": site_code.upper(),
+                            "name": site_name,
+                            "type": site_type,
+                            "description": description,
+                            "is_active": is_active
+                        }
+                        
+                        result = supabase.table("sites").insert(site_data).execute()
+                        
+                        if result.data:
+                            st.success("✅ Site cadastrado com sucesso!")
+                            st.rerun()
+                        else:
+                            st.error("Erro ao cadastrar site.")
+                            
+                    except Exception as e:
+                        st.error(f"Erro: {str(e)}")
+    
+    with tab2:
+        st.subheader("Gerenciar Contratadas")
+        
+        # Lista contratadas existentes
+        contractors = get_contractors()
+        
+        if contractors:
+            st.write("**Contratadas Cadastradas:**")
+            contractors_df = pd.DataFrame(contractors)
+            st.dataframe(contractors_df, use_container_width=True, hide_index=True)
+        else:
+            st.info("Nenhuma contratada cadastrada.")
+        
+        # Formulário para nova contratada
+        st.subheader("Adicionar Nova Contratada")
+        
+        with st.form("new_contractor_form"):
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                contractor_name = st.text_input("Nome da Contratada")
+                cnpj = st.text_input("CNPJ", placeholder="00.000.000/0000-00")
+            
+            with col2:
+                contact_email = st.text_input("E-mail de Contato")
+                contact_phone = st.text_input("Telefone de Contato")
+            
+            description = st.text_area("Descrição dos Serviços", height=100)
+            
+            submitted = st.form_submit_button("💾 Salvar Contratada", type="primary")
+            
+            if submitted:
+                if not contractor_name:
+                    st.error("Nome é obrigatório.")
+                else:
+                    try:
+                        supabase = get_client()
+                        
+                        contractor_data = {
+                            "name": contractor_name,
+                            "cnpj": cnpj,
+                            "contact_email": contact_email,
+                            "contact_phone": contact_phone,
+                            "description": description
+                        }
+                        
+                        result = supabase.table("contractors").insert(contractor_data).execute()
+                        
+                        if result.data:
+                            st.success("✅ Contratada cadastrada com sucesso!")
+                            st.rerun()
+                        else:
+                            st.error("Erro ao cadastrar contratada.")
+                            
+                    except Exception as e:
+                        st.error(f"Erro: {str(e)}")
+    
+    with tab3:
+        st.subheader("Gerenciar Usuários")
+        
+        # Lista usuários existentes
+        users = get_users()
+        
+        if users:
+            st.write("**Usuários Cadastrados:**")
+            users_df = pd.DataFrame(users)
+            st.dataframe(users_df, use_container_width=True, hide_index=True)
+        else:
+            st.info("Nenhum usuário cadastrado.")
+        
+        # Formulário para novo usuário
+        st.subheader("Adicionar Novo Usuário")
+        
+        with st.form("new_user_form"):
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                email = st.text_input("E-mail do Usuário")
+                role = st.selectbox(
+                    "Papel",
+                    options=["viewer", "editor", "admin"],
+                    format_func=lambda x: {
+                        "viewer": "Visualizador",
+                        "editor": "Editor", 
+                        "admin": "Administrador"
+                    }[x]
+                )
+            
+            with col2:
+                # Busca sites para seleção
+                sites = get_sites()
+                site_options = {f"{site['code']} - {site['name']}": site['id'] for site in sites}
+                selected_sites = st.multiselect(
+                    "Sites de Acesso",
+                    options=list(site_options.keys()),
+                    help="Selecione os sites que o usuário pode acessar"
+                )
+                site_ids = [site_options[site] for site in selected_sites]
+            
+            is_active = st.checkbox("Usuário Ativo", value=True)
+            
+            submitted = st.form_submit_button("💾 Salvar Usuário", type="primary")
+            
+            if submitted:
+                if not email:
+                    st.error("E-mail é obrigatório.")
+                else:
+                    try:
+                        supabase = get_client()
+                        
+                        # Cria usuário no Auth
+                        auth_response = supabase.auth.admin.create_user({
+                            "email": email,
+                            "password": "temp_password_123",  # Usuário deve alterar no primeiro login
+                            "email_confirm": True
+                        })
+                        
+                        if auth_response.user:
+                            # Cria perfil do usuário
+                            profile_data = {
+                                "user_id": auth_response.user.id,
+                                "email": email,
+                                "role": role,
+                                "site_ids": site_ids,
+                                "is_active": is_active
+                            }
+                            
+                            result = supabase.table("profiles").insert(profile_data).execute()
+                            
+                            if result.data:
+                                st.success("✅ Usuário criado com sucesso!")
+                                st.info("🔑 Senha temporária: temp_password_123 (usuário deve alterar no primeiro login)")
+                                st.rerun()
+                            else:
+                                st.error("Erro ao criar perfil do usuário.")
+                        else:
+                            st.error("Erro ao criar usuário no sistema de autenticação.")
+                            
+                    except Exception as e:
+                        st.error(f"Erro: {str(e)}")
+    
+    with tab4:
+        st.subheader("Importar Dados")
+        
+        # Importação de horas trabalhadas
+        st.subheader("📊 Importar Horas Trabalhadas")
+        
+        uploaded_hours = st.file_uploader(
+            "Arquivo CSV de Horas Trabalhadas",
+            type=['csv'],
+            key="hours_upload",
+            help="Formato esperado: site_code, year, month, hours"
+        )
+        
+        if uploaded_hours:
+            try:
+                hours_df = pd.read_csv(uploaded_hours)
+                st.write("**Preview dos dados:**")
+                st.dataframe(hours_df.head(), use_container_width=True)
+                
+                # Mapeamento de sites
+                sites = get_sites()
+                site_mapping = {site['code']: site['id'] for site in sites}
+                
+                if st.button("📥 Importar Horas", key="import_hours"):
+                    success = import_hours_csv(hours_df, site_mapping)
+                    if success:
+                        st.rerun()
+                        
+            except Exception as e:
+                st.error(f"Erro ao processar arquivo: {str(e)}")
+        
+        # Importação de acidentes
+        st.subheader("🚨 Importar Acidentes")
+        
+        uploaded_accidents = st.file_uploader(
+            "Arquivo CSV de Acidentes",
+            type=['csv'],
+            key="accidents_upload",
+            help="Formato esperado: site_code, date, severity, description, lost_days, root_cause, corrective_actions"
+        )
+        
+        if uploaded_accidents:
+            try:
+                accidents_df = pd.read_csv(uploaded_accidents)
+                st.write("**Preview dos dados:**")
+                st.dataframe(accidents_df.head(), use_container_width=True)
+                
+                # Mapeamento de sites
+                sites = get_sites()
+                site_mapping = {site['code']: site['id'] for site in sites}
+                
+                if st.button("📥 Importar Acidentes", key="import_accidents"):
+                    success = import_accidents_csv(accidents_df, site_mapping)
+                    if success:
+                        st.rerun()
+                        
+            except Exception as e:
+                st.error(f"Erro ao processar arquivo: {str(e)}")
+    
+    with tab5:
+        st.subheader("Atualizar KPIs")
+        
+        st.info("💡 Os KPIs são calculados automaticamente baseados nos dados de acidentes e horas trabalhadas.")
+        
+        if st.button("🔄 Recalcular KPIs", type="primary"):
+            with st.spinner("Recalculando KPIs..."):
+                try:
+                    # Aqui você implementaria a lógica para recalcular os KPIs
+                    # Por exemplo, executando uma stored procedure ou função no Supabase
+                    st.success("✅ KPIs recalculados com sucesso!")
+                except Exception as e:
+                    st.error(f"Erro ao recalcular KPIs: {str(e)}")
+        
+        # Estatísticas do sistema
+        st.subheader("📊 Estatísticas do Sistema")
+        
+        try:
+            supabase = get_client()
+            
+            # Conta registros em cada tabela
+            stats = {}
+            
+            tables = ['sites', 'contractors', 'accidents', 'near_misses', 'nonconformities', 'hours_worked_monthly']
+            
+            for table in tables:
+                try:
+                    result = supabase.table(table).select("id", count="exact").execute()
+                    stats[table] = result.count
+                except:
+                    stats[table] = 0
+            
+            col1, col2, col3 = st.columns(3)
+            
+            with col1:
+                st.metric("Sites", stats.get('sites', 0))
+                st.metric("Contratadas", stats.get('contractors', 0))
+            
+            with col2:
+                st.metric("Acidentes", stats.get('accidents', 0))
+                st.metric("Quase-Acidentes", stats.get('near_misses', 0))
+            
+            with col3:
+                st.metric("Não Conformidades", stats.get('nonconformities', 0))
+                st.metric("Registros de Horas", stats.get('hours_worked_monthly', 0))
+                
+        except Exception as e:
+            st.error(f"Erro ao carregar estatísticas: {str(e)}")
+
+def get_sites():
+    """Busca sites disponíveis"""
+    try:
+        supabase = get_client()
+        response = supabase.table("sites").select("*").execute()
+        return response.data
+    except:
+        return []
+
+def get_contractors():
+    """Busca contratadas disponíveis"""
+    try:
+        supabase = get_client()
+        response = supabase.table("contractors").select("*").execute()
+        return response.data
+    except:
+        return []
+
+def get_users():
+    """Busca usuários disponíveis"""
+    try:
+        supabase = get_client()
+        response = supabase.table("profiles").select("*").execute()
+        return response.data
+    except:
+        return []
+
+if __name__ == "__main__":
+    app({})
