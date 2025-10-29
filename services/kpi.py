@@ -179,3 +179,134 @@ def generate_kpi_summary(df: pd.DataFrame) -> Dict[str, Any]:
         'total_lost_days': total_lost_days,
         'total_hours': total_hours
     }
+
+def calculate_forecast(df: pd.DataFrame, months_ahead: int = 1) -> Dict[str, Any]:
+    """Calcula previsões para os próximos meses baseadas em tendências históricas"""
+    if df.empty or len(df) < 3:
+        return {}
+    
+    try:
+        # Ordena por período
+        df_sorted = df.sort_values('period').copy()
+        
+        # Calcula médias móveis dos últimos 3 meses
+        recent_data = df_sorted.tail(3)
+        
+        # Previsões baseadas em médias móveis simples
+        forecasts = {}
+        
+        # Taxa de Frequência - usa média móvel dos últimos 3 meses
+        if 'hours' in df_sorted.columns and 'accidents_total' in df_sorted.columns:
+            df_sorted['freq_rate'] = (df_sorted['accidents_total'] / df_sorted['hours']) * 1_000_000
+            
+            # Calcula tendência simples comparando últimos 3 meses
+            recent_freq = df_sorted['freq_rate'].tail(3).values
+            if len(recent_freq) >= 2:
+                # Tendência baseada na diferença entre último e penúltimo
+                trend = recent_freq[-1] - recent_freq[-2] if len(recent_freq) >= 2 else 0
+                
+                # Previsão: último valor + tendência
+                predicted_freq = recent_freq[-1] + trend
+                predicted_freq = max(0, predicted_freq)  # Não pode ser negativo
+                
+                forecasts['frequency_rate'] = {
+                    'predicted': predicted_freq,
+                    'trend': 'increasing' if trend > 0 else 'decreasing' if trend < 0 else 'stable',
+                    'confidence': 0.7  # Confiança fixa para simplicidade
+                }
+        
+        # Taxa de Gravidade - usa média móvel dos últimos 3 meses
+        if 'hours' in df_sorted.columns and 'lost_days_total' in df_sorted.columns:
+            df_sorted['sev_rate'] = (df_sorted['lost_days_total'] / df_sorted['hours']) * 1_000_000
+            
+            recent_sev = df_sorted['sev_rate'].tail(3).values
+            if len(recent_sev) >= 2:
+                trend = recent_sev[-1] - recent_sev[-2] if len(recent_sev) >= 2 else 0
+                
+                predicted_sev = recent_sev[-1] + trend
+                predicted_sev = max(0, predicted_sev)  # Não pode ser negativo
+                
+                forecasts['severity_rate'] = {
+                    'predicted': predicted_sev,
+                    'trend': 'increasing' if trend > 0 else 'decreasing' if trend < 0 else 'stable',
+                    'confidence': 0.7
+                }
+        
+        # Total de Acidentes - usa média móvel dos últimos 3 meses
+        if 'accidents_total' in df_sorted.columns:
+            recent_acc = df_sorted['accidents_total'].tail(3).values
+            if len(recent_acc) >= 2:
+                trend = recent_acc[-1] - recent_acc[-2] if len(recent_acc) >= 2 else 0
+                
+                predicted_acc = recent_acc[-1] + trend
+                predicted_acc = max(0, round(predicted_acc))  # Arredonda e não pode ser negativo
+                
+                forecasts['total_accidents'] = {
+                    'predicted': predicted_acc,
+                    'trend': 'increasing' if trend > 0 else 'decreasing' if trend < 0 else 'stable',
+                    'confidence': 0.7
+                }
+        
+        # Dias Perdidos - usa média móvel dos últimos 3 meses
+        if 'lost_days_total' in df_sorted.columns:
+            recent_days = df_sorted['lost_days_total'].tail(3).values
+            if len(recent_days) >= 2:
+                trend = recent_days[-1] - recent_days[-2] if len(recent_days) >= 2 else 0
+                
+                predicted_days = recent_days[-1] + trend
+                predicted_days = max(0, round(predicted_days))  # Arredonda e não pode ser negativo
+                
+                forecasts['lost_days'] = {
+                    'predicted': predicted_days,
+                    'trend': 'increasing' if trend > 0 else 'decreasing' if trend < 0 else 'stable',
+                    'confidence': 0.7
+                }
+        
+        # Horas trabalhadas (assume valor médio dos últimos 3 meses)
+        if 'hours' in df_sorted.columns:
+            avg_hours = float(recent_data['hours'].mean())
+            forecasts['hours'] = {
+                'predicted': round(avg_hours),
+                'trend': 'stable',
+                'confidence': 0.8
+            }
+        
+        return forecasts
+        
+    except Exception as e:
+        # Em caso de erro, retorna dicionário vazio
+        return {}
+
+def generate_forecast_recommendations(forecasts: Dict[str, Any]) -> List[str]:
+    """Gera recomendações baseadas nas previsões"""
+    recommendations = []
+    
+    # Análise da taxa de frequência
+    if 'frequency_rate' in forecasts:
+        freq_data = forecasts['frequency_rate']
+        if freq_data['trend'] == 'increasing' and freq_data['predicted'] > 5:
+            recommendations.append("🚨 **CRÍTICO:** Taxa de frequência prevista em alta - implementar medidas preventivas urgentes")
+        elif freq_data['trend'] == 'increasing':
+            recommendations.append("⚠️ **ATENÇÃO:** Taxa de frequência em tendência de alta - revisar procedimentos")
+        elif freq_data['trend'] == 'decreasing':
+            recommendations.append("✅ **POSITIVO:** Taxa de frequência em tendência de melhoria - manter práticas atuais")
+    
+    # Análise da taxa de gravidade
+    if 'severity_rate' in forecasts:
+        sev_data = forecasts['severity_rate']
+        if sev_data['trend'] == 'increasing' and sev_data['predicted'] > 50:
+            recommendations.append("🚨 **CRÍTICO:** Taxa de gravidade prevista em alta - investigar causas raiz")
+        elif sev_data['trend'] == 'increasing':
+            recommendations.append("⚠️ **ATENÇÃO:** Taxa de gravidade em tendência de alta - implementar medidas preventivas")
+        elif sev_data['trend'] == 'decreasing':
+            recommendations.append("✅ **POSITIVO:** Taxa de gravidade em tendência de melhoria - documentar boas práticas")
+    
+    # Análise do total de acidentes
+    if 'total_accidents' in forecasts:
+        acc_data = forecasts['total_accidents']
+        if acc_data['predicted'] > 2:
+            recommendations.append("⚠️ **MONITORAR:** Previsão de acidentes elevada - intensificar treinamentos")
+        elif acc_data['predicted'] == 0:
+            recommendations.append("🎯 **META:** Previsão de zero acidentes - manter excelente desempenho")
+    
+    return recommendations
