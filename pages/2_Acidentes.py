@@ -8,15 +8,7 @@ from services.uploads import upload_evidence, get_attachments
 from components.cards import create_metric_row, create_bar_chart, create_pie_chart
 from components.filters import apply_filters_to_df
 from managers.supabase_config import get_supabase_client
-from utils.nbr_14280_classification import (
-    AccidentSeverity, 
-    SEVERITY_OPTIONS, 
-    classify_accident_severity,
-    validate_accident_data,
-    get_severity_description,
-    get_severity_color,
-    get_severity_icon
-)
+# Imports da NBR 14280 removidos
 
 def calculate_work_days_until_accident(accident_date, employee_email=None):
     """
@@ -131,26 +123,30 @@ def app(filters=None):
         filters = st.session_state.get('filters', {})
     
     # Tabs para diferentes visualizações
-    tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["📊 Análise", "📋 Registros", "📎 Evidências", "➕ Novo Acidente", "📋 NBR 14280", "📚 Instruções"])
+    tab1, tab2, tab3, tab4, tab5 = st.tabs(["📊 Análise", "📋 Registros", "📎 Evidências", "➕ Novo Acidente", "📚 Instruções"])
+    
+    # Busca dados uma única vez no início
+    with st.spinner("Carregando dados de acidentes..."):
+        df = fetch_accidents(
+            start_date=filters.get("start_date"),
+            end_date=filters.get("end_date")
+        )
+    
+    if df.empty:
+        st.warning("Nenhum acidente encontrado com os filtros aplicados.")
+        work_days_analysis = {}
+        df_with_work_days = df
+    else:
+        # Aplica filtros adicionais
+        df = apply_filters_to_df(df, filters)
+        
+        # Análise de dias trabalhados até acidente
+        work_days_analysis, df_with_work_days = get_work_days_analysis(df)
     
     with tab1:
         st.subheader("Análise de Acidentes")
         
-        # Busca dados
-        with st.spinner("Carregando dados de acidentes..."):
-            df = fetch_accidents(
-                start_date=filters.get("start_date"),
-                end_date=filters.get("end_date")
-            )
-        
-        if df.empty:
-            st.warning("Nenhum acidente encontrado com os filtros aplicados.")
-        else:
-            # Aplica filtros adicionais
-            df = apply_filters_to_df(df, filters)
-            
-            # Análise de dias trabalhados até acidente
-            work_days_analysis, df_with_work_days = get_work_days_analysis(df)
+        if not df.empty:
             
             # Métricas principais
             total_accidents = len(df)
@@ -363,27 +359,13 @@ def app(filters=None):
             if search_term and 'description' in filtered_df.columns:
                 filtered_df = filtered_df[filtered_df['description'].astype(str).str.contains(search_term, case=False, na=False)]
             
-            # Exibe tabela com classificação NBR 14280
-            display_cols = ['occurred_at', 'type', 'severity_nbr', 'description', 'lost_days', 'root_cause', 'status']
+            # Exibe tabela de acidentes
+            display_cols = ['occurred_at', 'type', 'description', 'lost_days', 'root_cause', 'status']
             available_cols = [col for col in display_cols if col in filtered_df.columns]
             
             # Adiciona coluna de dias trabalhados se disponível
             if 'work_days_until_accident' in filtered_df.columns:
                 available_cols.append('work_days_until_accident')
-            
-            # Adiciona coluna de classificação legível se disponível
-            if 'severity_nbr' in filtered_df.columns:
-                def format_severity(x):
-                    try:
-                        if x:
-                            return f"{get_severity_icon(AccidentSeverity(x))} {x.title()}"
-                        return "⚪ Não classificado"
-                    except:
-                        return "⚪ Não classificado"
-                
-                filtered_df['severity_display'] = filtered_df['severity_nbr'].apply(format_severity)
-                if 'severity_display' not in available_cols:
-                    available_cols.append('severity_display')
             
             if available_cols:
                 st.dataframe(
@@ -490,34 +472,9 @@ def app(filters=None):
                             "Fator Organizacional", "Fator Técnico", "Outros"]
                 )
                 
-                # Campos NBR 14280
+                # Campos adicionais
                 cat_number = st.text_input("Número da CAT", placeholder="Ex: 2024001234")
                 communication_date = st.date_input("Data de Comunicação", value=date.today())
-            
-            # Classificação NBR 14280 (calculada automaticamente)
-            if accident_type in ['fatal', 'lesao'] or is_fatal:
-                severity = classify_accident_severity(lost_days, is_fatal)
-                if severity:
-                    severity_desc = get_severity_description(severity)
-                    severity_icon = get_severity_icon(severity)
-                    severity_color = get_severity_color(severity)
-                    
-                    st.markdown(f"**Classificação NBR 14280:** {severity_icon} {severity_desc}")
-                    
-                    # Validação dos dados
-                    validation = validate_accident_data(accident_type, lost_days, is_fatal)
-                    
-                    if validation['warnings']:
-                        for warning in validation['warnings']:
-                            st.warning(f"⚠️ {warning}")
-                    
-                    if validation['errors']:
-                        for error in validation['errors']:
-                            st.error(f"❌ {error}")
-                    
-                    if validation['recommendations']:
-                        for rec in validation['recommendations']:
-                            st.info(f"💡 {rec}")
             
             # Campos de investigação
             st.subheader("🔍 Investigação do Acidente")
@@ -551,11 +508,7 @@ def app(filters=None):
                         from managers.supabase_config import get_service_role_client
                         supabase = get_service_role_client()
                         
-                        # Classifica severidade conforme NBR 14280
-                        severity = classify_accident_severity(lost_days, is_fatal)
-                        severity_value = severity.value if severity else None
-                        
-                        # Insere acidente com campos NBR 14280
+                        # Insere acidente
                         accident_data = {
                             "occurred_at": date_input.isoformat(),
                             "type": accident_type,
@@ -565,9 +518,7 @@ def app(filters=None):
                             "lost_days": lost_days,
                             "root_cause": root_cause,
                             "status": "fechado",
-                            # Campos NBR 14280
                             "is_fatal": is_fatal,
-                            "severity_nbr": severity_value,
                             "cat_number": cat_number if cat_number else None,
                             "communication_date": communication_date.isoformat() if communication_date else None,
                             "investigation_completed": investigation_completed,
@@ -626,201 +577,6 @@ def delete_attachment(attachment_id):
         return False
 
     with tab5:
-        st.subheader("📋 Análise NBR 14280 - Classificação de Acidentes")
-        
-        # Busca dados com classificação NBR 14280
-        with st.spinner("Carregando dados NBR 14280..."):
-            try:
-                from managers.supabase_config import get_service_role_client
-                supabase = get_service_role_client()
-                
-                # Busca dados da view NBR 14280
-                query = supabase.table("accidents_nbr_14280").select("*")
-                
-                if filters.get("start_date"):
-                    query = query.gte("occurred_at", filters["start_date"].isoformat())
-                if filters.get("end_date"):
-                    query = query.lte("occurred_at", filters["end_date"].isoformat())
-                    
-                data = query.order("occurred_at", desc=True).execute().data
-                df_nbr = pd.DataFrame(data)
-                
-            except Exception as e:
-                st.error(f"Erro ao buscar dados NBR 14280: {str(e)}")
-                df_nbr = pd.DataFrame()
-        
-        if df_nbr.empty:
-            st.warning("Nenhum acidente encontrado com classificação NBR 14280.")
-        else:
-            # Aplica filtros adicionais
-            df_nbr = apply_filters_to_df(df_nbr, filters)
-            
-            # Métricas NBR 14280
-            st.subheader("📊 Métricas NBR 14280")
-            
-            col1, col2, col3, col4 = st.columns(4)
-            
-            with col1:
-                leve_count = len(df_nbr[df_nbr['severity_nbr'] == 'leve'])
-                st.metric("🟢 Leves", leve_count, help="1-15 dias perdidos")
-            
-            with col2:
-                moderado_count = len(df_nbr[df_nbr['severity_nbr'] == 'moderado'])
-                st.metric("🟡 Moderados", moderado_count, help="16-30 dias perdidos")
-            
-            with col3:
-                grave_count = len(df_nbr[df_nbr['severity_nbr'] == 'grave'])
-                st.metric("🟠 Graves", grave_count, help="31+ dias perdidos")
-            
-            with col4:
-                fatal_count = len(df_nbr[df_nbr['severity_nbr'] == 'fatal'])
-                st.metric("🔴 Fatais", fatal_count, help="Acidentes fatais")
-            
-            # Gráfico de distribuição por severidade
-            st.subheader("📈 Distribuição por Severidade NBR 14280")
-            
-            if 'severity_nbr' in df_nbr.columns:
-                severity_counts = df_nbr['severity_nbr'].value_counts()
-                
-                # Cria gráfico com cores específicas
-                colors = []
-                for severity in severity_counts.index:
-                    if severity == 'leve':
-                        colors.append('#28a745')
-                    elif severity == 'moderado':
-                        colors.append('#ffc107')
-                    elif severity == 'grave':
-                        colors.append('#fd7e14')
-                    elif severity == 'fatal':
-                        colors.append('#dc3545')
-                    else:
-                        colors.append('#6c757d')
-                
-                fig = px.pie(
-                    values=severity_counts.values,
-                    names=[f"{get_severity_icon(AccidentSeverity(s))} {s.title()}" for s in severity_counts.index],
-                    title="Distribuição por Severidade conforme NBR 14280",
-                    color_discrete_sequence=colors
-                )
-                fig.update_layout(height=500)
-                st.plotly_chart(fig, use_container_width=True)
-            
-            # Análise de dias perdidos por severidade
-            st.subheader("📅 Dias Perdidos por Severidade")
-            
-            if 'lost_days' in df_nbr.columns and 'severity_nbr' in df_nbr.columns:
-                severity_days = df_nbr.groupby('severity_nbr')['lost_days'].agg(['sum', 'mean', 'count']).reset_index()
-                severity_days.columns = ['Severidade', 'Total Dias', 'Média Dias', 'Quantidade']
-                
-                # Adiciona ícones
-                severity_days['Severidade_Icon'] = severity_days['Severidade'].apply(
-                    lambda x: f"{get_severity_icon(AccidentSeverity(x))} {x.title()}" if x else "⚪ Não classificado"
-                )
-                
-                st.dataframe(
-                    severity_days[['Severidade_Icon', 'Quantidade', 'Total Dias', 'Média Dias']],
-                    use_container_width=True,
-                    hide_index=True
-                )
-            
-            # Tabela de acidentes com classificação NBR 14280
-            st.subheader("📋 Acidentes Classificados NBR 14280")
-            
-            # Filtros específicos para NBR 14280
-            col1, col2, col3 = st.columns(3)
-            
-            with col1:
-                severity_filter = st.selectbox(
-                    "Filtrar por Severidade",
-                    options=["Todas"] + list(df_nbr['severity_nbr'].unique()) if 'severity_nbr' in df_nbr.columns else ["Todas"],
-                    key="nbr_severity_filter"
-                )
-            
-            with col2:
-                investigation_filter = st.selectbox(
-                    "Filtrar por Investigação",
-                    options=["Todas", "Concluída", "Pendente"],
-                    key="nbr_investigation_filter"
-                )
-            
-            with col3:
-                cat_filter = st.text_input("Filtrar por CAT", key="nbr_cat_filter")
-            
-            # Aplica filtros
-            filtered_nbr = df_nbr.copy()
-            
-            if severity_filter != "Todas" and 'severity_nbr' in filtered_nbr.columns:
-                filtered_nbr = filtered_nbr[filtered_nbr['severity_nbr'] == severity_filter]
-            
-            if investigation_filter == "Concluída" and 'investigation_completed' in filtered_nbr.columns:
-                filtered_nbr = filtered_nbr[filtered_nbr['investigation_completed'] == True]
-            elif investigation_filter == "Pendente" and 'investigation_completed' in filtered_nbr.columns:
-                filtered_nbr = filtered_nbr[filtered_nbr['investigation_completed'] == False]
-            
-            if cat_filter and 'cat_number' in filtered_nbr.columns:
-                filtered_nbr = filtered_nbr[filtered_nbr['cat_number'].str.contains(cat_filter, case=False, na=False)]
-            
-            # Exibe tabela
-            display_cols = [
-                'occurred_at', 'type', 'severity_nbr', 'lost_days', 
-                'cat_number', 'investigation_completed', 'description'
-            ]
-            available_cols = [col for col in display_cols if col in filtered_nbr.columns]
-            
-            if available_cols:
-                # Adiciona colunas formatadas
-                if 'severity_nbr' in filtered_nbr.columns:
-                    filtered_nbr['severity_display'] = filtered_nbr['severity_nbr'].apply(
-                        lambda x: f"{get_severity_icon(AccidentSeverity(x))} {x.title()}" if x else "⚪ Não classificado"
-                    )
-                    available_cols.append('severity_display')
-                
-                if 'investigation_completed' in filtered_nbr.columns:
-                    filtered_nbr['investigation_status'] = filtered_nbr['investigation_completed'].apply(
-                        lambda x: "✅ Concluída" if x else "⏳ Pendente"
-                    )
-                    available_cols.append('investigation_status')
-                
-                st.dataframe(
-                    filtered_nbr[available_cols],
-                    use_container_width=True,
-                    hide_index=True
-                )
-            
-            # Estatísticas de conformidade
-            st.subheader("📊 Conformidade NBR 14280")
-            
-            col1, col2, col3 = st.columns(3)
-            
-            with col1:
-                total_accidents = len(df_nbr)
-                classified_accidents = len(df_nbr[df_nbr['severity_nbr'].notna()])
-                classification_rate = (classified_accidents / total_accidents * 100) if total_accidents > 0 else 0
-                st.metric(
-                    "Taxa de Classificação", 
-                    f"{classification_rate:.1f}%",
-                    help="Percentual de acidentes classificados conforme NBR 14280"
-                )
-            
-            with col2:
-                investigated_accidents = len(df_nbr[df_nbr['investigation_completed'] == True]) if 'investigation_completed' in df_nbr.columns else 0
-                investigation_rate = (investigated_accidents / total_accidents * 100) if total_accidents > 0 else 0
-                st.metric(
-                    "Taxa de Investigação", 
-                    f"{investigation_rate:.1f}%",
-                    help="Percentual de acidentes com investigação concluída"
-                )
-            
-            with col3:
-                cat_accidents = len(df_nbr[df_nbr['cat_number'].notna()]) if 'cat_number' in df_nbr.columns else 0
-                cat_rate = (cat_accidents / total_accidents * 100) if total_accidents > 0 else 0
-                st.metric(
-                    "Taxa de CAT", 
-                    f"{cat_rate:.1f}%",
-                    help="Percentual de acidentes com CAT registrada"
-                )
-    
-    with tab6:
         # Importa e exibe instruções
         from components.instructions import create_instructions_page, get_accidents_instructions
         

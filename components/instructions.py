@@ -1,10 +1,10 @@
 import streamlit as st
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Any
 
 def create_instructions_page(
     title: str,
     description: str,
-    sections: List[Dict[str, any]],
+    sections: List[Dict[str, Any]],
     tips: Optional[List[str]] = None,
     warnings: Optional[List[str]] = None,
     references: Optional[List[str]] = None
@@ -115,7 +115,7 @@ def get_accidents_instructions():
                 "title": "Funcionalidades Principais",
                 "icon": "🔧",
                 "content": """
-                - **Registro de Acidentes**: Cadastro completo com classificação NBR 14280
+                - **Registro de Acidentes**: Cadastro completo de acidentes
                 - **Análise de Dias Trabalhados**: Cálculo de dias trabalhados até o acidente
                 - **Classificação por Gravidade**: Leve, Moderado, Grave e Fatal
                 - **Gestão de Evidências**: Upload e organização de documentos
@@ -131,7 +131,7 @@ def get_accidents_instructions():
                     "Acesse a aba 'Novo Acidente'",
                     "Preencha os dados básicos (data, tipo, descrição)",
                     "Informe os dias perdidos e se é fatal",
-                    "Adicione a classificação NBR 14280",
+                    "Adicione a classificação do acidente",
                     "Preencha os dados de investigação",
                     "Faça upload das evidências",
                     "Clique em 'Salvar Acidente'"
@@ -162,15 +162,14 @@ def get_accidents_instructions():
             },
             {
                 "type": "info",
-                "title": "Classificação NBR 14280",
+                "title": "Classificação de Acidentes",
                 "icon": "📋",
                 "content": """
-                **Leve**: 1-15 dias perdidos  
-                **Moderado**: 16-30 dias perdidos  
-                **Grave**: 31+ dias perdidos  
                 **Fatal**: Acidentes que resultam em morte
+                **Com Lesão**: Acidentes que resultam em lesões físicas
+                **Sem Lesão**: Acidentes que não resultam em lesões físicas
                 
-                A classificação é feita automaticamente pelo sistema baseada nos dias perdidos.
+                A classificação é baseada no tipo de acidente e dias perdidos.
                 """
             },
             {
@@ -208,7 +207,7 @@ def get_accidents_instructions():
         "references": [
             "NR-5: Comissão Interna de Prevenção de Acidentes",
             "NR-7: Programa de Controle Médico de Saúde Ocupacional", 
-            "NBR 14280: Cadastro de Acidente do Trabalho",
+            "NR-4: Serviços Especializados em Engenharia de Segurança",
             "ISO 45001: Sistema de Gestão de SST"
         ]
     }

@@ -158,39 +158,39 @@ def app(filters=None):
     
         # === RESUMO MENSAL SIMPLIFICADO ===
         st.subheader("📅 Resumo Mensal")
-    
-    if not df.empty:
-        # Tabela simplificada
-        period_summary = df.groupby('period').agg({
-            'accidents_total': 'sum',
-            'fatalities': 'sum',
-            'with_injury': 'sum',
-            'lost_days_total': 'sum',
-            'hours': 'sum'
-        }).reset_index()
         
-        # Calcula taxas
-        period_summary['freq_rate'] = (period_summary['accidents_total'] / period_summary['hours'] * 1_000_000).round(0)
-        period_summary['sev_rate'] = (period_summary['lost_days_total'] / period_summary['hours'] * 1_000_000).round(0)
+        if not df.empty:
+            # Tabela simplificada
+            period_summary = df.groupby('period').agg({
+                'accidents_total': 'sum',
+                'fatalities': 'sum',
+                'with_injury': 'sum',
+                'lost_days_total': 'sum',
+                'hours': 'sum'
+            }).reset_index()
+            
+            # Calcula taxas
+            period_summary['freq_rate'] = (period_summary['accidents_total'] / period_summary['hours'] * 1_000_000).round(0)
+            period_summary['sev_rate'] = (period_summary['lost_days_total'] / period_summary['hours'] * 1_000_000).round(0)
+            
+            # Renomeia colunas
+            period_summary.columns = [
+                    'Período', 'Acidentes', 'Fatais', 'Com Lesão', 
+                    'Dias Perdidos', 'Horas', 'Taxa Freq.', 'Taxa Grav.'
+            ]
+            
+            # Formata números
+            for col in ['Acidentes', 'Fatais', 'Com Lesão', 'Dias Perdidos', 'Taxa Freq.', 'Taxa Grav.']:
+                period_summary[col] = period_summary[col].astype(int)
+            
+            period_summary['Horas'] = period_summary['Horas'].round(0).astype(int)
+            
+            st.dataframe(
+                period_summary,
+                use_container_width=True,
+                hide_index=True
+            )
         
-        # Renomeia colunas
-        period_summary.columns = [
-                'Período', 'Acidentes', 'Fatais', 'Com Lesão', 
-                'Dias Perdidos', 'Horas', 'Taxa Freq.', 'Taxa Grav.'
-        ]
-        
-        # Formata números
-        for col in ['Acidentes', 'Fatais', 'Com Lesão', 'Dias Perdidos', 'Taxa Freq.', 'Taxa Grav.']:
-            period_summary[col] = period_summary[col].astype(int)
-        
-        period_summary['Horas'] = period_summary['Horas'].round(0).astype(int)
-        
-        st.dataframe(
-            period_summary,
-            use_container_width=True,
-            hide_index=True
-        )
-    
         # === ALERTAS SIMPLIFICADOS ===
         st.subheader("🚨 Alertas")
         
