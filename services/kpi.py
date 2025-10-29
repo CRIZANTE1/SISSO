@@ -34,13 +34,13 @@ def fetch_kpi_data(user_email: Optional[str] = None,
 
 def calculate_frequency_rate(accidents: int, hours_worked: float) -> float:
     """Calcula taxa de frequência (acidentes por 1M de horas)"""
-    if hours_worked == 0:
+    if hours_worked is None or hours_worked == 0:
         return 0.0
     return (accidents / hours_worked) * 1_000_000
 
 def calculate_severity_rate(lost_days: int, hours_worked: float) -> float:
     """Calcula taxa de gravidade (dias perdidos por 1M de horas)"""
-    if hours_worked == 0:
+    if hours_worked is None or hours_worked == 0:
         return 0.0
     return (lost_days / hours_worked) * 1_000_000
 
@@ -162,11 +162,12 @@ def generate_kpi_summary(df: pd.DataFrame) -> Dict[str, Any]:
             prev_data['hours']
         )
         
-        freq_change = ((freq_rate - prev_freq_rate) / prev_freq_rate * 100) if prev_freq_rate > 0 else 0
-        sev_change = ((sev_rate - prev_sev_rate) / prev_sev_rate * 100) if prev_sev_rate > 0 else 0
+        # Evita variações artificiais quando o período anterior é zero ou inexistente
+        freq_change = ((freq_rate - prev_freq_rate) / prev_freq_rate * 100) if prev_freq_rate and prev_freq_rate > 0 else None
+        sev_change = ((sev_rate - prev_sev_rate) / prev_sev_rate * 100) if prev_sev_rate and prev_sev_rate > 0 else None
     else:
-        freq_change = 0
-        sev_change = 0
+        freq_change = None
+        sev_change = None
     
     return {
         'latest_period': latest_period,

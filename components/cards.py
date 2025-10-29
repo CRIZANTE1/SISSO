@@ -255,7 +255,8 @@ def create_dashboard_summary(kpi_data: Dict[str, Any]) -> None:
             "change": kpi_data.get('frequency_change'),
             "change_label": "vs mês anterior",
             "icon": "📈",
-            "color": "danger" if kpi_data.get('frequency_change', 0) > 0 else "success"
+            # Cor neutra quando não há base de comparação
+            "color": ("info" if kpi_data.get('frequency_change') is None else ("danger" if kpi_data.get('frequency_change', 0) > 0 else "success"))
         },
         {
             "title": "Taxa de Gravidade", 
@@ -263,7 +264,7 @@ def create_dashboard_summary(kpi_data: Dict[str, Any]) -> None:
             "change": kpi_data.get('severity_change'),
             "change_label": "vs mês anterior",
             "icon": "⚠️",
-            "color": "danger" if kpi_data.get('severity_change', 0) > 0 else "success"
+            "color": ("info" if kpi_data.get('severity_change') is None else ("danger" if kpi_data.get('severity_change', 0) > 0 else "success"))
         },
         {
             "title": "Total de Acidentes",
