@@ -195,11 +195,9 @@ def calculate_forecast(df: pd.DataFrame, months_ahead: int = 1) -> Dict[str, Any
         # Previsões baseadas em médias móveis simples
         forecasts = {}
         
-        # Taxa de Frequência - converte horas para dias trabalhados (8h/dia)
+        # Taxa de Frequência - usa média móvel dos últimos 3 meses
         if 'hours' in df_sorted.columns and 'accidents_total' in df_sorted.columns:
-            # Converte horas para dias trabalhados (assumindo 8 horas por dia)
-            df_sorted['days_worked'] = df_sorted['hours'] / 8
-            df_sorted['freq_rate'] = (df_sorted['accidents_total'] / df_sorted['days_worked']) * 1_000_000
+            df_sorted['freq_rate'] = (df_sorted['accidents_total'] / df_sorted['hours']) * 1_000_000
             
             # Calcula tendência simples comparando últimos 3 meses
             recent_freq = df_sorted['freq_rate'].tail(3).values
@@ -217,10 +215,9 @@ def calculate_forecast(df: pd.DataFrame, months_ahead: int = 1) -> Dict[str, Any
                     'confidence': 0.7  # Confiança fixa para simplicidade
                 }
         
-        # Taxa de Gravidade - converte horas para dias trabalhados (8h/dia)
+        # Taxa de Gravidade - usa média móvel dos últimos 3 meses
         if 'hours' in df_sorted.columns and 'lost_days_total' in df_sorted.columns:
-            # Usa os dias trabalhados já calculados
-            df_sorted['sev_rate'] = (df_sorted['lost_days_total'] / df_sorted['days_worked']) * 1_000_000
+            df_sorted['sev_rate'] = (df_sorted['lost_days_total'] / df_sorted['hours']) * 1_000_000
             
             recent_sev = df_sorted['sev_rate'].tail(3).values
             if len(recent_sev) >= 2:
