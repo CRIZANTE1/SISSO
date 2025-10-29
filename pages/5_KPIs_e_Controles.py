@@ -63,100 +63,100 @@ def app(filters=None):
         tab1, tab2, tab3 = st.tabs(["📊 Análises", "📚 Metodologia", "🔧 Configurações"])
         
         with tab1:
-        # Métricas principais com interpretações
-        freq_interpretation = kpi_summary.get('frequency_interpretation', {})
-        sev_interpretation = kpi_summary.get('severity_interpretation', {})
-        
-        metrics = [
-            {
-                "title": "Taxa de Frequência (TF)",
-                "value": f"{kpi_summary.get('frequency_rate', 0):.2f}",
-                "change": kpi_summary.get('frequency_change'),
-                "change_label": "vs período anterior",
-                "icon": freq_interpretation.get('icon', '📈'),
-                "color": freq_interpretation.get('color', 'normal'),
-                "subtitle": freq_interpretation.get('classification', 'N/A')
-            },
-            {
-                "title": "Taxa de Gravidade (TG)",
-                "value": f"{kpi_summary.get('severity_rate', 0):.2f}",
-                "change": kpi_summary.get('severity_change'),
-                "change_label": "vs período anterior",
-                "icon": sev_interpretation.get('icon', '⚠️'),
-                "color": sev_interpretation.get('color', 'normal'),
-                "subtitle": sev_interpretation.get('classification', 'N/A')
-            },
-            {
-                "title": "Total de Acidentes",
-                "value": kpi_summary.get('total_accidents', 0),
-                "icon": "🚨",
-                "color": "normal"
-            },
-            {
-                "title": "Dias Perdidos",
-                "value": kpi_summary.get('total_lost_days', 0),
-                "icon": "📅",
-                "color": "warning"
-            }
-        ]
-        
-        create_metric_row(metrics)
-        
-        # Gráficos de tendência
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            fig1 = create_trend_chart(
-                df,
-                "period",
-                "freq_rate_per_million",
-                "Evolução da Taxa de Frequência"
-            )
-            st.plotly_chart(fig1, use_container_width=True)
-        
-        with col2:
-            fig2 = create_trend_chart(
-                df,
-                "period", 
-                "sev_rate_per_million",
-                "Evolução da Taxa de Gravidade"
-            )
-            st.plotly_chart(fig2, use_container_width=True)
-        
-        # Análise por site
-        if 'site_code' in df.columns:
-            st.subheader("KPIs por Site")
+            # Métricas principais com interpretações
+            freq_interpretation = kpi_summary.get('frequency_interpretation', {})
+            sev_interpretation = kpi_summary.get('severity_interpretation', {})
             
-            site_analysis = df.groupby('site_code').agg({
-                'accidents_total': 'sum',
-                'lost_days_total': 'sum',
-                'hours': 'sum'
-            }).reset_index()
+            metrics = [
+                {
+                    "title": "Taxa de Frequência (TF)",
+                    "value": f"{kpi_summary.get('frequency_rate', 0):.2f}",
+                    "change": kpi_summary.get('frequency_change'),
+                    "change_label": "vs período anterior",
+                    "icon": freq_interpretation.get('icon', '📈'),
+                    "color": freq_interpretation.get('color', 'normal'),
+                    "subtitle": freq_interpretation.get('classification', 'N/A')
+                },
+                {
+                    "title": "Taxa de Gravidade (TG)",
+                    "value": f"{kpi_summary.get('severity_rate', 0):.2f}",
+                    "change": kpi_summary.get('severity_change'),
+                    "change_label": "vs período anterior",
+                    "icon": sev_interpretation.get('icon', '⚠️'),
+                    "color": sev_interpretation.get('color', 'normal'),
+                    "subtitle": sev_interpretation.get('classification', 'N/A')
+                },
+                {
+                    "title": "Total de Acidentes",
+                    "value": kpi_summary.get('total_accidents', 0),
+                    "icon": "🚨",
+                    "color": "normal"
+                },
+                {
+                    "title": "Dias Perdidos",
+                    "value": kpi_summary.get('total_lost_days', 0),
+                    "icon": "📅",
+                    "color": "warning"
+                }
+            ]
             
-            site_analysis['freq_rate'] = (site_analysis['accidents_total'] / site_analysis['hours']) * 1_000_000
-            site_analysis['sev_rate'] = (site_analysis['lost_days_total'] / site_analysis['hours']) * 1_000_000
+            create_metric_row(metrics)
             
+            # Gráficos de tendência
             col1, col2 = st.columns(2)
             
             with col1:
-                fig3 = px.bar(
-                    site_analysis,
-                    x='site_code',
-                    y='freq_rate',
-                    title='Taxa de Frequência por Site',
-                    labels={'freq_rate': 'Taxa de Frequência', 'site_code': 'Site'}
+                fig1 = create_trend_chart(
+                    df,
+                    "period",
+                    "freq_rate_per_million",
+                    "Evolução da Taxa de Frequência"
                 )
-                st.plotly_chart(fig3, use_container_width=True)
+                st.plotly_chart(fig1, use_container_width=True)
             
             with col2:
-                fig4 = px.bar(
-                    site_analysis,
-                    x='site_code',
-                    y='sev_rate',
-                    title='Taxa de Gravidade por Site',
-                    labels={'sev_rate': 'Taxa de Gravidade', 'site_code': 'Site'}
+                fig2 = create_trend_chart(
+                    df,
+                    "period", 
+                    "sev_rate_per_million",
+                    "Evolução da Taxa de Gravidade"
                 )
-                st.plotly_chart(fig4, use_container_width=True)
+                st.plotly_chart(fig2, use_container_width=True)
+            
+            # Análise por site
+            if 'site_code' in df.columns:
+                st.subheader("KPIs por Site")
+                
+                site_analysis = df.groupby('site_code').agg({
+                    'accidents_total': 'sum',
+                    'lost_days_total': 'sum',
+                    'hours': 'sum'
+                }).reset_index()
+                
+                site_analysis['freq_rate'] = (site_analysis['accidents_total'] / site_analysis['hours']) * 1_000_000
+                site_analysis['sev_rate'] = (site_analysis['lost_days_total'] / site_analysis['hours']) * 1_000_000
+                
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    fig3 = px.bar(
+                        site_analysis,
+                        x='site_code',
+                        y='freq_rate',
+                        title='Taxa de Frequência por Site',
+                        labels={'freq_rate': 'Taxa de Frequência', 'site_code': 'Site'}
+                    )
+                    st.plotly_chart(fig3, use_container_width=True)
+                
+                with col2:
+                    fig4 = px.bar(
+                        site_analysis,
+                        x='site_code',
+                        y='sev_rate',
+                        title='Taxa de Gravidade por Site',
+                        labels={'sev_rate': 'Taxa de Gravidade', 'site_code': 'Site'}
+                    )
+                    st.plotly_chart(fig4, use_container_width=True)
     
     with tab2:
         st.subheader("Controles Estatísticos")
