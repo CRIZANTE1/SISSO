@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 from typing import List, Optional, Dict, Any
 from managers.supabase_config import get_supabase_client
+import streamlit as st
 
 # Import scipy opcionalmente
 try:
