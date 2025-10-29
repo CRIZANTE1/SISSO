@@ -145,19 +145,19 @@ def app(filters=None):
     tab1, tab2, tab3, tab4, tab5 = st.tabs(["📊 Análise", "📋 Registros", "📎 Evidências", "➕ Novo Acidente", "📚 Instruções"])
     
     # Busca dados uma única vez no início
-        with st.spinner("Carregando dados de acidentes..."):
-            df = fetch_accidents(
-                start_date=filters.get("start_date"),
-                end_date=filters.get("end_date")
-            )
-        
-        if df.empty:
-            st.warning("Nenhum acidente encontrado com os filtros aplicados.")
+    with st.spinner("Carregando dados de acidentes..."):
+        df = fetch_accidents(
+            start_date=filters.get("start_date"),
+            end_date=filters.get("end_date")
+        )
+    
+    if df.empty:
+        st.warning("Nenhum acidente encontrado com os filtros aplicados.")
         work_days_analysis = {}
         df_with_work_days = df
-        else:
-            # Aplica filtros adicionais
-            df = apply_filters_to_df(df, filters)
+    else:
+        # Aplica filtros adicionais
+        df = apply_filters_to_df(df, filters)
         
         # Análise de dias trabalhados até acidente
         work_days_analysis, df_with_work_days = get_work_days_analysis(df)
@@ -438,7 +438,7 @@ def app(filters=None):
                 
                 # Busca evidências
                 try:
-                attachments = get_attachments("accident", str(accident_id))
+                    attachments = get_attachments("accident", str(accident_id))
                 except:
                     attachments = []
                 
@@ -457,13 +457,13 @@ def app(filters=None):
                             if st.button("📥 Download", key=f"download_{attachment.get('id', 'unknown')}"):
                                 try:
                                     file_data = download_attachment(attachment.get('bucket', ''), attachment.get('path', ''))
-                                if file_data:
-                                    st.download_button(
-                                        "💾 Baixar Arquivo",
-                                        file_data,
+                                    if file_data:
+                                        st.download_button(
+                                            "💾 Baixar Arquivo",
+                                            file_data,
                                             attachment.get('filename', 'arquivo'),
                                             key=f"download_btn_{attachment.get('id', 'unknown')}"
-                                    )
+                                        )
                                 except:
                                     st.error("Erro ao baixar arquivo")
                         
@@ -471,8 +471,8 @@ def app(filters=None):
                             if st.button("🗑️ Remover", key=f"remove_{attachment.get('id', 'unknown')}"):
                                 try:
                                     if delete_attachment(attachment.get('id', '')):
-                                    st.success("Evidência removida!")
-                                    st.rerun()
+                                        st.success("Evidência removida!")
+                                        st.rerun()
                                 except:
                                     st.error("Erro ao remover evidência")
                 else:
