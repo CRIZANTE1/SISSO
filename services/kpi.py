@@ -235,6 +235,11 @@ def generate_kpi_summary(df: pd.DataFrame) -> Dict[str, Any]:
     total_fatalities = df.get('fatalities', pd.Series([0] * len(df))).sum()
     total_debited_days = df.get('debited_days', pd.Series([0] * len(df))).sum()
     
+    # Verifica se as horas podem estar em minutos (se o valor for muito baixo)
+    # Se as horas forem menores que 1000, assume que estão em minutos
+    if total_hours > 0 and total_hours < 1000:
+        total_hours = total_hours / 60  # Converte minutos para horas
+    
     # Cálculos acumulados para todo o período
     freq_rate = calculate_frequency_rate(total_accidents, total_hours)
     sev_rate = calculate_severity_rate(total_lost_days, total_hours, total_debited_days)
@@ -452,11 +457,16 @@ def analyze_accidents_by_category(accidents_df: pd.DataFrame) -> Dict[str, Any]:
         accidents_df['year_month'] = accidents_df['occurred_at'].dt.to_period('M')
     
     # Análise por tipo de acidente
-    type_analysis = accidents_df.groupby('type').agg({
+    agg_dict = {
         'id': 'count',
-        'lost_days': 'sum',
-        'is_fatal': 'sum'
-    }).rename(columns={'id': 'count'})
+        'lost_days': 'sum'
+    }
+    
+    # Adiciona is_fatal apenas se a coluna existir
+    if 'is_fatal' in accidents_df.columns:
+        agg_dict['is_fatal'] = 'sum'
+    
+    type_analysis = accidents_df.groupby('type').agg(agg_dict).rename(columns={'id': 'count'})
     
     # Análise por classificação
     classification_analysis = accidents_df.groupby('classification').agg({
@@ -478,11 +488,16 @@ def analyze_accidents_by_category(accidents_df: pd.DataFrame) -> Dict[str, Any]:
     
     # Análise temporal (últimos 12 meses)
     if 'year_month' in accidents_df.columns:
-        temporal_analysis = accidents_df.groupby('year_month').agg({
+        temporal_agg_dict = {
             'id': 'count',
-            'lost_days': 'sum',
-            'is_fatal': 'sum'
-        }).rename(columns={'id': 'count'})
+            'lost_days': 'sum'
+        }
+        
+        # Adiciona is_fatal apenas se a coluna existir
+        if 'is_fatal' in accidents_df.columns:
+            temporal_agg_dict['is_fatal'] = 'sum'
+            
+        temporal_analysis = accidents_df.groupby('year_month').agg(temporal_agg_dict).rename(columns={'id': 'count'})
     else:
         temporal_analysis = pd.DataFrame()
     
