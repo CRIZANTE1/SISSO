@@ -44,7 +44,7 @@ def app(filters=None):
     df = apply_filters_to_df(df, filters)
     
     # Tabs para diferentes análises
-    tab1, tab2, tab3, tab4, tab5 = st.tabs(["📊 KPIs Básicos", "📈 Controles Estatísticos", "📊 Monitoramento de Tendências", "🔮 Previsões", "📋 Relatórios"])
+    tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["📊 KPIs Básicos", "📈 Controles Estatísticos", "📊 Monitoramento de Tendências", "🔮 Previsões", "📋 Relatórios", "📚 Instruções"])
     
     with tab1:
         st.subheader("KPIs Básicos de Segurança")
@@ -1177,6 +1177,20 @@ def app(filters=None):
         if st.button("💾 Salvar Configurações"):
             st.success("✅ Configurações salvas com sucesso!")
             st.info("ℹ️ As configurações serão aplicadas na próxima análise.")
+    
+    with tab6:
+        # Importa e exibe instruções
+        from components.instructions import create_instructions_page, get_kpis_instructions
+        
+        instructions_data = get_kpis_instructions()
+        create_instructions_page(
+            title=instructions_data["title"],
+            description=instructions_data["description"],
+            sections=instructions_data["sections"],
+            tips=instructions_data["tips"],
+            warnings=instructions_data["warnings"],
+            references=instructions_data["references"]
+        )
 
 if __name__ == "__main__":
     app({})

@@ -8,6 +8,100 @@ from services.uploads import upload_evidence, get_attachments
 from components.cards import create_metric_row, create_bar_chart, create_pie_chart
 from components.filters import apply_filters_to_df
 from managers.supabase_config import get_supabase_client
+from utils.nbr_14280_classification import (
+    AccidentSeverity, 
+    SEVERITY_OPTIONS, 
+    classify_accident_severity,
+    validate_accident_data,
+    get_severity_description,
+    get_severity_color,
+    get_severity_icon
+)
+
+def calculate_work_days_until_accident(accident_date, employee_email=None):
+    """
+    Calcula quantos dias o funcionário trabalhou até o acidente acontecer.
+    Baseado na data de criação do perfil (admissão) e horas trabalhadas mensais.
+    """
+    try:
+        from managers.supabase_config import get_service_role_client
+        supabase = get_service_role_client()
+        
+        # Busca data de admissão do funcionário (created_at do perfil)
+        if employee_email:
+            profile_response = supabase.table("profiles").select("created_at").eq("email", employee_email).execute()
+            if profile_response and hasattr(profile_response, 'data') and profile_response.data:
+                admission_date = pd.to_datetime(profile_response.data[0]['created_at']).date()
+            else:
+                # Se não encontrar o funcionário, usa a data do acidente como referência
+                admission_date = accident_date
+        else:
+            # Se não especificar funcionário, usa a data do acidente como referência
+            admission_date = accident_date
+        
+        # Calcula dias corridos entre admissão e acidente
+        days_since_admission = (accident_date - admission_date).days
+        
+        # Busca horas trabalhadas mensais para calcular dias úteis
+        if employee_email:
+            hours_response = supabase.table("hours_worked_monthly").select("*").eq("created_by", employee_email).execute()
+            if hours_response and hasattr(hours_response, 'data') and hours_response.data:
+                # Calcula dias úteis baseado nas horas trabalhadas
+                total_hours = sum([float(row.get('hours', 0)) for row in hours_response.data])
+                # Assume 8 horas por dia útil
+                work_days = total_hours / 8
+                return min(work_days, days_since_admission)
+        
+        # Se não encontrar dados de horas, retorna dias corridos
+        return days_since_admission
+        
+    except Exception as e:
+        st.error(f"Erro ao calcular dias trabalhados: {str(e)}")
+        return 0
+
+def get_work_days_analysis(df):
+    """
+    Analisa os dias trabalhados até acidentes e retorna estatísticas.
+    """
+    if df.empty or 'occurred_at' not in df.columns:
+        return {}, df
+    
+    try:
+        # Cria uma cópia para não modificar o DataFrame original
+        df_work = df.copy()
+        
+        # Converte data para datetime
+        df_work['occurred_at'] = pd.to_datetime(df_work['occurred_at'])
+        df_work['accident_date'] = df_work['occurred_at'].dt.date
+        
+        # Calcula dias trabalhados para cada acidente
+        work_days_list = []
+        for idx, row in df_work.iterrows():
+            work_days = calculate_work_days_until_accident(
+                row['accident_date'], 
+                row.get('created_by')
+            )
+            work_days_list.append(work_days)
+        
+        df_work['work_days_until_accident'] = work_days_list
+        
+        # Estatísticas
+        analysis = {
+            'total_accidents': len(df_work),
+            'avg_work_days': df_work['work_days_until_accident'].mean(),
+            'median_work_days': df_work['work_days_until_accident'].median(),
+            'min_work_days': df_work['work_days_until_accident'].min(),
+            'max_work_days': df_work['work_days_until_accident'].max(),
+            'accidents_first_week': len(df_work[df_work['work_days_until_accident'] <= 7]),
+            'accidents_first_month': len(df_work[df_work['work_days_until_accident'] <= 30]),
+            'accidents_first_year': len(df_work[df_work['work_days_until_accident'] <= 365])
+        }
+        
+        return analysis, df_work
+        
+    except Exception as e:
+        st.error(f"Erro na análise de dias trabalhados: {str(e)}")
+        return {}, df
 
 def fetch_accidents(start_date=None, end_date=None):
     """Busca dados de acidentes"""
@@ -21,8 +115,10 @@ def fetch_accidents(start_date=None, end_date=None):
         if end_date:
             query = query.lte("occurred_at", end_date.isoformat())
             
-        data = query.order("occurred_at", desc=True).execute().data
-        return pd.DataFrame(data)
+        response = query.order("occurred_at", desc=True).execute()
+        if response and hasattr(response, 'data') and response.data:
+            return pd.DataFrame(response.data)
+        return pd.DataFrame()
     except Exception as e:
         st.error(f"Erro ao buscar acidentes: {str(e)}")
         return pd.DataFrame()
@@ -35,7 +131,7 @@ def app(filters=None):
         filters = st.session_state.get('filters', {})
     
     # Tabs para diferentes visualizações
-    tab1, tab2, tab3, tab4 = st.tabs(["📊 Análise", "📋 Registros", "📎 Evidências", "➕ Novo Acidente"])
+    tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["📊 Análise", "📋 Registros", "📎 Evidências", "➕ Novo Acidente", "📋 NBR 14280", "📚 Instruções"])
     
     with tab1:
         st.subheader("Análise de Acidentes")
@@ -52,6 +148,9 @@ def app(filters=None):
         else:
             # Aplica filtros adicionais
             df = apply_filters_to_df(df, filters)
+            
+            # Análise de dias trabalhados até acidente
+            work_days_analysis, df_with_work_days = get_work_days_analysis(df)
             
             # Métricas principais
             total_accidents = len(df)
@@ -89,6 +188,69 @@ def app(filters=None):
             
             create_metric_row(metrics)
             
+            # Análise de Dias Trabalhados até Acidente
+            if work_days_analysis:
+                st.subheader("📅 Análise de Dias Trabalhados até Acidente")
+                
+                col1, col2, col3, col4 = st.columns(4)
+                
+                with col1:
+                    st.metric(
+                        "Média de Dias",
+                        f"{work_days_analysis.get('avg_work_days', 0):.0f}",
+                        help="Média de dias trabalhados até o acidente"
+                    )
+                
+                with col2:
+                    st.metric(
+                        "Primeira Semana",
+                        f"{work_days_analysis.get('accidents_first_week', 0)}",
+                        help="Acidentes nos primeiros 7 dias de trabalho"
+                    )
+                
+                with col3:
+                    st.metric(
+                        "Primeiro Mês",
+                        f"{work_days_analysis.get('accidents_first_month', 0)}",
+                        help="Acidentes nos primeiros 30 dias de trabalho"
+                    )
+                
+                with col4:
+                    st.metric(
+                        "Primeiro Ano",
+                        f"{work_days_analysis.get('accidents_first_year', 0)}",
+                        help="Acidentes nos primeiros 365 dias de trabalho"
+                    )
+                
+                # Gráfico de distribuição de dias trabalhados
+                if 'work_days_until_accident' in df_with_work_days.columns:
+                    st.subheader("📊 Distribuição de Dias Trabalhados até Acidente")
+                    
+                    # Cria faixas de dias
+                    df_with_work_days['work_days_range'] = pd.cut(
+                        df_with_work_days['work_days_until_accident'],
+                        bins=[0, 7, 30, 90, 365, float('inf')],
+                        labels=['0-7 dias', '8-30 dias', '31-90 dias', '91-365 dias', 'Mais de 1 ano'],
+                        include_lowest=True
+                    )
+                    
+                    range_counts = df_with_work_days['work_days_range'].value_counts()
+                    
+                    fig_work_days = px.bar(
+                        x=range_counts.index,
+                        y=range_counts.values,
+                        title="Acidentes por Faixa de Dias Trabalhados",
+                        color=range_counts.values,
+                        color_continuous_scale="Oranges"
+                    )
+                    fig_work_days.update_layout(
+                        xaxis_title="Faixa de Dias Trabalhados",
+                        yaxis_title="Número de Acidentes",
+                        showlegend=False,
+                        height=400
+                    )
+                    st.plotly_chart(fig_work_days, use_container_width=True)
+            
             # Gráficos
             col1, col2 = st.columns(2)
             
@@ -115,8 +277,9 @@ def app(filters=None):
             with col2:
                 # Acidentes por mês - Simplificada
                 if 'occurred_at' in df.columns:
-                    df['month'] = pd.to_datetime(df['occurred_at']).dt.to_period('M')
-                    monthly_counts = df.groupby('month').size().reset_index(name='count')
+                    df_temp = df.copy()
+                    df_temp['month'] = pd.to_datetime(df_temp['occurred_at']).dt.to_period('M')
+                    monthly_counts = df_temp.groupby('month').size().reset_index(name='count')
                     monthly_counts['month'] = monthly_counts['month'].astype(str)
                     
                     fig2 = px.bar(
@@ -198,11 +361,29 @@ def app(filters=None):
                 filtered_df = filtered_df[filtered_df['status'] == status_filter]
             
             if search_term and 'description' in filtered_df.columns:
-                filtered_df = filtered_df[filtered_df['description'].str.contains(search_term, case=False, na=False)]
+                filtered_df = filtered_df[filtered_df['description'].astype(str).str.contains(search_term, case=False, na=False)]
             
-            # Exibe tabela
-            display_cols = ['occurred_at', 'type', 'description', 'lost_days', 'root_cause', 'status']
+            # Exibe tabela com classificação NBR 14280
+            display_cols = ['occurred_at', 'type', 'severity_nbr', 'description', 'lost_days', 'root_cause', 'status']
             available_cols = [col for col in display_cols if col in filtered_df.columns]
+            
+            # Adiciona coluna de dias trabalhados se disponível
+            if 'work_days_until_accident' in filtered_df.columns:
+                available_cols.append('work_days_until_accident')
+            
+            # Adiciona coluna de classificação legível se disponível
+            if 'severity_nbr' in filtered_df.columns:
+                def format_severity(x):
+                    try:
+                        if x:
+                            return f"{get_severity_icon(AccidentSeverity(x))} {x.title()}"
+                        return "⚪ Não classificado"
+                    except:
+                        return "⚪ Não classificado"
+                
+                filtered_df['severity_display'] = filtered_df['severity_nbr'].apply(format_severity)
+                if 'severity_display' not in available_cols:
+                    available_cols.append('severity_display')
             
             if available_cols:
                 st.dataframe(
@@ -237,7 +418,10 @@ def app(filters=None):
                 accident_id = accident_options[selected_accident]
                 
                 # Busca evidências
-                attachments = get_attachments("accident", str(accident_id))
+                try:
+                    attachments = get_attachments("accident", str(accident_id))
+                except:
+                    attachments = []
                 
                 if attachments:
                     st.write(f"**Evidências para o acidente selecionado:**")
@@ -251,21 +435,27 @@ def app(filters=None):
                                 st.caption(attachment['description'])
                         
                         with col2:
-                            if st.button("📥 Download", key=f"download_{attachment['id']}"):
-                                file_data = download_attachment(attachment['bucket'], attachment['path'])
-                                if file_data:
-                                    st.download_button(
-                                        "💾 Baixar Arquivo",
-                                        file_data,
-                                        attachment['filename'],
-                                        key=f"download_btn_{attachment['id']}"
-                                    )
+                            if st.button("📥 Download", key=f"download_{attachment.get('id', 'unknown')}"):
+                                try:
+                                    file_data = download_attachment(attachment.get('bucket', ''), attachment.get('path', ''))
+                                    if file_data:
+                                        st.download_button(
+                                            "💾 Baixar Arquivo",
+                                            file_data,
+                                            attachment.get('filename', 'arquivo'),
+                                            key=f"download_btn_{attachment.get('id', 'unknown')}"
+                                        )
+                                except:
+                                    st.error("Erro ao baixar arquivo")
                         
                         with col3:
-                            if st.button("🗑️ Remover", key=f"remove_{attachment['id']}"):
-                                if delete_attachment(attachment['id']):
-                                    st.success("Evidência removida!")
-                                    st.rerun()
+                            if st.button("🗑️ Remover", key=f"remove_{attachment.get('id', 'unknown')}"):
+                                try:
+                                    if delete_attachment(attachment.get('id', '')):
+                                        st.success("Evidência removida!")
+                                        st.rerun()
+                                except:
+                                    st.error("Erro ao remover evidência")
                 else:
                     st.info("Nenhuma evidência encontrada para este acidente.")
         else:
@@ -289,6 +479,7 @@ def app(filters=None):
                     }[x]
                 )
                 lost_days = st.number_input("Dias Perdidos", min_value=0, value=0)
+                is_fatal = st.checkbox("Acidente Fatal", value=False, help="Marque se o acidente resultou em morte")
             
             with col2:
                 classification = st.text_input("Classificação")
@@ -298,6 +489,47 @@ def app(filters=None):
                     options=["Fator Humano", "Fator Material", "Fator Ambiental", 
                             "Fator Organizacional", "Fator Técnico", "Outros"]
                 )
+                
+                # Campos NBR 14280
+                cat_number = st.text_input("Número da CAT", placeholder="Ex: 2024001234")
+                communication_date = st.date_input("Data de Comunicação", value=date.today())
+            
+            # Classificação NBR 14280 (calculada automaticamente)
+            if accident_type in ['fatal', 'lesao'] or is_fatal:
+                severity = classify_accident_severity(lost_days, is_fatal)
+                if severity:
+                    severity_desc = get_severity_description(severity)
+                    severity_icon = get_severity_icon(severity)
+                    severity_color = get_severity_color(severity)
+                    
+                    st.markdown(f"**Classificação NBR 14280:** {severity_icon} {severity_desc}")
+                    
+                    # Validação dos dados
+                    validation = validate_accident_data(accident_type, lost_days, is_fatal)
+                    
+                    if validation['warnings']:
+                        for warning in validation['warnings']:
+                            st.warning(f"⚠️ {warning}")
+                    
+                    if validation['errors']:
+                        for error in validation['errors']:
+                            st.error(f"❌ {error}")
+                    
+                    if validation['recommendations']:
+                        for rec in validation['recommendations']:
+                            st.info(f"💡 {rec}")
+            
+            # Campos de investigação
+            st.subheader("🔍 Investigação do Acidente")
+            col3, col4 = st.columns(2)
+            
+            with col3:
+                investigation_completed = st.checkbox("Investigação Concluída", value=False)
+                investigation_date = st.date_input("Data de Conclusão da Investigação", value=date.today()) if investigation_completed else None
+            
+            with col4:
+                investigation_responsible = st.text_input("Responsável pela Investigação") if investigation_completed else None
+                investigation_notes = st.text_area("Observações da Investigação", height=80) if investigation_completed else None
             
             description = st.text_area("Descrição do Acidente", height=100)
             corrective_actions = st.text_area("Ações Corretivas", height=100)
@@ -319,7 +551,11 @@ def app(filters=None):
                         from managers.supabase_config import get_service_role_client
                         supabase = get_service_role_client()
                         
-                        # Insere acidente
+                        # Classifica severidade conforme NBR 14280
+                        severity = classify_accident_severity(lost_days, is_fatal)
+                        severity_value = severity.value if severity else None
+                        
+                        # Insere acidente com campos NBR 14280
                         accident_data = {
                             "occurred_at": date_input.isoformat(),
                             "type": accident_type,
@@ -328,7 +564,16 @@ def app(filters=None):
                             "description": description,
                             "lost_days": lost_days,
                             "root_cause": root_cause,
-                            "status": "fechado"
+                            "status": "fechado",
+                            # Campos NBR 14280
+                            "is_fatal": is_fatal,
+                            "severity_nbr": severity_value,
+                            "cat_number": cat_number if cat_number else None,
+                            "communication_date": communication_date.isoformat() if communication_date else None,
+                            "investigation_completed": investigation_completed,
+                            "investigation_date": investigation_date.isoformat() if investigation_date else None,
+                            "investigation_responsible": investigation_responsible if investigation_responsible else None,
+                            "investigation_notes": investigation_notes if investigation_notes else None
                         }
                         
                         result = supabase.table("accidents").insert(accident_data).execute()
@@ -362,8 +607,10 @@ def download_attachment(bucket, path):
     """Download de anexo"""
     try:
         supabase = get_supabase_client()
-        response = supabase.storage.from_(bucket).download(path)
-        return response
+        if supabase:
+            response = supabase.storage.from_(bucket).download(path)
+            return response
+        return None
     except:
         return None
 
@@ -371,210 +618,221 @@ def delete_attachment(attachment_id):
     """Remove anexo"""
     try:
         supabase = get_supabase_client()
-        supabase.table("attachments").delete().eq("id", attachment_id).execute()
-        return True
+        if supabase:
+            supabase.table("attachments").delete().eq("id", attachment_id).execute()
+            return True
+        return False
     except:
         return False
 
-    with tab2:
-        st.subheader("📚 Metodologia de Análise de Acidentes")
+    with tab5:
+        st.subheader("📋 Análise NBR 14280 - Classificação de Acidentes")
         
-        st.markdown("""
-        ## 🎯 Objetivo da Análise
+        # Busca dados com classificação NBR 14280
+        with st.spinner("Carregando dados NBR 14280..."):
+            try:
+                from managers.supabase_config import get_service_role_client
+                supabase = get_service_role_client()
+                
+                # Busca dados da view NBR 14280
+                query = supabase.table("accidents_nbr_14280").select("*")
+                
+                if filters.get("start_date"):
+                    query = query.gte("occurred_at", filters["start_date"].isoformat())
+                if filters.get("end_date"):
+                    query = query.lte("occurred_at", filters["end_date"].isoformat())
+                    
+                data = query.order("occurred_at", desc=True).execute().data
+                df_nbr = pd.DataFrame(data)
+                
+            except Exception as e:
+                st.error(f"Erro ao buscar dados NBR 14280: {str(e)}")
+                df_nbr = pd.DataFrame()
         
-        A análise de acidentes tem como objetivo:
-        - **Identificar** padrões e tendências nos acidentes
-        - **Investigar** causas raiz dos eventos
-        - **Prevenir** ocorrências futuras
-        - **Melhorar** continuamente a segurança
-        - **Comunicar** lições aprendidas
-        """)
+        if df_nbr.empty:
+            st.warning("Nenhum acidente encontrado com classificação NBR 14280.")
+        else:
+            # Aplica filtros adicionais
+            df_nbr = apply_filters_to_df(df_nbr, filters)
+            
+            # Métricas NBR 14280
+            st.subheader("📊 Métricas NBR 14280")
+            
+            col1, col2, col3, col4 = st.columns(4)
+            
+            with col1:
+                leve_count = len(df_nbr[df_nbr['severity_nbr'] == 'leve'])
+                st.metric("🟢 Leves", leve_count, help="1-15 dias perdidos")
+            
+            with col2:
+                moderado_count = len(df_nbr[df_nbr['severity_nbr'] == 'moderado'])
+                st.metric("🟡 Moderados", moderado_count, help="16-30 dias perdidos")
+            
+            with col3:
+                grave_count = len(df_nbr[df_nbr['severity_nbr'] == 'grave'])
+                st.metric("🟠 Graves", grave_count, help="31+ dias perdidos")
+            
+            with col4:
+                fatal_count = len(df_nbr[df_nbr['severity_nbr'] == 'fatal'])
+                st.metric("🔴 Fatais", fatal_count, help="Acidentes fatais")
+            
+            # Gráfico de distribuição por severidade
+            st.subheader("📈 Distribuição por Severidade NBR 14280")
+            
+            if 'severity_nbr' in df_nbr.columns:
+                severity_counts = df_nbr['severity_nbr'].value_counts()
+                
+                # Cria gráfico com cores específicas
+                colors = []
+                for severity in severity_counts.index:
+                    if severity == 'leve':
+                        colors.append('#28a745')
+                    elif severity == 'moderado':
+                        colors.append('#ffc107')
+                    elif severity == 'grave':
+                        colors.append('#fd7e14')
+                    elif severity == 'fatal':
+                        colors.append('#dc3545')
+                    else:
+                        colors.append('#6c757d')
+                
+                fig = px.pie(
+                    values=severity_counts.values,
+                    names=[f"{get_severity_icon(AccidentSeverity(s))} {s.title()}" for s in severity_counts.index],
+                    title="Distribuição por Severidade conforme NBR 14280",
+                    color_discrete_sequence=colors
+                )
+                fig.update_layout(height=500)
+                st.plotly_chart(fig, use_container_width=True)
+            
+            # Análise de dias perdidos por severidade
+            st.subheader("📅 Dias Perdidos por Severidade")
+            
+            if 'lost_days' in df_nbr.columns and 'severity_nbr' in df_nbr.columns:
+                severity_days = df_nbr.groupby('severity_nbr')['lost_days'].agg(['sum', 'mean', 'count']).reset_index()
+                severity_days.columns = ['Severidade', 'Total Dias', 'Média Dias', 'Quantidade']
+                
+                # Adiciona ícones
+                severity_days['Severidade_Icon'] = severity_days['Severidade'].apply(
+                    lambda x: f"{get_severity_icon(AccidentSeverity(x))} {x.title()}" if x else "⚪ Não classificado"
+                )
+                
+                st.dataframe(
+                    severity_days[['Severidade_Icon', 'Quantidade', 'Total Dias', 'Média Dias']],
+                    use_container_width=True,
+                    hide_index=True
+                )
+            
+            # Tabela de acidentes com classificação NBR 14280
+            st.subheader("📋 Acidentes Classificados NBR 14280")
+            
+            # Filtros específicos para NBR 14280
+            col1, col2, col3 = st.columns(3)
+            
+            with col1:
+                severity_filter = st.selectbox(
+                    "Filtrar por Severidade",
+                    options=["Todas"] + list(df_nbr['severity_nbr'].unique()) if 'severity_nbr' in df_nbr.columns else ["Todas"],
+                    key="nbr_severity_filter"
+                )
+            
+            with col2:
+                investigation_filter = st.selectbox(
+                    "Filtrar por Investigação",
+                    options=["Todas", "Concluída", "Pendente"],
+                    key="nbr_investigation_filter"
+                )
+            
+            with col3:
+                cat_filter = st.text_input("Filtrar por CAT", key="nbr_cat_filter")
+            
+            # Aplica filtros
+            filtered_nbr = df_nbr.copy()
+            
+            if severity_filter != "Todas" and 'severity_nbr' in filtered_nbr.columns:
+                filtered_nbr = filtered_nbr[filtered_nbr['severity_nbr'] == severity_filter]
+            
+            if investigation_filter == "Concluída" and 'investigation_completed' in filtered_nbr.columns:
+                filtered_nbr = filtered_nbr[filtered_nbr['investigation_completed'] == True]
+            elif investigation_filter == "Pendente" and 'investigation_completed' in filtered_nbr.columns:
+                filtered_nbr = filtered_nbr[filtered_nbr['investigation_completed'] == False]
+            
+            if cat_filter and 'cat_number' in filtered_nbr.columns:
+                filtered_nbr = filtered_nbr[filtered_nbr['cat_number'].str.contains(cat_filter, case=False, na=False)]
+            
+            # Exibe tabela
+            display_cols = [
+                'occurred_at', 'type', 'severity_nbr', 'lost_days', 
+                'cat_number', 'investigation_completed', 'description'
+            ]
+            available_cols = [col for col in display_cols if col in filtered_nbr.columns]
+            
+            if available_cols:
+                # Adiciona colunas formatadas
+                if 'severity_nbr' in filtered_nbr.columns:
+                    filtered_nbr['severity_display'] = filtered_nbr['severity_nbr'].apply(
+                        lambda x: f"{get_severity_icon(AccidentSeverity(x))} {x.title()}" if x else "⚪ Não classificado"
+                    )
+                    available_cols.append('severity_display')
+                
+                if 'investigation_completed' in filtered_nbr.columns:
+                    filtered_nbr['investigation_status'] = filtered_nbr['investigation_completed'].apply(
+                        lambda x: "✅ Concluída" if x else "⏳ Pendente"
+                    )
+                    available_cols.append('investigation_status')
+                
+                st.dataframe(
+                    filtered_nbr[available_cols],
+                    use_container_width=True,
+                    hide_index=True
+                )
+            
+            # Estatísticas de conformidade
+            st.subheader("📊 Conformidade NBR 14280")
+            
+            col1, col2, col3 = st.columns(3)
+            
+            with col1:
+                total_accidents = len(df_nbr)
+                classified_accidents = len(df_nbr[df_nbr['severity_nbr'].notna()])
+                classification_rate = (classified_accidents / total_accidents * 100) if total_accidents > 0 else 0
+                st.metric(
+                    "Taxa de Classificação", 
+                    f"{classification_rate:.1f}%",
+                    help="Percentual de acidentes classificados conforme NBR 14280"
+                )
+            
+            with col2:
+                investigated_accidents = len(df_nbr[df_nbr['investigation_completed'] == True]) if 'investigation_completed' in df_nbr.columns else 0
+                investigation_rate = (investigated_accidents / total_accidents * 100) if total_accidents > 0 else 0
+                st.metric(
+                    "Taxa de Investigação", 
+                    f"{investigation_rate:.1f}%",
+                    help="Percentual de acidentes com investigação concluída"
+                )
+            
+            with col3:
+                cat_accidents = len(df_nbr[df_nbr['cat_number'].notna()]) if 'cat_number' in df_nbr.columns else 0
+                cat_rate = (cat_accidents / total_accidents * 100) if total_accidents > 0 else 0
+                st.metric(
+                    "Taxa de CAT", 
+                    f"{cat_rate:.1f}%",
+                    help="Percentual de acidentes com CAT registrada"
+                )
+    
+    with tab6:
+        # Importa e exibe instruções
+        from components.instructions import create_instructions_page, get_accidents_instructions
         
-        st.markdown("""
-        ## 📊 Classificação de Acidentes
-        
-        ### Por Gravidade
-        1. **Fatais**: Acidentes que resultam em morte
-        2. **Com Lesão**: Acidentes que resultam em lesões físicas
-        3. **Sem Lesão**: Acidentes que não resultam em lesões físicas
-        
-        ### Por Tipo
-        - **Quedas**: Quedas de altura, escorregões, tropeços
-        - **Cortes**: Cortes por ferramentas, objetos cortantes
-        - **Queimaduras**: Queimaduras térmicas, químicas, elétricas
-        - **Impactos**: Colisões, golpes, esmagamentos
-        - **Outros**: Outros tipos de acidentes não classificados
-        
-        ### Por Localização
-        - **Área de Produção**: Locais onde ocorrem atividades produtivas
-        - **Escritórios**: Áreas administrativas
-        - **Área Externa**: Pátios, estacionamentos, áreas externas
-        - **Outros**: Outras localizações específicas
-        """)
-        
-        st.markdown("""
-        ## 📈 Métricas de Análise
-        
-        ### Métricas Quantitativas
-        1. **Total de Acidentes**: Contagem absoluta de eventos
-        2. **Taxa de Frequência**: Acidentes por 1M horas trabalhadas
-        3. **Taxa de Gravidade**: Dias perdidos por 1M horas trabalhadas
-        4. **Distribuição por Tipo**: Percentual de cada categoria
-        5. **Distribuição por Local**: Percentual por localização
-        
-        ### Métricas Temporais
-        1. **Evolução Mensal**: Tendência ao longo do tempo
-        2. **Sazonalidade**: Padrões por estação do ano
-        3. **Dias da Semana**: Análise por dia da semana
-        4. **Horários**: Análise por período do dia
-        
-        ### Métricas de Impacto
-        1. **Dias Perdidos**: Impacto econômico
-        2. **Custos Diretos**: Gastos com tratamento
-        3. **Custos Indiretos**: Perda de produtividade
-        4. **Impacto Social**: Efeitos na equipe
-        """)
-        
-        st.markdown("""
-        ## 🔍 Análise de Causas
-        
-        ### Método 5 Porquês
-        1. **Por que** o acidente aconteceu?
-        2. **Por que** essa causa ocorreu?
-        3. **Por que** essa condição existia?
-        4. **Por que** não foi detectada?
-        5. **Por que** não foi prevenida?
-        
-        ### Árvore de Causas
-        - **Causa Imediata**: Ação ou condição que causou o acidente
-        - **Causa Contributiva**: Fatores que contribuíram
-        - **Causa Raiz**: Fator fundamental que permitiu o evento
-        
-        ### Fatores Humanos
-        - **Comportamento**: Ações inseguras
-        - **Conhecimento**: Falta de treinamento
-        - **Atitude**: Negligência ou pressa
-        - **Fadiga**: Cansaço físico ou mental
-        
-        ### Fatores Ambientais
-        - **Condições de Trabalho**: Iluminação, temperatura, ruído
-        - **Equipamentos**: Falhas, manutenção inadequada
-        - **Procedimentos**: Instruções inadequadas ou ausentes
-        - **Organização**: Pressão por produtividade
-        """)
-        
-        st.markdown("""
-        ## 📊 Visualizações e Gráficos
-        
-        ### Gráficos de Barras
-        - **Comparação**: Entre diferentes categorias
-        - **Evolução**: Ao longo do tempo
-        - **Ranking**: Ordenação por frequência
-        
-        ### Gráficos de Pizza
-        - **Distribuição**: Percentual de cada categoria
-        - **Proporção**: Relação entre diferentes tipos
-        - **Composição**: Estrutura dos acidentes
-        
-        ### Gráficos de Linha
-        - **Tendências**: Evolução temporal
-        - **Sazonalidade**: Padrões repetitivos
-        - **Comparação**: Entre diferentes períodos
-        
-        ### Mapas de Calor
-        - **Localização**: Concentração por área
-        - **Temporal**: Padrões por horário
-        - **Gravidade**: Intensidade dos eventos
-        """)
-        
-        st.markdown("""
-        ## 🚨 Sistema de Alertas
-        
-        ### Critérios de Alerta
-        1. **Acidentes Fatais**: Sempre crítico
-        2. **Aumento de 50%**: Em relação ao período anterior
-        3. **Padrões Anômalos**: Sequências incomuns
-        4. **Concentração**: Muitos acidentes em uma área
-        
-        ### Níveis de Alerta
-        - **🔴 CRÍTICO**: Ação imediata necessária
-        - **🟡 ATENÇÃO**: Monitoramento intensivo
-        - **🟢 NORMAL**: Situação controlada
-        
-        ### Ações Recomendadas
-        - **Investigar**: Causas raiz imediatamente
-        - **Implementar**: Medidas corretivas
-        - **Comunicar**: Informar stakeholders
-        - **Monitorar**: Acompanhar efetividade
-        """)
-        
-        st.markdown("""
-        ## 📋 Relatórios e Documentação
-        
-        ### Relatório de Acidente
-        1. **Dados Básicos**: Data, hora, local, envolvidos
-        2. **Descrição**: Narrativa do evento
-        3. **Causas**: Análise de causas raiz
-        4. **Ações**: Medidas tomadas e recomendadas
-        5. **Anexos**: Fotos, documentos, evidências
-        
-        ### Relatório de Análise
-        1. **Resumo Executivo**: Visão geral para gestores
-        2. **Análise Detalhada**: Dados técnicos
-        3. **Tendências**: Padrões identificados
-        4. **Recomendações**: Ações sugeridas
-        5. **Acompanhamento**: Status das ações
-        
-        ### Documentação de Evidências
-        - **Fotografias**: Registro visual do local
-        - **Vídeos**: Gravações do evento
-        - **Documentos**: Relatórios, laudos
-        - **Depoimentos**: Testemunhas e envolvidos
-        """)
-        
-        st.markdown("""
-        ## 🔧 Ferramentas e Recursos
-        
-        ### Upload de Evidências
-        - **Formatos Suportados**: JPG, PNG, PDF, DOC, XLS
-        - **Tamanho Máximo**: 10MB por arquivo
-        - **Segurança**: Criptografia e controle de acesso
-        - **Organização**: Categorização automática
-        
-        ### Filtros e Busca
-        - **Por Período**: Data de ocorrência
-        - **Por Tipo**: Classificação do acidente
-        - **Por Local**: Área de ocorrência
-        - **Por Gravidade**: Nível de impacto
-        
-        ### Exportação de Dados
-        - **Formato CSV**: Para análise externa
-        - **Relatórios PDF**: Para apresentações
-        - **Dashboards**: Para monitoramento
-        - **Alertas**: Para notificações
-        """)
-        
-        st.markdown("""
-        ## 📚 Referências e Normas
-        
-        ### Normas Regulamentadoras
-        - **NR-5**: Comissão Interna de Prevenção de Acidentes
-        - **NR-7**: Programa de Controle Médico de Saúde Ocupacional
-        - **NR-18**: Condições e Meio Ambiente de Trabalho
-        - **NR-35**: Trabalho em Altura
-        
-        ### Padrões Internacionais
-        - **ISO 45001**: Sistema de Gestão de SST
-        - **OHSAS 18001**: Especificação para SST
-        - **ANSI Z16.1**: Métodos de Registro de Acidentes
-        - **OSHA**: Occupational Safety and Health Administration
-        
-        ### Metodologias de Análise
-        - **Análise de Árvore de Falhas**: FTA
-        - **Análise de Modos de Falha**: FMEA
-        - **Análise de Riscos**: HAZOP
-        - **Investigação de Acidentes**: Método TapRooT
-        """)
+        instructions_data = get_accidents_instructions()
+        create_instructions_page(
+            title=instructions_data["title"],
+            description=instructions_data["description"],
+            sections=instructions_data["sections"],
+            tips=instructions_data["tips"],
+            warnings=instructions_data["warnings"],
+            references=instructions_data["references"]
+        )
 
 if __name__ == "__main__":
     app({})

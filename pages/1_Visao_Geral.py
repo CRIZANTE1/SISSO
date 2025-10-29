@@ -41,7 +41,7 @@ def app(filters=None):
     kpi_summary = generate_kpi_summary(df)
     
     # Cria abas para diferentes seções
-    tab1, tab2 = st.tabs(["📊 Dashboard", "📚 Metodologia"])
+    tab1, tab2, tab3 = st.tabs(["📊 Dashboard", "📚 Metodologia", "📚 Instruções"])
     
     with tab1:
         # === RESUMO EXECUTIVO ===
@@ -466,6 +466,20 @@ def app(filters=None):
         - **OHSAS 18001**: Especificação para Sistemas de Gestão de SST
         - **ANSI Z16.1**: Métodos de Registro e Medição de Acidentes
         """)
+    
+    with tab3:
+        # Importa e exibe instruções
+        from components.instructions import create_instructions_page, get_general_instructions
+        
+        instructions_data = get_general_instructions()
+        create_instructions_page(
+            title=instructions_data["title"],
+            description=instructions_data["description"],
+            sections=instructions_data["sections"],
+            tips=instructions_data["tips"],
+            warnings=instructions_data["warnings"],
+            references=instructions_data["references"]
+        )
 
 if __name__ == "__main__":
     app({})
