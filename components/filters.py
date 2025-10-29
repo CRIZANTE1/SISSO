@@ -72,13 +72,13 @@ def date_range_filter(key_prefix: str = "") -> tuple[Optional[date], Optional[da
     return start_date, end_date
 
 def severity_filter(key_prefix: str = "") -> List[str]:
-    """Filtro de severidade"""
+    """Filtro de severidade/tipo para ACCIDENTES (registráveis e não registráveis)
+    Mapeado para a nova estrutura: fatal, lesao, sem_lesao
+    """
     severity_options = {
         "Fatal": "fatal",
-        "Com Lesão": "with_injury", 
-        "Sem Lesão": "without_injury",
-        "Quase-Acidente": "near_miss",
-        "Não Conformidade": "nonconformity"
+        "Com Lesão": "lesao", 
+        "Sem Lesão": "sem_lesao",
     }
     
     selected_severities = st.multiselect(
@@ -184,6 +184,12 @@ def apply_filters_to_df(df: pd.DataFrame, filters: Dict[str, Any]) -> pd.DataFra
     """Aplica filtros a um DataFrame"""
     filtered_df = df.copy()
     
+    # Normaliza colunas de datas quando existirem
+    if "occurred_at" in filtered_df.columns:
+        filtered_df["occurred_at"] = pd.to_datetime(filtered_df["occurred_at"], errors="coerce").dt.date
+    if "opened_at" in filtered_df.columns:
+        filtered_df["opened_at"] = pd.to_datetime(filtered_df["opened_at"], errors="coerce").dt.date
+    
     # Filtro por usuários
     if filters.get("users") and "created_by" in filtered_df.columns:
         filtered_df = filtered_df[filtered_df["created_by"].isin(filters["users"])]
@@ -216,7 +222,10 @@ def apply_filters_to_df(df: pd.DataFrame, filters: Dict[str, Any]) -> pd.DataFra
     
     # Filtro por severidade de não conformidade
     if filters.get("severities") and "severity" in filtered_df.columns:
-        filtered_df = filtered_df[filtered_df["severity"].isin(filters["severities"])]
+        # Só aplica se houver interseção de valores possíveis
+        allowed = set(filters["severities"]) & set(filtered_df["severity"].dropna().unique())
+        if allowed:
+            filtered_df = filtered_df[filtered_df["severity"].isin(allowed)]
     
     # Filtro por causa raiz
     if filters.get("root_causes") and "root_cause" in filtered_df.columns:

@@ -162,79 +162,112 @@ def app(filters=None):
     # Meta de Acidentes Registráveis (Fatalidades + Com Lesão)
     st.subheader("🎯 Meta de Acidentes Registráveis (≤ 6 por ano)")
     TARGET_RECORDABLES_PER_YEAR = 6
+    TARGET_RECORDABLES_PER_MONTH = 0.5  # 6/12 meses
     
     if not df.empty and 'period' in df.columns:
         kpi_df = df.copy()
-        kpi_df['year'] = pd.to_datetime(kpi_df['period']).dt.year
-        # Soma anual
-        yearly = (
-            kpi_df.groupby('year')[['fatalities', 'with_injury', 'hours']]
+        kpi_df['period'] = pd.to_datetime(kpi_df['period'])
+        kpi_df['year'] = kpi_df['period'].dt.year
+        kpi_df['month'] = kpi_df['period'].dt.month
+        kpi_df['month_name'] = kpi_df['period'].dt.strftime('%Y-%m')
+        
+        # Soma mensal
+        monthly = (
+            kpi_df.groupby(['year', 'month', 'month_name'])[['fatalities', 'with_injury', 'hours']]
             .sum()
             .reset_index()
         )
-        yearly['recordables'] = yearly['fatalities'] + yearly['with_injury']
-        yearly['recordable_rate'] = yearly.apply(
+        monthly['recordables'] = monthly['fatalities'] + monthly['with_injury']
+        monthly['recordable_rate'] = monthly.apply(
             lambda r: ((r['recordables'] / r['hours']) * 1_000_000) if r['hours'] else 0.0,
             axis=1
         )
         
-        # KPIs do ano corrente
-        current_year = int(yearly['year'].max()) if not yearly.empty else None
-        current_row = yearly[yearly['year'] == current_year].iloc[0] if current_year is not None else None
+        # Acumulado anual para cada mês
+        monthly['yearly_cumulative'] = monthly.groupby('year')['recordables'].cumsum()
+        monthly['yearly_target'] = TARGET_RECORDABLES_PER_YEAR
+        monthly['monthly_target'] = TARGET_RECORDABLES_PER_MONTH
         
-        c1, c2, c3 = st.columns(3)
+        # KPIs do mês atual
+        latest_month = monthly.iloc[-1] if not monthly.empty else None
+        
+        c1, c2, c3, c4 = st.columns(4)
         with c1:
-            st.metric("Registráveis no Ano", int(current_row['recordables']) if current_row is not None else 0)
+            st.metric("Registráveis no Mês", int(latest_month['recordables']) if latest_month is not None else 0)
         with c2:
-            st.metric("Meta Anual", TARGET_RECORDABLES_PER_YEAR)
+            st.metric("Acumulado no Ano", int(latest_month['yearly_cumulative']) if latest_month is not None else 0)
         with c3:
-            status_txt = "Dentro da Meta" if current_row is not None and current_row['recordables'] <= TARGET_RECORDABLES_PER_YEAR else "Acima da Meta"
-            if current_row is not None and current_row['recordables'] <= TARGET_RECORDABLES_PER_YEAR:
-                st.success(status_txt)
+            st.metric("Meta Anual", TARGET_RECORDABLES_PER_YEAR)
+        with c4:
+            if latest_month is not None:
+                status_txt = "Dentro da Meta" if latest_month['yearly_cumulative'] <= TARGET_RECORDABLES_PER_YEAR else "Acima da Meta"
+                if latest_month['yearly_cumulative'] <= TARGET_RECORDABLES_PER_YEAR:
+                    st.success(status_txt)
+                else:
+                    st.error(status_txt)
             else:
-                st.error(status_txt)
+                st.info("Sem dados")
         
-        # Gráfico anual com linha da meta
-        display_df = yearly.copy()
-        display_df['Situação'] = display_df['recordables'] <= TARGET_RECORDABLES_PER_YEAR
+        # Gráfico mensal com linha da meta
+        display_df = monthly.copy()
+        display_df['Situação'] = display_df['yearly_cumulative'] <= display_df['yearly_target']
+        
         fig_goal = px.bar(
             display_df,
-            x='year',
+            x='month_name',
             y='recordables',
             color='Situação',
             color_discrete_map={True: '#28a745', False: '#dc3545'},
-            title='Acidentes Registráveis por Ano'
+            title='Acidentes Registráveis por Mês'
         )
         fig_goal.update_layout(
             height=420,
-            xaxis_title='Ano',
+            xaxis_title='Mês',
             yaxis_title='Registráveis (Fatalidades + Com Lesão)',
             showlegend=True,
             font=dict(size=12)
         )
-        # Linha da meta
-        fig_goal.add_hline(y=TARGET_RECORDABLES_PER_YEAR, line_dash='dash', line_color='#6c757d', annotation_text='Meta 6', annotation_position='top left')
+        # Linha da meta mensal
+        fig_goal.add_hline(y=TARGET_RECORDABLES_PER_MONTH, line_dash='dash', line_color='#6c757d', annotation_text='Meta 0.5/mês', annotation_position='top left')
         st.plotly_chart(fig_goal, use_container_width=True)
         
-        # Taxa de registráveis por 1M horas (opcional)
+        # Gráfico de acumulado anual vs meta
+        fig_cumulative = px.line(
+            display_df,
+            x='month_name',
+            y=['yearly_cumulative', 'yearly_target'],
+            markers=True,
+            title='Acumulado Anual vs Meta (6 por ano)',
+            color_discrete_map={'yearly_cumulative': '#007bff', 'yearly_target': '#6c757d'}
+        )
+        fig_cumulative.update_layout(
+            height=400,
+            xaxis_title='Mês',
+            yaxis_title='Registráveis Acumulados',
+            font=dict(size=12)
+        )
+        fig_cumulative.update_traces(line=dict(width=3), marker=dict(size=8))
+        st.plotly_chart(fig_cumulative, use_container_width=True)
+        
+        # Taxa de registráveis por 1M horas (mensal)
         st.caption("Taxa de registráveis por 1M horas (referência contextual)")
         fig_rate = px.line(
             display_df,
-            x='year',
+            x='month_name',
             y='recordable_rate',
             markers=True,
-            title='Taxa de Registráveis por 1M de Horas (Anual)'
+            title='Taxa de Registráveis por 1M de Horas (Mensal)'
         )
         fig_rate.update_layout(
             height=360,
-            xaxis_title='Ano',
+            xaxis_title='Mês',
             yaxis_title='Registráveis / 1.000.000 h',
             font=dict(size=12)
         )
         fig_rate.update_traces(line=dict(width=3), marker=dict(size=8))
         st.plotly_chart(fig_rate, use_container_width=True)
     else:
-        st.info("🎯 **Meta de Registráveis**\n\nNenhum dado disponível para a análise anual da meta.")
+        st.info("🎯 **Meta de Registráveis**\n\nNenhum dado disponível para a análise mensal da meta.")
     
     # Resumo por Período
     st.subheader("📅 Resumo por Período")
