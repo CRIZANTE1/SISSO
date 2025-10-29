@@ -59,8 +59,77 @@ def app(filters=None):
     
     st.markdown("---")
     
-    # Resumo executivo
-    create_dashboard_summary(kpi_summary)
+    # KPIs Principais - Simplificados e Corrigidos
+    st.subheader("📈 Indicadores de Segurança")
+    
+    if not df.empty and 'hours' in df.columns:
+        # Calcula KPIs do período mais recente
+        latest_data = df.iloc[-1] if len(df) > 0 else None
+        
+        if latest_data is not None:
+            # Taxa de Frequência (acidentes por 1M horas)
+            total_accidents = latest_data.get('accidents_total', 0)
+            total_hours = latest_data.get('hours', 0)
+            freq_rate = (total_accidents / total_hours * 1_000_000) if total_hours > 0 else 0
+            
+            # Taxa de Gravidade (dias perdidos por 1M horas)
+            total_lost_days = latest_data.get('lost_days_total', 0)
+            sev_rate = (total_lost_days / total_hours * 1_000_000) if total_hours > 0 else 0
+            
+            # Comparação com período anterior (se houver)
+            if len(df) > 1:
+                prev_data = df.iloc[-2]
+                prev_freq_rate = (prev_data.get('accidents_total', 0) / prev_data.get('hours', 1) * 1_000_000) if prev_data.get('hours', 0) > 0 else 0
+                prev_sev_rate = (prev_data.get('lost_days_total', 0) / prev_data.get('hours', 1) * 1_000_000) if prev_data.get('hours', 0) > 0 else 0
+                
+                freq_change = ((freq_rate - prev_freq_rate) / prev_freq_rate * 100) if prev_freq_rate > 0 else None
+                sev_change = ((sev_rate - prev_sev_rate) / prev_sev_rate * 100) if prev_sev_rate > 0 else None
+            else:
+                freq_change = None
+                sev_change = None
+            
+            # Exibe métricas
+            col1, col2, col3, col4 = st.columns(4)
+            
+            with col1:
+                if freq_change is not None:
+                    st.metric(
+                        "Taxa de Frequência", 
+                        f"{freq_rate:.2f}",
+                        delta=f"{freq_change:+.1f}%" if freq_change is not None else None
+                    )
+                else:
+                    st.metric("Taxa de Frequência", f"{freq_rate:.2f}")
+            
+            with col2:
+                if sev_change is not None:
+                    st.metric(
+                        "Taxa de Gravidade", 
+                        f"{sev_rate:.2f}",
+                        delta=f"{sev_change:+.1f}%" if sev_change is not None else None
+                    )
+                else:
+                    st.metric("Taxa de Gravidade", f"{sev_rate:.2f}")
+            
+            with col3:
+                st.metric("Total de Acidentes", int(total_accidents))
+            
+            with col4:
+                st.metric("Dias Perdidos", int(total_lost_days))
+            
+            # Informações contextuais
+            st.caption(f"📊 Baseado em {total_hours:,.0f} horas trabalhadas no período")
+            
+            if freq_rate > 5.0:
+                st.warning("⚠️ Taxa de frequência elevada - revisar procedimentos de segurança")
+            if sev_rate > 50.0:
+                st.warning("⚠️ Taxa de gravidade elevada - implementar medidas preventivas")
+            if total_lost_days == 0 and total_accidents > 0:
+                st.info("ℹ️ Acidentes sem dias perdidos registrados")
+        else:
+            st.info("📊 Nenhum dado disponível para calcular indicadores")
+    else:
+        st.info("📊 Dados insuficientes para calcular indicadores de segurança")
     
     st.markdown("---")
     
