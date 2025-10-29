@@ -532,6 +532,7 @@ def app(filters=None):
         - 🎯 **Previsão Inteligente**: Considera padrões e sazonalidade
         - ⚠️ **Alertas Preventivos**: Avisa sobre riscos futuros
         - 💡 **Recomendações**: Sugere ações baseadas nas previsões
+        - 📅 **Base em Dias**: Taxas calculadas por 1 milhão de dias trabalhados (8h/dia)
         """)
         
         # Calcula previsões
@@ -553,7 +554,7 @@ def app(filters=None):
                         st.metric(
                             "Taxa de Frequência Prevista",
                             f"{freq_data['predicted']:.0f}",
-                            help=f"Tendência: {freq_data['trend']}\nConfiança: {confidence_pct}%"
+                            help=f"Acidentes por 1M dias trabalhados\nTendência: {freq_data['trend']}\nConfiança: {confidence_pct}%"
                         )
                         st.caption(f"{trend_icon} {freq_data['trend'].title()}")
                 
@@ -566,7 +567,7 @@ def app(filters=None):
                         st.metric(
                             "Taxa de Gravidade Prevista",
                             f"{sev_data['predicted']:.0f}",
-                            help=f"Tendência: {sev_data['trend']}\nConfiança: {confidence_pct}%"
+                            help=f"Dias perdidos por 1M dias trabalhados\nTendência: {sev_data['trend']}\nConfiança: {confidence_pct}%"
                         )
                         st.caption(f"{trend_icon} {sev_data['trend'].title()}")
                 
@@ -697,13 +698,20 @@ def app(filters=None):
                 with st.expander("🔧 Detalhes Técnicos da Previsão"):
                     st.markdown("""
                     **Método Utilizado:**
-                    - Análise de regressão linear simples
+                    - Análise de tendência simples baseada em médias móveis
                     - Baseado nos últimos 3+ meses de dados
-                    - Considera tendências e sazonalidade básica
+                    - Converte horas trabalhadas para dias (8h/dia)
+                    - Taxas calculadas por 1 milhão de dias trabalhados
+                    
+                    **Conversão de Unidades:**
+                    - **Horas → Dias**: Divisão por 8 (jornada padrão)
+                    - **Taxa de Frequência**: Acidentes por 1M dias trabalhados
+                    - **Taxa de Gravidade**: Dias perdidos por 1M dias trabalhados
                     
                     **Limitações:**
                     - Previsões são estimativas baseadas em padrões históricos
                     - Não considera eventos externos imprevistos
+                    - Assume jornada padrão de 8 horas por dia
                     - Confiança diminui com maior variabilidade dos dados
                     
                     **Interpretação:**
