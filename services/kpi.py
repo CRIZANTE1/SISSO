@@ -421,20 +421,8 @@ def fetch_detailed_accidents(user_email: str, start_date=None, end_date=None) ->
         from managers.supabase_config import get_service_role_client
         supabase = get_service_role_client()
         
-        # Busca dados do usuário
-        user_response = supabase.table("profiles").select("id, sites").eq("email", user_email).execute()
-        
-        if not user_response.data:
-            return pd.DataFrame()
-        
-        user_data = user_response.data[0]
-        user_sites = user_data.get("sites", [])
-        
-        if not user_sites:
-            return pd.DataFrame()
-        
-        # Busca dados de acidentes
-        query = supabase.table("accidents").select("*").in_("site_id", user_sites)
+        # Busca dados de acidentes - o RLS já controla o acesso baseado no created_by
+        query = supabase.table("accidents").select("*").eq("created_by", user_email)
         
         if start_date:
             query = query.gte("occurred_at", start_date.isoformat())
