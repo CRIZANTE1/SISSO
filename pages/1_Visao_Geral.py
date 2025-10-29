@@ -36,90 +36,135 @@ def app(filters=None):
     # Gera resumo dos KPIs
     kpi_summary = generate_kpi_summary(df)
     
+    # Estatísticas do Sistema
+    st.subheader("📊 Estatísticas do Sistema")
+    
+    # Busca dados de todas as tabelas
+    system_stats = get_system_statistics()
+    
+    # Exibe estatísticas em cards
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        st.metric("Sites", system_stats.get('sites', 0))
+        st.metric("Contratadas", system_stats.get('contractors', 0))
+    
+    with col2:
+        st.metric("Acidentes", system_stats.get('accidents', 0))
+        st.metric("Quase-Acidentes", system_stats.get('near_misses', 0))
+    
+    with col3:
+        st.metric("Não Conformidades", system_stats.get('nonconformities', 0))
+        st.metric("Registros de Horas", system_stats.get('hours_records', 0))
+    
+    st.markdown("---")
+    
     # Resumo executivo
     create_dashboard_summary(kpi_summary)
     
     st.markdown("---")
     
     # Gráficos principais
-    col1, col2 = st.columns(2)
+    st.subheader("📊 Análise de Acidentes")
     
-    with col1:
-        # Gráfico de distribuição por mês
-        fig1 = px.bar(
-            df, 
-            x="period", 
-            y=["accidents_total", "fatalities", "with_injury", "without_injury"],
-            barmode="group", 
-            title="Distribuição de Acidentes por Mês",
-            labels={"value": "Quantidade", "variable": "Tipo"}
-        )
-        fig1.update_layout(height=400)
-        st.plotly_chart(fig1, use_container_width=True)
-    
-    with col2:
-        # Gráfico de taxa de frequência
-        if 'freq_rate_per_million' in df.columns:
-            fig2 = create_trend_chart(
-                df, 
-                "period", 
-                "freq_rate_per_million",
-                "Taxa de Frequência (por 1M de horas)"
-            )
-        else:
-            # Calcula taxa de frequência se não existir
-            df['freq_rate'] = (df['accidents_total'] / df['hours']) * 1_000_000
-            fig2 = create_trend_chart(
-                df, 
-                "period", 
-                "freq_rate",
-                "Taxa de Frequência (por 1M de horas)"
-            )
-        fig2.update_layout(height=400)
-        st.plotly_chart(fig2, use_container_width=True)
-    
-    # Gráficos de controle estatístico
-    st.subheader("📈 Controles Estatísticos")
-    
-    # Prepara dados para controle
-    control_df = calculate_poisson_control_limits(df)
-    
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        # Gráfico de controle para acidentes
-        fig3 = create_control_chart(
-            control_df,
-            "period",
-            "accidents_total", 
-            "ucl",
-            "lcl",
-            "expected",
-            "Controle de Acidentes (Poisson)"
-        )
-        st.plotly_chart(fig3, use_container_width=True)
-    
-    with col2:
-        # Gráfico de taxa de gravidade
-        if 'sev_rate_per_million' in df.columns:
-            sev_col = 'sev_rate_per_million'
-        else:
-            df['sev_rate'] = (df['lost_days_total'] / df['hours']) * 1_000_000
-            sev_col = 'sev_rate'
+    if not df.empty and 'period' in df.columns:
+        col1, col2 = st.columns(2)
         
-        fig4 = create_trend_chart(
-            df,
-            "period",
-            sev_col,
-            "Taxa de Gravidade (por 1M de horas)"
-        )
-        st.plotly_chart(fig4, use_container_width=True)
+        with col1:
+            # Gráfico de distribuição por mês - Simplificado
+            fig1 = px.bar(
+                df, 
+                x="period", 
+                y="accidents_total",
+                title="Total de Acidentes por Mês",
+                color="accidents_total",
+                color_continuous_scale="Reds"
+            )
+            fig1.update_layout(
+                height=400,
+                xaxis_title="Período",
+                yaxis_title="Número de Acidentes",
+                showlegend=False,
+                font=dict(size=12)
+            )
+            fig1.update_traces(marker_line_width=0)
+            st.plotly_chart(fig1, use_container_width=True)
+        
+        with col2:
+            # Gráfico de tipos de acidente
+            accident_types = df[['fatalities', 'with_injury', 'without_injury']].sum()
+            accident_types = accident_types[accident_types > 0]  # Remove zeros
+            
+            if not accident_types.empty:
+                fig2 = px.pie(
+                    values=accident_types.values,
+                    names=['Fatais', 'Com Lesão', 'Sem Lesão'],
+                    title="Distribuição por Tipo de Acidente",
+                    color_discrete_sequence=px.colors.qualitative.Set3
+                )
+                fig2.update_layout(
+                    height=400,
+                    font=dict(size=12)
+                )
+                st.plotly_chart(fig2, use_container_width=True)
+            else:
+                st.info("📊 **Distribuição por Tipo**\n\nNenhum acidente registrado para exibir a distribuição.")
+    else:
+        st.info("📊 **Análise de Acidentes**\n\nNenhum dado de acidentes disponível para exibir os gráficos.")
     
-    # Análise por período
-    st.subheader("📅 Análise por Período")
+    # Análise de Tendências
+    st.subheader("📈 Análise de Tendências")
+    
+    if not df.empty and 'period' in df.columns and 'hours' in df.columns:
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            # Taxa de Frequência - Simplificada
+            df['freq_rate'] = (df['accidents_total'] / df['hours']) * 1_000_000
+            fig3 = px.line(
+                df,
+                x="period",
+                y="freq_rate",
+                title="Taxa de Frequência (por 1M horas)",
+                markers=True
+            )
+            fig3.update_layout(
+                height=400,
+                xaxis_title="Período",
+                yaxis_title="Taxa de Frequência",
+                font=dict(size=12)
+            )
+            fig3.update_traces(line=dict(width=3), marker=dict(size=8))
+            st.plotly_chart(fig3, use_container_width=True)
+        
+        with col2:
+            # Taxa de Gravidade - Simplificada
+            df['sev_rate'] = (df['lost_days_total'] / df['hours']) * 1_000_000
+            fig4 = px.line(
+                df,
+                x="period",
+                y="sev_rate",
+                title="Taxa de Gravidade (por 1M horas)",
+                markers=True,
+                color_discrete_sequence=['orange']
+            )
+            fig4.update_layout(
+                height=400,
+                xaxis_title="Período",
+                yaxis_title="Taxa de Gravidade",
+                font=dict(size=12)
+            )
+            fig4.update_traces(line=dict(width=3), marker=dict(size=8))
+            st.plotly_chart(fig4, use_container_width=True)
+    else:
+        st.info("📈 **Análise de Tendências**\n\nNenhum dado suficiente disponível para exibir as tendências.")
+    
+    # Resumo por Período
+    st.subheader("📅 Resumo por Período")
     
     if not df.empty:
-        period_analysis = df.groupby('period').agg({
+        # Tabela simplificada
+        period_summary = df.groupby('period').agg({
             'accidents_total': 'sum',
             'fatalities': 'sum',
             'with_injury': 'sum',
@@ -128,52 +173,25 @@ def app(filters=None):
             'hours': 'sum'
         }).reset_index()
         
-        # Calcula taxas por período
-        period_analysis['freq_rate'] = (period_analysis['accidents_total'] / period_analysis['hours']) * 1_000_000
-        period_analysis['sev_rate'] = (period_analysis['lost_days_total'] / period_analysis['hours']) * 1_000_000
+        # Renomeia colunas para português
+        period_summary.columns = [
+            'Período', 'Total Acidentes', 'Fatais', 'Com Lesão', 
+            'Sem Lesão', 'Dias Perdidos', 'Horas Trabalhadas'
+        ]
         
-        col1, col2 = st.columns(2)
+        # Formata números
+        for col in ['Total Acidentes', 'Fatais', 'Com Lesão', 'Sem Lesão', 'Dias Perdidos']:
+            period_summary[col] = period_summary[col].astype(int)
         
-        with col1:
-            # Taxa de frequência por período
-            fig5 = px.bar(
-                period_analysis,
-                x='period',
-                y='freq_rate',
-                title='Taxa de Frequência por Período',
-                labels={'freq_rate': 'Taxa de Frequência', 'period': 'Período'}
-            )
-            st.plotly_chart(fig5, use_container_width=True)
+        period_summary['Horas Trabalhadas'] = period_summary['Horas Trabalhadas'].round(0).astype(int)
         
-        with col2:
-            # Taxa de gravidade por período
-            fig6 = px.bar(
-                period_analysis,
-                x='period', 
-                y='sev_rate',
-                title='Taxa de Gravidade por Período',
-                labels={'sev_rate': 'Taxa de Gravidade', 'period': 'Período'}
-            )
-            st.plotly_chart(fig6, use_container_width=True)
-    
-    # Tabela de dados
-    st.subheader("📋 Dados Detalhados")
-    
-    # Seleciona colunas para exibição
-    display_cols = ['period', 'accidents_total', 'fatalities', 
-                   'with_injury', 'without_injury', 'lost_days_total', 'hours',
-                   'freq_rate_per_million', 'severity_rate_per_million']
-    
-    available_cols = [col for col in display_cols if col in df.columns]
-    
-    if available_cols:
         st.dataframe(
-            df[available_cols],
+            period_summary,
             use_container_width=True,
             hide_index=True
         )
     else:
-        st.dataframe(df, use_container_width=True, hide_index=True)
+        st.info("Nenhum dado disponível para resumo por período.")
     
     # Alertas e recomendações
     st.subheader("🚨 Alertas e Recomendações")
@@ -201,6 +219,66 @@ def app(filters=None):
     
     if kpi_summary.get('total_fatalities', 0) > 0:
         st.error("🚨 **CRÍTICO:** Investigação imediata necessária para acidentes fatais!")
+
+def get_system_statistics():
+    """Busca estatísticas gerais do sistema"""
+    try:
+        from managers.supabase_config import get_service_role_client
+        supabase = get_service_role_client()
+        
+        if not supabase:
+            return {}
+        
+        stats = {}
+        
+        # Conta registros em cada tabela
+        try:
+            # Sites (se existir)
+            sites_response = supabase.table("sites").select("id", count="exact").execute()
+            stats['sites'] = sites_response.count or 0
+        except:
+            stats['sites'] = 0
+        
+        try:
+            # Contratadas (se existir)
+            contractors_response = supabase.table("contractors").select("id", count="exact").execute()
+            stats['contractors'] = contractors_response.count or 0
+        except:
+            stats['contractors'] = 0
+        
+        try:
+            # Acidentes
+            accidents_response = supabase.table("accidents").select("id", count="exact").execute()
+            stats['accidents'] = accidents_response.count or 0
+        except:
+            stats['accidents'] = 0
+        
+        try:
+            # Quase-acidentes
+            near_misses_response = supabase.table("near_misses").select("id", count="exact").execute()
+            stats['near_misses'] = near_misses_response.count or 0
+        except:
+            stats['near_misses'] = 0
+        
+        try:
+            # Não conformidades
+            nonconformities_response = supabase.table("nonconformities").select("id", count="exact").execute()
+            stats['nonconformities'] = nonconformities_response.count or 0
+        except:
+            stats['nonconformities'] = 0
+        
+        try:
+            # Registros de horas
+            hours_response = supabase.table("hours_worked_monthly").select("id", count="exact").execute()
+            stats['hours_records'] = hours_response.count or 0
+        except:
+            stats['hours_records'] = 0
+        
+        return stats
+        
+    except Exception as e:
+        st.error(f"Erro ao buscar estatísticas do sistema: {str(e)}")
+        return {}
 
 if __name__ == "__main__":
     app({})

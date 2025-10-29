@@ -93,50 +93,76 @@ def app(filters=None):
             col1, col2 = st.columns(2)
             
             with col1:
-                # Distribuição por tipo
+                # Distribuição por tipo - Simplificada
                 if 'type' in df.columns:
                     type_counts = df['type'].value_counts()
-                    fig1 = create_pie_chart(
-                        pd.DataFrame({
-                            'type': type_counts.index,
-                            'count': type_counts.values
-                        }),
-                        'type',
-                        'count',
-                        'Distribuição por Tipo'
+                    type_names = {'fatal': 'Fatal', 'lesao': 'Com Lesão', 'sem_lesao': 'Sem Lesão'}
+                    
+                    fig1 = px.pie(
+                        values=type_counts.values,
+                        names=[type_names.get(t, t) for t in type_counts.index],
+                        title="Distribuição por Tipo de Acidente",
+                        color_discrete_sequence=px.colors.qualitative.Set3
+                    )
+                    fig1.update_layout(
+                        height=400,
+                        font=dict(size=12)
                     )
                     st.plotly_chart(fig1, use_container_width=True)
+                else:
+                    st.info("📊 **Distribuição por Tipo**\n\nNenhum dado de tipo disponível.")
             
             with col2:
-                # Acidentes por mês
+                # Acidentes por mês - Simplificada
                 if 'occurred_at' in df.columns:
                     df['month'] = pd.to_datetime(df['occurred_at']).dt.to_period('M')
                     monthly_counts = df.groupby('month').size().reset_index(name='count')
                     monthly_counts['month'] = monthly_counts['month'].astype(str)
                     
-                    fig2 = create_bar_chart(
+                    fig2 = px.bar(
                         monthly_counts,
-                        'month',
-                        'count',
-                        'Acidentes por Mês'
+                        x='month',
+                        y='count',
+                        title="Acidentes por Mês",
+                        color='count',
+                        color_continuous_scale="Reds"
                     )
+                    fig2.update_layout(
+                        height=400,
+                        xaxis_title="Mês",
+                        yaxis_title="Número de Acidentes",
+                        showlegend=False,
+                        font=dict(size=12)
+                    )
+                    fig2.update_traces(marker_line_width=0)
                     st.plotly_chart(fig2, use_container_width=True)
+                else:
+                    st.info("📅 **Acidentes por Mês**\n\nNenhum dado de data disponível.")
             
-            # Análise por causa raiz
-            if 'root_cause' in df.columns:
-                st.subheader("Análise por Causa Raiz")
+            # Análise por causa raiz - Simplificada
+            if 'root_cause' in df.columns and not df['root_cause'].isna().all():
+                st.subheader("📋 Análise por Causa Raiz")
                 root_cause_counts = df['root_cause'].value_counts()
                 
-                fig3 = create_bar_chart(
-                    pd.DataFrame({
-                        'root_cause': root_cause_counts.index,
-                        'count': root_cause_counts.values
-                    }),
-                    'root_cause',
-                    'count',
-                    'Acidentes por Causa Raiz'
+                fig3 = px.bar(
+                    x=root_cause_counts.values,
+                    y=root_cause_counts.index,
+                    orientation='h',
+                    title="Acidentes por Causa Raiz",
+                    color=root_cause_counts.values,
+                    color_continuous_scale="Blues"
                 )
+                fig3.update_layout(
+                    height=400,
+                    xaxis_title="Número de Acidentes",
+                    yaxis_title="Causa Raiz",
+                    showlegend=False,
+                    font=dict(size=12)
+                )
+                fig3.update_traces(marker_line_width=0)
                 st.plotly_chart(fig3, use_container_width=True)
+            else:
+                st.info("📋 **Análise por Causa Raiz**\n\nNenhum dado de causa raiz disponível.")
     
     with tab2:
         st.subheader("Registros de Acidentes")

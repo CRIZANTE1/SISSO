@@ -91,50 +91,76 @@ def app(filters=None):
             col1, col2 = st.columns(2)
             
             with col1:
-                # Distribuição por severidade potencial
+                # Distribuição por severidade potencial - Simplificada
                 if 'potential_severity' in df.columns:
                     severity_counts = df['potential_severity'].value_counts()
-                    fig1 = create_pie_chart(
-                        pd.DataFrame({
-                            'potential_severity': severity_counts.index,
-                            'count': severity_counts.values
-                        }),
-                        'potential_severity',
-                        'count',
-                        'Distribuição por Severidade Potencial'
+                    severity_names = {'low': 'Baixo', 'medium': 'Médio', 'high': 'Alto'}
+                    
+                    fig1 = px.pie(
+                        values=severity_counts.values,
+                        names=[severity_names.get(s, s) for s in severity_counts.index],
+                        title="Distribuição por Severidade Potencial",
+                        color_discrete_sequence=['#28a745', '#ffc107', '#dc3545']  # Verde, Amarelo, Vermelho
+                    )
+                    fig1.update_layout(
+                        height=400,
+                        font=dict(size=12)
                     )
                     st.plotly_chart(fig1, use_container_width=True)
+                else:
+                    st.info("📊 **Distribuição por Severidade**\n\nNenhum dado de severidade disponível.")
             
             with col2:
-                # Quase-acidentes por mês
+                # Quase-acidentes por mês - Simplificada
                 if 'occurred_at' in df.columns:
                     df['month'] = pd.to_datetime(df['occurred_at']).dt.to_period('M')
                     monthly_counts = df.groupby('month').size().reset_index(name='count')
                     monthly_counts['month'] = monthly_counts['month'].astype(str)
                     
-                    fig2 = create_bar_chart(
+                    fig2 = px.bar(
                         monthly_counts,
-                        'month',
-                        'count',
-                        'Quase-Acidentes por Mês'
+                        x='month',
+                        y='count',
+                        title="Quase-Acidentes por Mês",
+                        color='count',
+                        color_continuous_scale="Oranges"
                     )
+                    fig2.update_layout(
+                        height=400,
+                        xaxis_title="Mês",
+                        yaxis_title="Número de Quase-Acidentes",
+                        showlegend=False,
+                        font=dict(size=12)
+                    )
+                    fig2.update_traces(marker_line_width=0)
                     st.plotly_chart(fig2, use_container_width=True)
+                else:
+                    st.info("📅 **Quase-Acidentes por Mês**\n\nNenhum dado de data disponível.")
             
-            # Análise por status
-            if 'status' in df.columns:
-                st.subheader("Análise por Status")
+            # Análise por status - Simplificada
+            if 'status' in df.columns and not df['status'].isna().all():
+                st.subheader("📊 Análise por Status")
                 status_counts = df['status'].value_counts()
+                status_names = {'aberto': 'Aberto', 'fechado': 'Fechado'}
                 
-                fig3 = create_bar_chart(
-                    pd.DataFrame({
-                        'status': status_counts.index,
-                        'count': status_counts.values
-                    }),
-                    'status',
-                    'count',
-                    'Quase-Acidentes por Status'
+                fig3 = px.bar(
+                    x=status_counts.index,
+                    y=status_counts.values,
+                    title="Quase-Acidentes por Status",
+                    color=status_counts.values,
+                    color_continuous_scale="Greens"
                 )
+                fig3.update_layout(
+                    height=400,
+                    xaxis_title="Status",
+                    yaxis_title="Número de Quase-Acidentes",
+                    showlegend=False,
+                    font=dict(size=12)
+                )
+                fig3.update_traces(marker_line_width=0)
                 st.plotly_chart(fig3, use_container_width=True)
+            else:
+                st.info("📊 **Análise por Status**\n\nNenhum dado de status disponível.")
     
     with tab2:
         st.subheader("Registros de Quase-Acidentes")
