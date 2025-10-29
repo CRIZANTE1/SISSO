@@ -7,7 +7,9 @@ from services.kpi import (
     generate_kpi_summary,
     calculate_poisson_control_limits,
     calculate_ewma,
-    detect_control_chart_patterns
+    detect_control_chart_patterns,
+    fetch_detailed_accidents,
+    analyze_accidents_by_category
 )
 from components.filters import apply_filters_to_df
 
@@ -29,6 +31,13 @@ def app(filters=None):
             start_date=filters.get("start_date"),
             end_date=filters.get("end_date")
         )
+        
+        # Busca dados detalhados de acidentes
+        accidents_df = fetch_detailed_accidents(
+            user_email=user_email,
+            start_date=filters.get("start_date"),
+            end_date=filters.get("end_date")
+        )
     
     if df.empty:
         st.warning("Nenhum dado encontrado com os filtros aplicados.")
@@ -44,154 +53,357 @@ def app(filters=None):
     tab1, tab2, tab3 = st.tabs(["📊 Dashboard", "📚 Metodologia", "📚 Instruções"])
     
     with tab1:
-        # === RESUMO EXECUTIVO ===
-        st.subheader("📈 Resumo Executivo")
+        # === RESUMO SIMPLES E CLARO ===
+        st.subheader("📊 Resumo da Segurança no Trabalho")
         
-        # Métricas principais em destaque
+        # Status geral em destaque
+        freq_rate = kpi_summary.get('frequency_rate', 0)
+        sev_rate = kpi_summary.get('severity_rate', 0)
+        total_accidents = kpi_summary.get('total_accidents', 0)
+        fatalities = kpi_summary.get('total_fatalities', 0)
+        
+        # Determina status geral
+        if fatalities > 0:
+            status_color = "🔴"
+            status_text = "CRÍTICO"
+            status_description = "Há acidentes fatais registrados"
+        elif freq_rate > 40 or sev_rate > 100:
+            status_color = "🟠"
+            status_text = "ATENÇÃO"
+            status_description = "Indicadores elevados, revisão necessária"
+        elif freq_rate > 20 or sev_rate > 50:
+            status_color = "🟡"
+            status_text = "MONITORAR"
+            status_description = "Indicadores dentro do aceitável"
+        else:
+            status_color = "🟢"
+            status_text = "EXCELENTE"
+            status_description = "Indicadores em situação ideal"
+        
+        # Card de status principal
+        st.markdown(f"""
+        <div style="background-color: #f0f2f6; padding: 20px; border-radius: 10px; text-align: center; margin-bottom: 20px;">
+            <h2 style="color: #1f4e79; margin: 0;">{status_color} Status Geral: {status_text}</h2>
+            <p style="font-size: 16px; margin: 10px 0 0 0; color: #666;">{status_description}</p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Métricas principais simplificadas
+        st.subheader("📈 Indicadores Principais")
         col1, col2, col3, col4 = st.columns(4)
         
         with col1:
             freq_data = kpi_summary.get('frequency_interpretation', {})
+            freq_value = kpi_summary.get('frequency_rate', 0)
+            freq_class = freq_data.get('classification', 'N/A')
+            
+            # Ícone baseado na classificação
+            if freq_class == 'Muito Bom':
+                freq_icon = "🟢"
+            elif freq_class == 'Bom':
+                freq_icon = "🟡"
+            elif freq_class == 'Ruim':
+                freq_icon = "🟠"
+            else:
+                freq_icon = "🔴"
+            
             st.metric(
-                "Taxa de Frequência (TF)", 
-                f"{kpi_summary.get('frequency_rate', 0):.0f}",
+                f"{freq_icon} Acidentes por Milhão de Horas",
+                f"{freq_value:.0f}",
                 delta=f"{kpi_summary.get('frequency_change', 0):+.1f}%" if kpi_summary.get('frequency_change') else None,
-                help=f"Acidentes por 1 milhão de horas trabalhadas\nClassificação: {freq_data.get('classification', 'N/A')}"
+                help=f"Quantos acidentes acontecem a cada 1 milhão de horas trabalhadas\nClassificação: {freq_class}"
             )
-            st.caption(f"{freq_data.get('icon', '')} {freq_data.get('description', '')}")
         
         with col2:
             sev_data = kpi_summary.get('severity_interpretation', {})
+            sev_value = kpi_summary.get('severity_rate', 0)
+            sev_class = sev_data.get('classification', 'N/A')
+            
+            # Ícone baseado na classificação
+            if sev_class == 'Excelente':
+                sev_icon = "🟢"
+            elif sev_class == 'Aceitável':
+                sev_icon = "🟡"
+            elif sev_class == 'Elevado':
+                sev_icon = "🟠"
+            else:
+                sev_icon = "🔴"
+            
             st.metric(
-                "Taxa de Gravidade (TG)", 
-                f"{kpi_summary.get('severity_rate', 0):.0f}",
+                f"{sev_icon} Dias Perdidos por Milhão de Horas",
+                f"{sev_value:.0f}",
                 delta=f"{kpi_summary.get('severity_change', 0):+.1f}%" if kpi_summary.get('severity_change') else None,
-                help=f"Dias perdidos + debitados por 1 milhão de horas trabalhadas\nClassificação: {sev_data.get('classification', 'N/A')}"
+                help=f"Quantos dias de trabalho são perdidos a cada 1 milhão de horas trabalhadas\nClassificação: {sev_class}"
             )
-            st.caption(f"{sev_data.get('icon', '')} {sev_data.get('description', '')}")
         
         with col3:
+            total_acc = kpi_summary.get('total_accidents', 0)
+            fatalities = kpi_summary.get('total_fatalities', 0)
+            
+            # Ícone baseado no número de acidentes
+            if total_acc == 0:
+                acc_icon = "🟢"
+            elif total_acc <= 2:
+                acc_icon = "🟡"
+            elif total_acc <= 5:
+                acc_icon = "🟠"
+            else:
+                acc_icon = "🔴"
+            
             st.metric(
-                "Total de Acidentes",
-                kpi_summary.get('total_accidents', 0),
-                help="Total de acidentes no período"
+                f"{acc_icon} Total de Acidentes",
+                f"{total_acc}",
+                help=f"Quantos acidentes aconteceram no período\nFatais: {fatalities}"
             )
         
         with col4:
+            lost_days = kpi_summary.get('total_lost_days', 0)
+            
+            # Ícone baseado nos dias perdidos
+            if lost_days == 0:
+                days_icon = "🟢"
+            elif lost_days <= 10:
+                days_icon = "🟡"
+            elif lost_days <= 30:
+                days_icon = "🟠"
+            else:
+                days_icon = "🔴"
+            
             st.metric(
-                "Dias Perdidos",
-                kpi_summary.get('total_lost_days', 0),
-                help="Total de dias perdidos no período"
+                f"{days_icon} Dias de Trabalho Perdidos",
+                f"{lost_days}",
+                help="Quantos dias de trabalho foram perdidos devido a acidentes"
             )
         
-        # Status geral
+        # Resumo em linguagem simples
         st.markdown("---")
-    
-        # === STATUS DE SEGURANÇA ===
-        col1, col2 = st.columns([2, 1])
+        st.subheader("💡 O que isso significa?")
+        
+        # Explicação simples baseada nos dados
+        if fatalities > 0:
+            st.error("🚨 **SITUAÇÃO CRÍTICA**: Houve acidentes fatais. Ação imediata é necessária para investigar e prevenir novos casos.")
+        elif total_accidents == 0:
+            st.success("🎉 **EXCELENTE**: Nenhum acidente registrado no período! Continue mantendo os padrões de segurança.")
+        elif total_accidents <= 2:
+            st.info("✅ **BOM**: Poucos acidentes registrados. Continue monitorando e mantendo as práticas de segurança.")
+        else:
+            st.warning("⚠️ **ATENÇÃO**: Número de acidentes acima do ideal. É necessário revisar os procedimentos de segurança.")
+        
+        # Dicas práticas baseadas nos dados
+        st.markdown("**📋 Próximos Passos Recomendados:**")
+        if fatalities > 0:
+            st.markdown("- 🔍 Investigar imediatamente as causas dos acidentes fatais")
+            st.markdown("- 🚨 Implementar medidas emergenciais de segurança")
+            st.markdown("- 📞 Comunicar às autoridades competentes")
+        elif freq_rate > 40:
+            st.markdown("- 📚 Revisar e atualizar treinamentos de segurança")
+            st.markdown("- 🔧 Melhorar equipamentos de proteção individual")
+            st.markdown("- 👥 Intensificar supervisão no trabalho")
+        elif freq_rate > 20:
+            st.markdown("- 📊 Monitorar indicadores mensalmente")
+            st.markdown("- 🎯 Focar em prevenção de acidentes")
+            st.markdown("- ✅ Manter práticas atuais de segurança")
+        else:
+            st.markdown("- 🏆 Documentar boas práticas que estão funcionando")
+            st.markdown("- 📈 Manter os padrões atuais de excelência")
+            st.markdown("- 🔄 Compartilhar experiências com outras equipes")
+        
+        st.markdown("---")
+        
+        # === DETALHES DOS ACIDENTES ===
+        if not accidents_df.empty:
+            st.subheader("🔍 Detalhes dos Acidentes")
+            
+            # Analisa acidentes por categoria
+            accident_analysis = analyze_accidents_by_category(accidents_df)
+            
+            if accident_analysis:
+                # Resumo simples dos acidentes
+                st.markdown("**📊 Resumo por Tipo de Acidente**")
+                col1, col2, col3 = st.columns(3)
+                
+                with col1:
+                    if accident_analysis.get('by_type'):
+                        for accident_type, data in accident_analysis['by_type'].items():
+                            type_name = {
+                                'fatal': 'Fatal',
+                                'lesao': 'Com Lesão',
+                                'sem_lesao': 'Sem Lesão'
+                            }.get(accident_type, accident_type)
+                            
+                            # Cor baseada no tipo
+                            if accident_type == 'fatal':
+                                color = "🔴"
+                            elif accident_type == 'lesao':
+                                color = "🟠"
+                            else:
+                                color = "🟡"
+                            
+                            st.metric(
+                                f"{color} {type_name}",
+                                f"{data['count']} acidentes",
+                                help=f"Dias perdidos: {data['lost_days']} | Fatais: {data['fatalities']}"
+                            )
+                    else:
+                        st.info("Nenhum acidente registrado")
+                
+                with col2:
+                    st.markdown("**🎯 Principais Causas**")
+                    if accident_analysis.get('by_root_cause'):
+                        # Mostra apenas as 2 mais comuns
+                        sorted_causes = sorted(
+                            accident_analysis['by_root_cause'].items(),
+                            key=lambda x: x[1]['count'],
+                            reverse=True
+                        )[:2]
+                        
+                        for cause, data in sorted_causes:
+                            if cause and cause.strip():
+                                st.metric(
+                                    f"🔍 {cause}",
+                                    f"{data['count']} acidentes",
+                                    help=f"Dias perdidos: {data['lost_days']}"
+                                )
+                    else:
+                        st.info("Nenhuma causa registrada")
+                
+                with col3:
+                    st.markdown("**📅 Estatísticas Gerais**")
+                    total_acc = accident_analysis.get('total_accidents', 0)
+                    fatalities = accident_analysis.get('total_fatalities', 0)
+                    lost_days = accident_analysis.get('total_lost_days', 0)
+                    
+                    st.metric("Total de Acidentes", f"{total_acc}")
+                    st.metric("Acidentes Fatais", f"{fatalities}")
+                    st.metric("Dias Perdidos", f"{lost_days}")
+                
+                # Gráfico simples de distribuição
+                if accident_analysis.get('by_type'):
+                    st.markdown("**📈 Distribuição Visual dos Acidentes**")
+                    
+                    type_data = accident_analysis['by_type']
+                    type_names = []
+                    type_counts = []
+                    type_colors = []
+                    
+                    for accident_type, data in type_data.items():
+                        type_name = {
+                            'fatal': 'Fatal',
+                            'lesao': 'Com Lesão',
+                            'sem_lesao': 'Sem Lesão'
+                        }.get(accident_type, accident_type)
+                        
+                        type_names.append(type_name)
+                        type_counts.append(data['count'])
+                        
+                        # Cores baseadas no tipo
+                        if accident_type == 'fatal':
+                            type_colors.append('#FF0000')  # Vermelho
+                        elif accident_type == 'lesao':
+                            type_colors.append('#FFA500')  # Laranja
+                        else:
+                            type_colors.append('#FFD700')  # Amarelo
+                    
+                    # Cria gráfico de pizza simples
+                    fig = go.Figure(data=[go.Pie(
+                        labels=type_names,
+                        values=type_counts,
+                        marker_colors=type_colors,
+                        textinfo='label+value',
+                        textfont_size=14
+                    )])
+                    
+                    fig.update_layout(
+                        title="Tipos de Acidentes",
+                        height=350,
+                        showlegend=True,
+                        font=dict(size=12)
+                    )
+                    
+                    st.plotly_chart(fig, use_container_width=True)
+        
+        st.markdown("---")
+        
+        # === INFORMAÇÕES ADICIONAIS ===
+        st.subheader("📊 Informações de Base")
+        col1, col2, col3 = st.columns(3)
         
         with col1:
-            st.subheader("🎯 Status de Segurança")
-            
-            # Calcula status baseado nos indicadores e interpretações
-            freq_rate = kpi_summary.get('frequency_rate', 0)
-            sev_rate = kpi_summary.get('severity_rate', 0)
-            fatalities = kpi_summary.get('total_fatalities', 0)
-            freq_interpretation = kpi_summary.get('frequency_interpretation', {})
-            sev_interpretation = kpi_summary.get('severity_interpretation', {})
-            
-            # Status geral baseado nas interpretações
-            if fatalities > 0:
-                st.error("🚨 **CRÍTICO** - Acidentes fatais registrados")
-            elif freq_interpretation.get('classification') == 'Péssimo' or sev_interpretation.get('classification') == 'Crítico':
-                st.error("🚨 **CRÍTICO** - Indicadores em situação crítica")
-            elif freq_interpretation.get('classification') == 'Ruim' or sev_interpretation.get('classification') == 'Elevado':
-                st.warning("⚠️ **ATENÇÃO** - Indicadores elevados, revisão necessária")
-            elif freq_interpretation.get('classification') == 'Bom' or sev_interpretation.get('classification') == 'Aceitável':
-                st.info("📊 **BOM** - Indicadores dentro do aceitável")
-            else:
-                st.success("✅ **EXCELENTE** - Indicadores em situação ideal")
+            st.metric(
+                "Horas Trabalhadas",
+                f"{kpi_summary.get('total_hours', 0):,.0f}",
+                help="Total de horas trabalhadas no período"
+            )
         
         with col2:
-            st.subheader("📊 Base de Cálculo")
-            st.metric("Horas Trabalhadas", f"{kpi_summary.get('total_hours', 0):,.0f}")
-            st.metric("Período", f"{len(df)} meses")
+            st.metric(
+                "Período Analisado",
+                f"{len(df)} meses",
+                help="Quantidade de meses com dados"
+            )
+        
+        with col3:
+            if kpi_summary.get('total_hours', 0) > 0:
+                avg_hours_month = kpi_summary.get('total_hours', 0) / len(df) if len(df) > 0 else 0
+                st.metric(
+                    "Média Mensal",
+                    f"{avg_hours_month:,.0f} horas",
+                    help="Média de horas trabalhadas por mês"
+                )
+            else:
+                st.metric("Média Mensal", "0 horas")
         
         st.markdown("---")
         
-        # === VISUALIZAÇÃO SIMPLIFICADA ===
-        st.subheader("📊 Evolução dos Indicadores")
-        
+        # === GRÁFICO SIMPLES ===
         if not df.empty and 'period' in df.columns and 'hours' in df.columns:
-            # Calcula indicadores mensais
-            df['freq_rate'] = (df['accidents_total'] / df['hours']) * 1_000_000
-            df['sev_rate'] = (df['lost_days_total'] / df['hours']) * 1_000_000
+            st.subheader("📈 Evolução dos Acidentes")
             
-            # Gráfico único com ambos os indicadores
+            # Gráfico simples de acidentes por mês
             fig = go.Figure()
             
-            # Taxa de Frequência
             fig.add_trace(go.Scatter(
                 x=df['period'],
-                y=df['freq_rate'],
+                y=df['accidents_total'],
                 mode='lines+markers',
-                name='Taxa de Frequência',
+                name='Total de Acidentes',
                 line=dict(color='#1f77b4', width=3),
                 marker=dict(size=8)
             ))
             
-            # Taxa de Gravidade
-            fig.add_trace(go.Scatter(
-                x=df['period'],
-                y=df['sev_rate'],
-                mode='lines+markers',
-                name='Taxa de Gravidade',
-                line=dict(color='#ff7f0e', width=3),
-                marker=dict(size=8),
-                yaxis='y2'
-            ))
-            
-            # Layout do gráfico
             fig.update_layout(
-                title="Evolução das Taxas de Segurança",
+                title="Acidentes por Mês",
                 xaxis_title="Período",
-                yaxis=dict(title="Taxa de Frequência", side="left"),
-                yaxis2=dict(title="Taxa de Gravidade", side="right", overlaying="y"),
-                height=400,
+                yaxis_title="Número de Acidentes",
+                height=350,
                 template="plotly_white",
                 font=dict(size=12)
             )
             
             st.plotly_chart(fig, use_container_width=True)
     
-        # === RESUMO MENSAL SIMPLIFICADO ===
-        st.subheader("📅 Resumo Mensal")
-        
+        # === TABELA MENSAL SIMPLES ===
         if not df.empty:
+            st.subheader("📅 Dados por Mês")
+            
             # Tabela simplificada
             period_summary = df.groupby('period').agg({
                 'accidents_total': 'sum',
                 'fatalities': 'sum',
-                'with_injury': 'sum',
                 'lost_days_total': 'sum',
                 'hours': 'sum'
             }).reset_index()
             
-            # Calcula taxas
-            period_summary['freq_rate'] = (period_summary['accidents_total'] / period_summary['hours'] * 1_000_000).round(0)
-            period_summary['sev_rate'] = (period_summary['lost_days_total'] / period_summary['hours'] * 1_000_000).round(0)
-            
-            # Renomeia colunas
+            # Renomeia colunas para linguagem simples
             period_summary.columns = [
-                    'Período', 'Acidentes', 'Fatais', 'Com Lesão', 
-                    'Dias Perdidos', 'Horas', 'Taxa Freq.', 'Taxa Grav.'
+                'Mês', 'Acidentes', 'Fatais', 'Dias Perdidos', 'Horas Trabalhadas'
             ]
             
             # Formata números
-            for col in ['Acidentes', 'Fatais', 'Com Lesão', 'Dias Perdidos', 'Taxa Freq.', 'Taxa Grav.']:
+            for col in ['Acidentes', 'Fatais', 'Dias Perdidos']:
                 period_summary[col] = period_summary[col].astype(int)
             
-            period_summary['Horas'] = period_summary['Horas'].round(0).astype(int)
+            period_summary['Horas Trabalhadas'] = period_summary['Horas Trabalhadas'].round(0).astype(int)
             
             st.dataframe(
                 period_summary,
@@ -199,157 +411,22 @@ def app(filters=None):
                 hide_index=True
             )
         
-        # === ALERTAS SIMPLIFICADOS ===
-        st.subheader("🚨 Alertas")
+        # === RESUMO FINAL ===
+        st.subheader("📋 Resumo Final")
         
-        # Alertas baseados nas interpretações dos indicadores
-        alerts = []
-        freq_interpretation = kpi_summary.get('frequency_interpretation', {})
-        sev_interpretation = kpi_summary.get('severity_interpretation', {})
-        
-        if kpi_summary.get('total_fatalities', 0) > 0:
-            alerts.append("🚨 **CRÍTICO:** Acidentes fatais registrados")
-        
-        # Alertas baseados na classificação da Taxa de Frequência
-        freq_classification = freq_interpretation.get('classification', '')
-        if freq_classification == 'Péssimo':
-            alerts.append("🚨 **CRÍTICO:** Taxa de frequência em situação péssima (acima de 60)")
-        elif freq_classification == 'Ruim':
-            alerts.append("⚠️ **ATENÇÃO:** Taxa de frequência em situação ruim (40,1-60)")
-        elif freq_classification == 'Bom':
-            alerts.append("📊 **BOM:** Taxa de frequência em situação boa (20,1-40)")
-        elif freq_classification == 'Muito Bom':
-            alerts.append("✅ **EXCELENTE:** Taxa de frequência em situação muito boa (até 20)")
-        
-        # Alertas baseados na classificação da Taxa de Gravidade
-        sev_classification = sev_interpretation.get('classification', '')
-        if sev_classification == 'Crítico':
-            alerts.append("🚨 **CRÍTICO:** Taxa de gravidade em situação crítica (acima de 200)")
-        elif sev_classification == 'Elevado':
-            alerts.append("⚠️ **ATENÇÃO:** Taxa de gravidade elevada (100-200)")
-        elif sev_classification == 'Aceitável':
-            alerts.append("📊 **ACEITÁVEL:** Taxa de gravidade em situação aceitável (50-100)")
-        elif sev_classification == 'Excelente':
-            alerts.append("✅ **EXCELENTE:** Taxa de gravidade em situação excelente (até 50)")
-        
-        if alerts:
-            for alert in alerts:
-                st.markdown(alert)
+        # Resumo simples baseado nos dados
+        if fatalities > 0:
+            st.error("🚨 **ATENÇÃO CRÍTICA**: Há acidentes fatais registrados. Ação imediata necessária.")
+        elif total_accidents == 0:
+            st.success("🎉 **PARABÉNS**: Nenhum acidente registrado! Continue assim!")
+        elif total_accidents <= 2:
+            st.info("✅ **BOM**: Poucos acidentes. Continue monitorando a segurança.")
         else:
-            st.success("✅ Nenhum alerta crítico identificado")
+            st.warning("⚠️ **CUIDADO**: Número de acidentes acima do ideal. Revisar procedimentos.")
         
-        st.markdown("---")
-        
-        # === CONTROLES ESTATÍSTICOS ===
-        st.subheader("📊 Controles Estatísticos")
-        
-        if not df.empty and len(df) >= 3:
-            # Calcula limites de controle para taxa de frequência
-            freq_limits = calculate_poisson_control_limits(df)
-            
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                st.markdown("**📈 Taxa de Frequência - Controle Estatístico**")
-                st.metric("Limite Superior", f"{freq_limits['ucl'].iloc[-1]:.1f}")
-                st.metric("Valor Esperado", f"{freq_limits['expected'].iloc[-1]:.1f}")
-                st.metric("Limite Inferior", f"{freq_limits['lcl'].iloc[-1]:.1f}")
-            
-            with col2:
-                st.markdown("**📊 Status do Controle**")
-                current_freq = df['accidents_total'].iloc[-1] if not df.empty else 0
-                if current_freq > freq_limits['ucl'].iloc[-1]:
-                    st.error("🚨 **FORA DE CONTROLE** - Acima do limite superior")
-                elif current_freq < freq_limits['lcl'].iloc[-1]:
-                    st.success("✅ **MELHORIA** - Abaixo do limite inferior")
-                else:
-                    st.info("📊 **SOB CONTROLE** - Dentro dos limites")
-                
-                st.metric("Valor Atual", f"{current_freq:.1f}")
-        
-        st.markdown("---")
-        
-        # === MONITORAMENTO DE TENDÊNCIAS ===
-        st.subheader("📈 Monitoramento de Tendências (EWMA)")
-        
-        if not df.empty and len(df) >= 3:
-            # Calcula EWMA para taxa de frequência
-            df['freq_rate'] = (df['accidents_total'] / df['hours']) * 1_000_000
-            ewma_data = calculate_ewma(df, 'freq_rate', lambda_param=0.2)
-            
-            # Cria gráfico de tendência
-            fig = go.Figure()
-            
-            # Dados reais
-            fig.add_trace(go.Scatter(
-                x=df['period'],
-                y=df['freq_rate'],
-                mode='lines+markers',
-                name='📊 Taxa de Frequência Real',
-                line=dict(color='#1f77b4', width=2),
-                marker=dict(size=6)
-            ))
-            
-            # EWMA
-            fig.add_trace(go.Scatter(
-                x=ewma_data['period'],
-                y=ewma_data['ewma'],
-                mode='lines',
-                name='📈 Tendência Suavizada (EWMA)',
-                line=dict(color='#ff7f0e', width=3)
-            ))
-            
-            # Limites de controle EWMA
-            fig.add_trace(go.Scatter(
-                x=ewma_data['period'],
-                y=ewma_data['ewma_ucl'],
-                mode='lines',
-                name='⚠️ Limite Superior',
-                line=dict(color='red', width=2, dash='dash')
-            ))
-            
-            fig.add_trace(go.Scatter(
-                x=ewma_data['period'],
-                y=ewma_data['ewma_lcl'],
-                mode='lines',
-                name='✅ Limite Inferior',
-                line=dict(color='green', width=2, dash='dash')
-            ))
-            
-            fig.update_layout(
-                title="📈 Monitoramento de Tendências - Taxa de Frequência",
-                xaxis_title="Período",
-                yaxis_title="Taxa de Frequência",
-                height=400,
-                template="plotly_white"
-            )
-            
-            st.plotly_chart(fig, use_container_width=True)
-            
-            # Análise de tendência
-            col1, col2, col3 = st.columns(3)
-            
-            with col1:
-                st.metric(
-                    "Valor EWMA Atual",
-                    f"{ewma_data['ewma'].iloc[-1]:.2f}",
-                    help="Valor atual da tendência suavizada"
-                )
-            
-            with col2:
-                trend_status = "📈 Crescente" if ewma_data['ewma'].iloc[-1] > ewma_data['ewma'].iloc[-2] else "📉 Decrescente" if ewma_data['ewma'].iloc[-1] < ewma_data['ewma'].iloc[-2] else "➡️ Estável"
-                st.metric("Tendência", trend_status)
-            
-            with col3:
-                if ewma_data['ewma'].iloc[-1] > ewma_data['ewma_ucl'].iloc[-1]:
-                    st.error("🚨 **ALERTA** - Acima do limite")
-                elif ewma_data['ewma'].iloc[-1] < ewma_data['ewma_lcl'].iloc[-1]:
-                    st.success("✅ **MELHORIA** - Abaixo do limite")
-                else:
-                    st.info("📊 **NORMAL** - Dentro dos limites")
-        
-        else:
-            st.warning("⚠️ Dados insuficientes para análise de tendências (mínimo 3 períodos)")
+        # Informação adicional simples
+        if kpi_summary.get('total_hours', 0) > 0:
+            st.info(f"📊 **Base de cálculo**: {kpi_summary.get('total_hours', 0):,.0f} horas trabalhadas em {len(df)} meses")
     
     with tab2:
         st.subheader("📚 Metodologia do Dashboard Executivo")

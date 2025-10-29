@@ -411,3 +411,145 @@ def generate_forecast_recommendations(forecasts: Dict[str, Any]) -> List[str]:
             recommendations.append("🎯 **META:** Previsão de zero acidentes - manter excelente desempenho")
     
     return recommendations
+
+def fetch_detailed_accidents(user_email: str, start_date=None, end_date=None) -> pd.DataFrame:
+    """
+    Busca dados detalhados de acidentes do usuário atual
+    """
+    try:
+        from managers.supabase_config import get_service_role_client
+        supabase = get_service_role_client()
+        
+        # Busca dados do usuário
+        user_response = supabase.table("profiles").select("id, sites").eq("email", user_email).execute()
+        
+        if not user_response.data:
+            return pd.DataFrame()
+        
+        user_data = user_response.data[0]
+        user_sites = user_data.get("sites", [])
+        
+        if not user_sites:
+            return pd.DataFrame()
+        
+        # Busca dados de acidentes
+        query = supabase.table("accidents").select("*").in_("site_id", user_sites)
+        
+        if start_date:
+            query = query.gte("occurred_at", start_date.isoformat())
+        if end_date:
+            query = query.lte("occurred_at", end_date.isoformat())
+            
+        response = query.order("occurred_at", desc=True).execute()
+        
+        if response and hasattr(response, 'data') and response.data:
+            return pd.DataFrame(response.data)
+        return pd.DataFrame()
+        
+    except Exception as e:
+        st.error(f"Erro ao buscar dados de acidentes: {str(e)}")
+        return pd.DataFrame()
+
+def analyze_accidents_by_category(accidents_df: pd.DataFrame) -> Dict[str, Any]:
+    """
+    Analisa acidentes por categoria (lesão/fatalidade) e calcula frequência
+    """
+    if accidents_df.empty:
+        return {}
+    
+    # Converte data para datetime se necessário
+    if 'occurred_at' in accidents_df.columns:
+        accidents_df['occurred_at'] = pd.to_datetime(accidents_df['occurred_at'])
+        accidents_df['year_month'] = accidents_df['occurred_at'].dt.to_period('M')
+    
+    # Análise por tipo de acidente
+    type_analysis = accidents_df.groupby('type').agg({
+        'id': 'count',
+        'lost_days': 'sum',
+        'is_fatal': 'sum'
+    }).rename(columns={'id': 'count'})
+    
+    # Análise por classificação
+    classification_analysis = accidents_df.groupby('classification').agg({
+        'id': 'count',
+        'lost_days': 'sum'
+    }).rename(columns={'id': 'count'})
+    
+    # Análise por parte do corpo
+    body_part_analysis = accidents_df.groupby('body_part').agg({
+        'id': 'count',
+        'lost_days': 'sum'
+    }).rename(columns={'id': 'count'})
+    
+    # Análise por causa raiz
+    root_cause_analysis = accidents_df.groupby('root_cause').agg({
+        'id': 'count',
+        'lost_days': 'sum'
+    }).rename(columns={'id': 'count'})
+    
+    # Análise temporal (últimos 12 meses)
+    if 'year_month' in accidents_df.columns:
+        temporal_analysis = accidents_df.groupby('year_month').agg({
+            'id': 'count',
+            'lost_days': 'sum',
+            'is_fatal': 'sum'
+        }).rename(columns={'id': 'count'})
+    else:
+        temporal_analysis = pd.DataFrame()
+    
+    # Converte para formato mais legível
+    def format_analysis(df, name):
+        if df.empty:
+            return {}
+        
+        result = {}
+        for idx, row in df.iterrows():
+            if pd.isna(idx) or idx == '':
+                continue
+            result[str(idx)] = {
+                'count': int(row['count']),
+                'lost_days': int(row.get('lost_days', 0)),
+                'fatalities': int(row.get('is_fatal', 0)) if 'is_fatal' in row else 0
+            }
+        return result
+    
+    return {
+        'by_type': format_analysis(type_analysis, 'Tipo'),
+        'by_classification': format_analysis(classification_analysis, 'Classificação'),
+        'by_body_part': format_analysis(body_part_analysis, 'Parte do Corpo'),
+        'by_root_cause': format_analysis(root_cause_analysis, 'Causa Raiz'),
+        'temporal': format_analysis(temporal_analysis, 'Temporal'),
+        'total_accidents': len(accidents_df),
+        'total_fatalities': int(accidents_df['is_fatal'].sum()) if 'is_fatal' in accidents_df.columns else 0,
+        'total_lost_days': int(accidents_df['lost_days'].sum()) if 'lost_days' in accidents_df.columns else 0,
+        'frequency_by_period': calculate_accident_frequency_by_period(accidents_df)
+    }
+
+def calculate_accident_frequency_by_period(accidents_df: pd.DataFrame) -> Dict[str, Any]:
+    """
+    Calcula a frequência de acidentes por período (mensal)
+    """
+    if accidents_df.empty or 'occurred_at' not in accidents_df.columns:
+        return {}
+    
+    # Converte data para datetime
+    accidents_df['occurred_at'] = pd.to_datetime(accidents_df['occurred_at'])
+    accidents_df['year_month'] = accidents_df['occurred_at'].dt.to_period('M')
+    
+    # Agrupa por período e tipo
+    period_analysis = accidents_df.groupby(['year_month', 'type']).size().unstack(fill_value=0)
+    
+    # Calcula frequência relativa
+    period_totals = period_analysis.sum(axis=1)
+    period_frequency = {}
+    
+    for period in period_analysis.index:
+        period_str = str(period)
+        period_frequency[period_str] = {
+            'total': int(period_totals[period]),
+            'fatal': int(period_analysis.loc[period, 'fatal']) if 'fatal' in period_analysis.columns else 0,
+            'lesao': int(period_analysis.loc[period, 'lesao']) if 'lesao' in period_analysis.columns else 0,
+            'sem_lesao': int(period_analysis.loc[period, 'sem_lesao']) if 'sem_lesao' in period_analysis.columns else 0
+        }
+    
+    return period_frequency
