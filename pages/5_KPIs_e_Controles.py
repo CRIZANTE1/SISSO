@@ -916,7 +916,7 @@ def app(filters=None):
         ### Método de Previsão
         - **Análise de Tendência**: Baseada em médias móveis
         - **Período Mínimo**: 3 meses de dados históricos
-        - **Conversão**: Horas para dias trabalhados (8h/dia)
+        - **Base**: Horas trabalhadas
         - **Confiança**: Baseada na estabilidade dos dados
         
         ### Limitações

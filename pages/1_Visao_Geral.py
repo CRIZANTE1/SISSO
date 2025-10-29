@@ -46,9 +46,9 @@ def app(filters=None):
     with tab1:
         # === RESUMO EXECUTIVO ===
         st.subheader("📈 Resumo Executivo")
-    
+        
         # Métricas principais em destaque
-            col1, col2, col3, col4 = st.columns(4)
+        col1, col2, col3, col4 = st.columns(4)
         
         with col1:
             st.metric(
@@ -169,21 +169,21 @@ def app(filters=None):
             'hours': 'sum'
         }).reset_index()
         
-            # Calcula taxas
-            period_summary['freq_rate'] = (period_summary['accidents_total'] / period_summary['hours'] * 1_000_000).round(0)
-            period_summary['sev_rate'] = (period_summary['lost_days_total'] / period_summary['hours'] * 1_000_000).round(0)
-            
-            # Renomeia colunas
+        # Calcula taxas
+        period_summary['freq_rate'] = (period_summary['accidents_total'] / period_summary['hours'] * 1_000_000).round(0)
+        period_summary['sev_rate'] = (period_summary['lost_days_total'] / period_summary['hours'] * 1_000_000).round(0)
+        
+        # Renomeia colunas
         period_summary.columns = [
                 'Período', 'Acidentes', 'Fatais', 'Com Lesão', 
                 'Dias Perdidos', 'Horas', 'Taxa Freq.', 'Taxa Grav.'
         ]
         
         # Formata números
-            for col in ['Acidentes', 'Fatais', 'Com Lesão', 'Dias Perdidos', 'Taxa Freq.', 'Taxa Grav.']:
+        for col in ['Acidentes', 'Fatais', 'Com Lesão', 'Dias Perdidos', 'Taxa Freq.', 'Taxa Grav.']:
             period_summary[col] = period_summary[col].astype(int)
         
-            period_summary['Horas'] = period_summary['Horas'].round(0).astype(int)
+        period_summary['Horas'] = period_summary['Horas'].round(0).astype(int)
         
         st.dataframe(
             period_summary,
