@@ -208,64 +208,115 @@ def app(filters=None):
             else:
                 st.info("Sem dados")
         
-        # Gráfico mensal com linha da meta
+        # Gráfico mensal - Fatalidades + Com Lesão
         display_df = monthly.copy()
-        display_df['Situação'] = display_df['yearly_cumulative'] <= display_df['yearly_target']
         
+        # Cria colunas separadas para cada tipo
+        display_df['Fatalidades'] = display_df['fatalities']
+        display_df['Com Lesão'] = display_df['with_injury']
+        
+        # Gráfico de barras empilhadas
         fig_goal = px.bar(
             display_df,
             x='month_name',
-            y='recordables',
-            color='Situação',
-            color_discrete_map={True: '#28a745', False: '#dc3545'},
-            title='Acidentes Registráveis por Mês'
+            y=['Fatalidades', 'Com Lesão'],
+            title='Acidentes Registráveis por Mês (Fatalidades + Com Lesão)',
+            color_discrete_map={'Fatalidades': '#dc3545', 'Com Lesão': '#ffc107'},
+            text_auto=True
         )
         fig_goal.update_layout(
             height=420,
             xaxis_title='Mês',
-            yaxis_title='Registráveis (Fatalidades + Com Lesão)',
-            showlegend=True,
+            yaxis_title='Número de Acidentes',
+            barmode='stack',
             font=dict(size=12)
         )
+        fig_goal.update_traces(
+            textposition='inside',
+            textfont=dict(size=10, color='white')
+        )
+        
         # Linha da meta mensal
-        fig_goal.add_hline(y=TARGET_RECORDABLES_PER_MONTH, line_dash='dash', line_color='#6c757d', annotation_text='Meta 0.5/mês', annotation_position='top left')
+        fig_goal.add_hline(
+            y=TARGET_RECORDABLES_PER_MONTH, 
+            line_dash='dash', 
+            line_color='#6c757d', 
+            annotation_text='Meta: 0.5/mês', 
+            annotation_position='top right'
+        )
         st.plotly_chart(fig_goal, use_container_width=True)
         
-        # Gráfico de acumulado anual vs meta
+        # Resumo simples dos dados
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            total_fatalities = display_df['Fatalidades'].sum()
+            st.metric("Total Fatalidades", total_fatalities, delta=None)
+        with col2:
+            total_injuries = display_df['Com Lesão'].sum()
+            st.metric("Total Com Lesão", total_injuries, delta=None)
+        with col3:
+            total_recordables = total_fatalities + total_injuries
+            st.metric("Total Registráveis", total_recordables, delta=None)
+        
+        st.markdown("---")
+        
+        # Gráfico de acumulado anual vs meta - Simplificado
         fig_cumulative = px.line(
             display_df,
             x='month_name',
-            y=['yearly_cumulative', 'yearly_target'],
+            y='yearly_cumulative',
             markers=True,
-            title='Acumulado Anual vs Meta (6 por ano)',
-            color_discrete_map={'yearly_cumulative': '#007bff', 'yearly_target': '#6c757d'}
+            title='Acumulado Anual de Acidentes Registráveis',
+            color_discrete_sequence=['#007bff']
         )
         fig_cumulative.update_layout(
             height=400,
             xaxis_title='Mês',
-            yaxis_title='Registráveis Acumulados',
+            yaxis_title='Total Acumulado no Ano',
             font=dict(size=12)
         )
-        fig_cumulative.update_traces(line=dict(width=3), marker=dict(size=8))
+        fig_cumulative.update_traces(line=dict(width=4), marker=dict(size=10))
+        
+        # Adiciona linha da meta anual
+        fig_cumulative.add_hline(
+            y=TARGET_RECORDABLES_PER_YEAR, 
+            line_dash='dash', 
+            line_color='#dc3545', 
+            annotation_text='Meta: 6 por ano', 
+            annotation_position='top right'
+        )
+        
+        # Adiciona área de alerta (acima de 4 acidentes)
+        fig_cumulative.add_hrect(
+            y0=4, y1=TARGET_RECORDABLES_PER_YEAR,
+            fillcolor="rgba(255, 193, 7, 0.2)",
+            annotation_text="Zona de Atenção",
+            annotation_position="top left"
+        )
+        
         st.plotly_chart(fig_cumulative, use_container_width=True)
         
-        # Taxa de registráveis por 1M horas (mensal)
-        st.caption("Taxa de registráveis por 1M horas (referência contextual)")
-        fig_rate = px.line(
-            display_df,
-            x='month_name',
-            y='recordable_rate',
-            markers=True,
-            title='Taxa de Registráveis por 1M de Horas (Mensal)'
-        )
-        fig_rate.update_layout(
-            height=360,
-            xaxis_title='Mês',
-            yaxis_title='Registráveis / 1.000.000 h',
-            font=dict(size=12)
-        )
-        fig_rate.update_traces(line=dict(width=3), marker=dict(size=8))
-        st.plotly_chart(fig_rate, use_container_width=True)
+        # Taxa de registráveis por 1M horas (mensal) - Simplificado
+        if display_df['recordable_rate'].sum() > 0:  # Só mostra se houver dados
+            st.caption("📊 Taxa de registráveis por 1M de horas trabalhadas")
+            fig_rate = px.line(
+                display_df,
+                x='month_name',
+                y='recordable_rate',
+                markers=True,
+                title='Taxa de Acidentes Registráveis (por 1M horas)',
+                color_discrete_sequence=['#17a2b8']
+            )
+            fig_rate.update_layout(
+                height=360,
+                xaxis_title='Mês',
+                yaxis_title='Taxa por 1M horas',
+                font=dict(size=12)
+            )
+            fig_rate.update_traces(line=dict(width=3), marker=dict(size=8))
+            st.plotly_chart(fig_rate, use_container_width=True)
+        else:
+            st.info("📊 **Taxa de Registráveis**\n\nNenhuma taxa calculável (sem horas trabalhadas registradas).")
     else:
         st.info("🎯 **Meta de Registráveis**\n\nNenhum dado disponível para a análise mensal da meta.")
     
