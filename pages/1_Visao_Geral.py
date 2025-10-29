@@ -2,7 +2,13 @@ import streamlit as st
 import plotly.express as px
 import plotly.graph_objects as go
 import pandas as pd
-from services.kpi import fetch_kpi_data, generate_kpi_summary
+from services.kpi import (
+    fetch_kpi_data, 
+    generate_kpi_summary,
+    calculate_poisson_control_limits,
+    calculate_ewma,
+    detect_control_chart_patterns
+)
 from components.filters import apply_filters_to_df
 
 def app(filters=None):
@@ -43,39 +49,39 @@ def app(filters=None):
     
         # Métricas principais em destaque
             col1, col2, col3, col4 = st.columns(4)
-            
-            with col1:
-                    st.metric(
-                        "Taxa de Frequência", 
+        
+        with col1:
+            st.metric(
+                "Taxa de Frequência", 
                 f"{kpi_summary.get('frequency_rate', 0):.0f}",
                 delta=f"{kpi_summary.get('frequency_change', 0):+.1f}%" if kpi_summary.get('frequency_change') else None,
                 help="Acidentes por 1 milhão de horas trabalhadas"
-                    )
-            
-            with col2:
-                    st.metric(
-                        "Taxa de Gravidade", 
+            )
+        
+        with col2:
+            st.metric(
+                "Taxa de Gravidade", 
                 f"{kpi_summary.get('severity_rate', 0):.0f}",
                 delta=f"{kpi_summary.get('severity_change', 0):+.1f}%" if kpi_summary.get('severity_change') else None,
                 help="Dias perdidos por 1 milhão de horas trabalhadas"
-                    )
-            
-            with col3:
+            )
+        
+        with col3:
             st.metric(
                 "Total de Acidentes",
                 kpi_summary.get('total_accidents', 0),
                 help="Total de acidentes no período"
             )
-            
-            with col4:
+        
+        with col4:
             st.metric(
                 "Dias Perdidos",
                 kpi_summary.get('total_lost_days', 0),
                 help="Total de dias perdidos no período"
             )
-    
+        
         # Status geral
-    st.markdown("---")
+        st.markdown("---")
     
         # === STATUS DE SEGURANÇA ===
         col1, col2 = st.columns([2, 1])
@@ -153,37 +159,37 @@ def app(filters=None):
         # === RESUMO MENSAL SIMPLIFICADO ===
         st.subheader("📅 Resumo Mensal")
     
-        if not df.empty:
-            # Tabela simplificada
-            period_summary = df.groupby('period').agg({
-                'accidents_total': 'sum',
-                'fatalities': 'sum',
-                'with_injury': 'sum',
-                'lost_days_total': 'sum',
-                'hours': 'sum'
-            }).reset_index()
-            
+    if not df.empty:
+        # Tabela simplificada
+        period_summary = df.groupby('period').agg({
+            'accidents_total': 'sum',
+            'fatalities': 'sum',
+            'with_injury': 'sum',
+            'lost_days_total': 'sum',
+            'hours': 'sum'
+        }).reset_index()
+        
             # Calcula taxas
             period_summary['freq_rate'] = (period_summary['accidents_total'] / period_summary['hours'] * 1_000_000).round(0)
             period_summary['sev_rate'] = (period_summary['lost_days_total'] / period_summary['hours'] * 1_000_000).round(0)
             
             # Renomeia colunas
-            period_summary.columns = [
+        period_summary.columns = [
                 'Período', 'Acidentes', 'Fatais', 'Com Lesão', 
                 'Dias Perdidos', 'Horas', 'Taxa Freq.', 'Taxa Grav.'
-            ]
-            
-            # Formata números
+        ]
+        
+        # Formata números
             for col in ['Acidentes', 'Fatais', 'Com Lesão', 'Dias Perdidos', 'Taxa Freq.', 'Taxa Grav.']:
-                period_summary[col] = period_summary[col].astype(int)
-            
+            period_summary[col] = period_summary[col].astype(int)
+        
             period_summary['Horas'] = period_summary['Horas'].round(0).astype(int)
-            
-            st.dataframe(
-                period_summary,
-                use_container_width=True,
-                hide_index=True
-            )
+        
+        st.dataframe(
+            period_summary,
+            use_container_width=True,
+            hide_index=True
+        )
     
         # === ALERTAS SIMPLIFICADOS ===
         st.subheader("🚨 Alertas")
@@ -209,6 +215,119 @@ def app(filters=None):
                 st.markdown(alert)
         else:
             st.success("✅ Nenhum alerta crítico identificado")
+        
+        st.markdown("---")
+        
+        # === CONTROLES ESTATÍSTICOS ===
+        st.subheader("📊 Controles Estatísticos")
+        
+        if not df.empty and len(df) >= 3:
+            # Calcula limites de controle para taxa de frequência
+            freq_limits = calculate_poisson_control_limits(df)
+            
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                st.markdown("**📈 Taxa de Frequência - Controle Estatístico**")
+                st.metric("Limite Superior", f"{freq_limits['ucl'].iloc[-1]:.1f}")
+                st.metric("Valor Esperado", f"{freq_limits['expected'].iloc[-1]:.1f}")
+                st.metric("Limite Inferior", f"{freq_limits['lcl'].iloc[-1]:.1f}")
+            
+            with col2:
+                st.markdown("**📊 Status do Controle**")
+                current_freq = df['accidents_total'].iloc[-1] if not df.empty else 0
+                if current_freq > freq_limits['ucl'].iloc[-1]:
+                    st.error("🚨 **FORA DE CONTROLE** - Acima do limite superior")
+                elif current_freq < freq_limits['lcl'].iloc[-1]:
+                    st.success("✅ **MELHORIA** - Abaixo do limite inferior")
+                else:
+                    st.info("📊 **SOB CONTROLE** - Dentro dos limites")
+                
+                st.metric("Valor Atual", f"{current_freq:.1f}")
+        
+        st.markdown("---")
+        
+        # === MONITORAMENTO DE TENDÊNCIAS ===
+        st.subheader("📈 Monitoramento de Tendências (EWMA)")
+        
+        if not df.empty and len(df) >= 3:
+            # Calcula EWMA para taxa de frequência
+            df['freq_rate'] = (df['accidents_total'] / df['hours']) * 1_000_000
+            ewma_data = calculate_ewma(df, 'freq_rate', lambda_param=0.2)
+            
+            # Cria gráfico de tendência
+            fig = go.Figure()
+            
+            # Dados reais
+            fig.add_trace(go.Scatter(
+                x=df['period'],
+                y=df['freq_rate'],
+                mode='lines+markers',
+                name='📊 Taxa de Frequência Real',
+                line=dict(color='#1f77b4', width=2),
+                marker=dict(size=6)
+            ))
+            
+            # EWMA
+            fig.add_trace(go.Scatter(
+                x=ewma_data['period'],
+                y=ewma_data['ewma'],
+                mode='lines',
+                name='📈 Tendência Suavizada (EWMA)',
+                line=dict(color='#ff7f0e', width=3)
+            ))
+            
+            # Limites de controle EWMA
+            fig.add_trace(go.Scatter(
+                x=ewma_data['period'],
+                y=ewma_data['ewma_ucl'],
+                mode='lines',
+                name='⚠️ Limite Superior',
+                line=dict(color='red', width=2, dash='dash')
+            ))
+            
+            fig.add_trace(go.Scatter(
+                x=ewma_data['period'],
+                y=ewma_data['ewma_lcl'],
+                mode='lines',
+                name='✅ Limite Inferior',
+                line=dict(color='green', width=2, dash='dash')
+            ))
+            
+            fig.update_layout(
+                title="📈 Monitoramento de Tendências - Taxa de Frequência",
+                xaxis_title="Período",
+                yaxis_title="Taxa de Frequência",
+                height=400,
+                template="plotly_white"
+            )
+            
+            st.plotly_chart(fig, use_container_width=True)
+            
+            # Análise de tendência
+            col1, col2, col3 = st.columns(3)
+            
+            with col1:
+                st.metric(
+                    "Valor EWMA Atual",
+                    f"{ewma_data['ewma'].iloc[-1]:.2f}",
+                    help="Valor atual da tendência suavizada"
+                )
+            
+            with col2:
+                trend_status = "📈 Crescente" if ewma_data['ewma'].iloc[-1] > ewma_data['ewma'].iloc[-2] else "📉 Decrescente" if ewma_data['ewma'].iloc[-1] < ewma_data['ewma'].iloc[-2] else "➡️ Estável"
+                st.metric("Tendência", trend_status)
+            
+            with col3:
+                if ewma_data['ewma'].iloc[-1] > ewma_data['ewma_ucl'].iloc[-1]:
+                    st.error("🚨 **ALERTA** - Acima do limite")
+                elif ewma_data['ewma'].iloc[-1] < ewma_data['ewma_lcl'].iloc[-1]:
+                    st.success("✅ **MELHORIA** - Abaixo do limite")
+                else:
+                    st.info("📊 **NORMAL** - Dentro dos limites")
+        
+        else:
+            st.warning("⚠️ Dados insuficientes para análise de tendências (mínimo 3 períodos)")
     
     with tab2:
         st.subheader("📚 Metodologia do Dashboard Executivo")
