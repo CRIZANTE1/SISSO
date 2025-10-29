@@ -42,7 +42,7 @@ def app(filters=None):
     df = apply_filters_to_df(df, filters)
     
     # Tabs para diferentes análises
-    tab1, tab2, tab3, tab4 = st.tabs(["📊 KPIs Básicos", "📈 Controles Estatísticos", "🔍 Método M", "📋 Relatórios"])
+    tab1, tab2, tab3, tab4 = st.tabs(["📊 KPIs Básicos", "📈 Controles Estatísticos", "📊 Monitoramento de Tendências", "📋 Relatórios"])
     
     with tab1:
         st.subheader("KPIs Básicos de Segurança")
@@ -194,112 +194,224 @@ def app(filters=None):
             st.dataframe(out_of_control_data, use_container_width=True)
     
     with tab3:
-        st.subheader("Método M - Monitoramento de Indicadores")
+        st.subheader("📊 Monitoramento Avançado de Tendências")
         
-        # Parâmetros do EWMA
+        # Explicação do método
+        st.info("""
+        **📈 O que é o Monitoramento de Tendências?**
+        
+        Esta ferramenta utiliza a técnica **EWMA (Média Móvel Ponderada Exponencialmente)** para detectar 
+        mudanças sutis nos indicadores de segurança ao longo do tempo. É especialmente útil para:
+        
+        - 🔍 **Detectar tendências** antes que se tornem problemas críticos
+        - 📊 **Suavizar variações** aleatórias nos dados
+        - ⚠️ **Alertar precocemente** sobre mudanças no desempenho
+        - 📈 **Identificar melhorias** ou deterioração gradual
+        """)
+        
+        # Configurações
+        st.subheader("⚙️ Configurações da Análise")
+        
         col1, col2 = st.columns(2)
         
         with col1:
-            lambda_param = st.slider(
-                "Parâmetro λ (Lambda) para EWMA",
-                min_value=0.1,
-                max_value=0.5,
-                value=0.2,
-                step=0.05,
-                help="Valores menores suavizam mais a série temporal"
-            )
-        
-        with col2:
             metric_choice = st.selectbox(
-                "Métrica para Análise EWMA",
+                "📊 Indicador para Monitoramento",
                 options=["accidents_total", "freq_rate_per_million", "sev_rate_per_million"],
                 format_func=lambda x: {
                     "accidents_total": "Total de Acidentes",
                     "freq_rate_per_million": "Taxa de Frequência",
                     "sev_rate_per_million": "Taxa de Gravidade"
-                }[x]
+                }[x],
+                help="Selecione qual indicador você deseja monitorar"
+            )
+        
+        with col2:
+            lambda_param = st.slider(
+                "🎛️ Sensibilidade da Detecção",
+                min_value=0.1,
+                max_value=0.5,
+                value=0.2,
+                step=0.05,
+                help="Valores menores = mais suave (detecta mudanças graduais)\nValores maiores = mais sensível (detecta mudanças rápidas)"
             )
         
         # Calcula EWMA
         ewma_df = calculate_ewma(df, metric_choice, lambda_param)
         
-        # Gráfico EWMA
+        # Gráfico de monitoramento
+        st.subheader("📈 Gráfico de Monitoramento")
+        
         fig1 = go.Figure()
         
-        # Valores observados
+        # Valores observados (dados reais)
         fig1.add_trace(go.Scatter(
             x=ewma_df['period'],
             y=ewma_df[metric_choice],
             mode='lines+markers',
-            name='Valores Observados',
+            name='📊 Dados Reais',
             line=dict(color='#1f77b4', width=2),
-            marker=dict(size=6)
+            marker=dict(size=6),
+            opacity=0.7
         ))
         
-        # EWMA
+        # Linha de tendência (EWMA)
         fig1.add_trace(go.Scatter(
             x=ewma_df['period'],
             y=ewma_df['ewma'],
             mode='lines',
-            name='EWMA',
-            line=dict(color='red', width=3)
+            name='📈 Tendência Suavizada',
+            line=dict(color='#ff6b35', width=4)
         ))
         
-        # Limites de controle EWMA
+        # Limite superior de controle
         fig1.add_trace(go.Scatter(
             x=ewma_df['period'],
             y=ewma_df['ewma_ucl'],
             mode='lines',
-            name='UCL EWMA',
-            line=dict(color='red', width=2, dash='dash')
+            name='⚠️ Limite Superior',
+            line=dict(color='#dc3545', width=2, dash='dash'),
+            opacity=0.8
+        ))
+        
+        # Limite inferior de controle
+        fig1.add_trace(go.Scatter(
+            x=ewma_df['period'],
+            y=ewma_df['ewma_lcl'],
+            mode='lines',
+            name='✅ Limite Inferior',
+            line=dict(color='#28a745', width=2, dash='dash'),
+            opacity=0.8
+        ))
+        
+        # Área entre os limites
+        fig1.add_trace(go.Scatter(
+            x=ewma_df['period'],
+            y=ewma_df['ewma_ucl'],
+            fill=None,
+            mode='lines',
+            line_color='rgba(0,0,0,0)',
+            showlegend=False,
+            hoverinfo="skip"
         ))
         
         fig1.add_trace(go.Scatter(
             x=ewma_df['period'],
             y=ewma_df['ewma_lcl'],
+            fill='tonexty',
             mode='lines',
-            name='LCL EWMA',
-            line=dict(color='red', width=2, dash='dash')
+            line_color='rgba(0,0,0,0)',
+            name='Zona de Controle',
+            fillcolor='rgba(0,255,0,0.1)',
+            hoverinfo="skip"
         ))
         
+        # Título e labels mais claros
+        metric_name = {
+            "accidents_total": "Total de Acidentes",
+            "freq_rate_per_million": "Taxa de Frequência",
+            "sev_rate_per_million": "Taxa de Gravidade"
+        }[metric_choice]
+        
         fig1.update_layout(
-            title=f'Análise EWMA - {metric_choice}',
+            title=f'📊 Monitoramento de Tendências - {metric_name}',
             xaxis_title='Período',
-            yaxis_title=metric_choice,
+            yaxis_title=metric_name,
             hovermode='x unified',
-            template='plotly_white'
+            template='plotly_white',
+            height=500,
+            font=dict(size=12)
         )
         
         st.plotly_chart(fig1, use_container_width=True)
         
-        # Análise de sinais EWMA
-        st.subheader("Análise de Sinais EWMA")
+        # Interpretação do gráfico
+        st.subheader("🔍 Como Interpretar o Gráfico")
         
-        # Identifica pontos fora dos limites EWMA
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.markdown("""
+            **📊 Dados Reais (azul)**
+            - Valores observados em cada período
+            - Podem ter variações aleatórias
+            
+            **📈 Tendência Suavizada (laranja)**
+            - Mostra a direção geral do indicador
+            - Ignora variações temporárias
+            - Linha ascendente = piora, descendente = melhora
+            """)
+        
+        with col2:
+            st.markdown("""
+            **⚠️ Limites de Controle**
+            - Linha vermelha tracejada = limite superior
+            - Linha verde tracejada = limite inferior
+            - Zona verde = desempenho normal
+            - Fora da zona = atenção necessária
+            """)
+        
+        # Análise de alertas
+        st.subheader("🚨 Análise de Alertas")
+        
+        # Identifica pontos fora dos limites
         ewma_out_of_control = (ewma_df[metric_choice] > ewma_df['ewma_ucl']) | (ewma_df[metric_choice] < ewma_df['ewma_lcl'])
         
         if ewma_out_of_control.any():
-            st.warning(f"⚠️ **{ewma_out_of_control.sum()} pontos** fora dos limites de controle EWMA!")
+            st.warning(f"⚠️ **{ewma_out_of_control.sum()} períodos** com indicadores fora da zona de controle!")
             
-            # Mostra pontos problemáticos
-            problem_points = ewma_df[ewma_out_of_control][['period', metric_choice, 'ewma', 'ewma_ucl', 'ewma_lcl']]
-            st.dataframe(problem_points, use_container_width=True)
+            # Mostra pontos problemáticos de forma mais clara
+            problem_points = ewma_df[ewma_out_of_control].copy()
+            problem_points['Status'] = problem_points.apply(
+                lambda row: "🔴 Acima do Limite" if row[metric_choice] > row['ewma_ucl'] else "🟢 Abaixo do Limite", 
+                axis=1
+            )
+            
+            display_cols = ['period', metric_choice, 'ewma', 'ewma_ucl', 'ewma_lcl', 'Status']
+            problem_display = problem_points[display_cols].copy()
+            problem_display.columns = ['Período', 'Valor Real', 'Tendência', 'Limite Superior', 'Limite Inferior', 'Status']
+            
+            st.dataframe(problem_display, use_container_width=True, hide_index=True)
         else:
-            st.success("✅ Todos os pontos estão dentro dos limites de controle EWMA!")
+            st.success("✅ **Excelente!** Todos os períodos estão dentro da zona de controle normal.")
         
-        # Estatísticas do EWMA
-        st.subheader("Estatísticas do EWMA")
+        # Resumo da análise
+        st.subheader("📊 Resumo da Análise")
         
         col1, col2, col3 = st.columns(3)
         
         with col1:
-            st.metric("Valor Inicial EWMA", f"{ewma_df['ewma'].iloc[0]:.2f}")
+            st.metric(
+                "🎯 Valor Inicial", 
+                f"{ewma_df['ewma'].iloc[0]:.1f}",
+                help="Valor da tendência no primeiro período"
+            )
         
         with col2:
-            st.metric("Valor Final EWMA", f"{ewma_df['ewma'].iloc[-1]:.2f}")
+            st.metric(
+                "📈 Valor Atual", 
+                f"{ewma_df['ewma'].iloc[-1]:.1f}",
+                help="Valor atual da tendência"
+            )
         
         with col3:
-            st.metric("Variação EWMA", f"{ewma_df['ewma'].iloc[-1] - ewma_df['ewma'].iloc[0]:.2f}")
+            variation = ewma_df['ewma'].iloc[-1] - ewma_df['ewma'].iloc[0]
+            st.metric(
+                "📊 Variação Total", 
+                f"{variation:+.1f}",
+                delta="Melhoria" if variation < 0 else "Deterioração" if variation > 0 else "Estável",
+                help="Mudança total na tendência"
+            )
+        
+        # Recomendações baseadas na análise
+        st.subheader("💡 Recomendações")
+        
+        if variation > 0:
+            st.warning("📈 **Tendência de Deterioração Detectada**\n\n- Revisar procedimentos de segurança\n- Investigar causas raiz\n- Implementar ações corretivas")
+        elif variation < -0.1:
+            st.success("📉 **Tendência de Melhoria Detectada**\n\n- Manter práticas atuais\n- Documentar boas práticas\n- Compartilhar lições aprendidas")
+        else:
+            st.info("📊 **Tendência Estável**\n\n- Continuar monitoramento\n- Manter padrões atuais\n- Focar em melhorias contínuas")
     
     with tab4:
         st.subheader("Relatórios de KPIs")
