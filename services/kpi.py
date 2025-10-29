@@ -135,21 +135,20 @@ def generate_kpi_summary(df: pd.DataFrame) -> Dict[str, Any]:
     if df.empty:
         return {}
     
+    # Calcula totais acumulados para todo o período
+    total_accidents = df['accidents_total'].sum()
+    total_lost_days = df['lost_days_total'].sum()
+    total_hours = df['hours'].sum()
+    total_fatalities = df.get('fatalities', pd.Series([0] * len(df))).sum()
+    
+    # Cálculos acumulados para todo o período
+    freq_rate = calculate_frequency_rate(total_accidents, total_hours)
+    sev_rate = calculate_severity_rate(total_lost_days, total_hours)
+    
+    # Comparação com período anterior (último período vs penúltimo)
     latest_period = df['period'].max()
     latest_data = df[df['period'] == latest_period].iloc[0]
     
-    # Cálculos para o período mais recente
-    freq_rate = calculate_frequency_rate(
-        latest_data['accidents_total'], 
-        latest_data['hours']
-    )
-    
-    sev_rate = calculate_severity_rate(
-        latest_data['lost_days_total'], 
-        latest_data['hours']
-    )
-    
-    # Comparação com período anterior
     prev_period_data = df[df['period'] < latest_period]
     if not prev_period_data.empty:
         prev_data = prev_period_data.iloc[-1]
@@ -175,8 +174,8 @@ def generate_kpi_summary(df: pd.DataFrame) -> Dict[str, Any]:
         'severity_rate': sev_rate,
         'frequency_change': freq_change,
         'severity_change': sev_change,
-        'total_accidents': latest_data['accidents_total'],
-        'total_fatalities': latest_data.get('fatalities', 0),
-        'total_lost_days': latest_data['lost_days_total'],
-        'total_hours': latest_data['hours']
+        'total_accidents': total_accidents,
+        'total_fatalities': total_fatalities,
+        'total_lost_days': total_lost_days,
+        'total_hours': total_hours
     }
