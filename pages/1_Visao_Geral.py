@@ -159,6 +159,83 @@ def app(filters=None):
     else:
         st.info("📈 **Análise de Tendências**\n\nNenhum dado suficiente disponível para exibir as tendências.")
     
+    # Meta de Acidentes Registráveis (Fatalidades + Com Lesão)
+    st.subheader("🎯 Meta de Acidentes Registráveis (≤ 6 por ano)")
+    TARGET_RECORDABLES_PER_YEAR = 6
+    
+    if not df.empty and 'period' in df.columns:
+        kpi_df = df.copy()
+        kpi_df['year'] = pd.to_datetime(kpi_df['period']).dt.year
+        # Soma anual
+        yearly = (
+            kpi_df.groupby('year')[['fatalities', 'with_injury', 'hours']]
+            .sum()
+            .reset_index()
+        )
+        yearly['recordables'] = yearly['fatalities'] + yearly['with_injury']
+        yearly['recordable_rate'] = yearly.apply(
+            lambda r: ((r['recordables'] / r['hours']) * 1_000_000) if r['hours'] else 0.0,
+            axis=1
+        )
+        
+        # KPIs do ano corrente
+        current_year = int(yearly['year'].max()) if not yearly.empty else None
+        current_row = yearly[yearly['year'] == current_year].iloc[0] if current_year is not None else None
+        
+        c1, c2, c3 = st.columns(3)
+        with c1:
+            st.metric("Registráveis no Ano", int(current_row['recordables']) if current_row is not None else 0)
+        with c2:
+            st.metric("Meta Anual", TARGET_RECORDABLES_PER_YEAR)
+        with c3:
+            status_txt = "Dentro da Meta" if current_row is not None and current_row['recordables'] <= TARGET_RECORDABLES_PER_YEAR else "Acima da Meta"
+            if current_row is not None and current_row['recordables'] <= TARGET_RECORDABLES_PER_YEAR:
+                st.success(status_txt)
+            else:
+                st.error(status_txt)
+        
+        # Gráfico anual com linha da meta
+        display_df = yearly.copy()
+        display_df['Situação'] = display_df['recordables'] <= TARGET_RECORDABLES_PER_YEAR
+        fig_goal = px.bar(
+            display_df,
+            x='year',
+            y='recordables',
+            color='Situação',
+            color_discrete_map={True: '#28a745', False: '#dc3545'},
+            title='Acidentes Registráveis por Ano'
+        )
+        fig_goal.update_layout(
+            height=420,
+            xaxis_title='Ano',
+            yaxis_title='Registráveis (Fatalidades + Com Lesão)',
+            showlegend=True,
+            font=dict(size=12)
+        )
+        # Linha da meta
+        fig_goal.add_hline(y=TARGET_RECORDABLES_PER_YEAR, line_dash='dash', line_color='#6c757d', annotation_text='Meta 6', annotation_position='top left')
+        st.plotly_chart(fig_goal, use_container_width=True)
+        
+        # Taxa de registráveis por 1M horas (opcional)
+        st.caption("Taxa de registráveis por 1M horas (referência contextual)")
+        fig_rate = px.line(
+            display_df,
+            x='year',
+            y='recordable_rate',
+            markers=True,
+            title='Taxa de Registráveis por 1M de Horas (Anual)'
+        )
+        fig_rate.update_layout(
+            height=360,
+            xaxis_title='Ano',
+            yaxis_title='Registráveis / 1.000.000 h',
+            font=dict(size=12)
+        )
+        fig_rate.update_traces(line=dict(width=3), marker=dict(size=8))
+        st.plotly_chart(fig_rate, use_container_width=True)
+    else:
+        st.info("🎯 **Meta de Registráveis**\n\nNenhum dado disponível para a análise anual da meta.")
+    
     # Resumo por Período
     st.subheader("📅 Resumo por Período")
     
@@ -196,8 +273,13 @@ def app(filters=None):
     # Alertas e recomendações
     st.subheader("🚨 Alertas e Recomendações")
     
+    # (Re)calcula dataframe de controle caso disponível
+    control_df = pd.DataFrame()
+    if not df.empty and 'accidents_total' in df.columns and 'hours' in df.columns:
+        control_df = calculate_poisson_control_limits(df)
+    
     # Verifica padrões de controle
-    if 'out_of_control' in control_df.columns:
+    if not control_df.empty and 'out_of_control' in control_df.columns:
         out_of_control_count = control_df['out_of_control'].sum()
         if out_of_control_count > 0:
             st.warning(f"⚠️ **{out_of_control_count}** pontos fora de controle estatístico detectados!")
