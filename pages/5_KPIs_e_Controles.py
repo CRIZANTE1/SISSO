@@ -166,32 +166,130 @@ def app(filters=None):
         st.plotly_chart(fig1, use_container_width=True)
         
         # Análise de padrões
-        patterns = detect_control_chart_patterns(
-            control_df,
-            "accidents_total",
-            "ucl",
-            "lcl"
-        )
-        
-        # Alertas baseados em padrões
-        st.subheader("🚨 Análise de Padrões")
-        
-        if patterns['out_of_control']:
-            st.warning(f"⚠️ **{len(patterns['out_of_control'])} pontos fora de controle** detectados!")
-        
-        if patterns['trend_up']:
-            st.error(f"🚨 **Tendência ascendente crítica** detectada em {len(patterns['trend_up'])} pontos!")
-        
-        if patterns['trend_down']:
-            st.success(f"✅ **Tendência descendente positiva** detectada em {len(patterns['trend_down'])} pontos!")
-        
-        # Tabela de pontos fora de controle
-        if patterns['out_of_control']:
-            st.subheader("Pontos Fora de Controle")
-            out_of_control_data = control_df.iloc[patterns['out_of_control']][
-                ['period', 'accidents_total', 'expected', 'ucl', 'lcl']
-            ]
-            st.dataframe(out_of_control_data, use_container_width=True)
+        try:
+            patterns = detect_control_chart_patterns(
+                control_df,
+                "accidents_total",
+                "ucl",
+                "lcl"
+            )
+            
+            # Alertas baseados em padrões
+            st.subheader("🚨 Análise de Padrões")
+            
+            # Explicação da análise
+            st.info("""
+            **📊 O que é a Análise de Padrões?**
+            
+            Esta ferramenta detecta automaticamente padrões estatísticos nos dados de acidentes:
+            
+            - 🔴 **Pontos Fora de Controle**: Valores que excedem os limites estatísticos
+            - 📈 **Tendência Ascendente**: 8 pontos consecutivos em alta (crítico)
+            - 📉 **Tendência Descendente**: 8 pontos consecutivos em baixa (positivo)
+            """)
+            
+            # Resumo dos padrões detectados
+            col1, col2, col3 = st.columns(3)
+            
+            with col1:
+                out_of_control_count = len(patterns['out_of_control'])
+                if out_of_control_count > 0:
+                    st.error(f"🔴 **{out_of_control_count} pontos fora de controle**")
+                else:
+                    st.success("✅ **Todos os pontos dentro dos limites**")
+            
+            with col2:
+                trend_up_count = len(patterns['trend_up'])
+                if trend_up_count > 0:
+                    st.error(f"📈 **{trend_up_count} tendências ascendentes críticas**")
+                else:
+                    st.success("✅ **Nenhuma tendência ascendente crítica**")
+            
+            with col3:
+                trend_down_count = len(patterns['trend_down'])
+                if trend_down_count > 0:
+                    st.success(f"📉 **{trend_down_count} tendências descendentes positivas**")
+                else:
+                    st.info("📊 **Nenhuma tendência descendente detectada**")
+            
+            # Detalhes dos padrões detectados
+            if patterns['out_of_control'] or patterns['trend_up'] or patterns['trend_down']:
+                st.subheader("📋 Detalhes dos Padrões Detectados")
+                
+                # Pontos fora de controle
+                if patterns['out_of_control']:
+                    st.warning(f"⚠️ **{len(patterns['out_of_control'])} Pontos Fora de Controle**")
+                    
+                    out_of_control_data = control_df.iloc[patterns['out_of_control']].copy()
+                    out_of_control_data['Status'] = out_of_control_data.apply(
+                        lambda row: "🔴 Acima do Limite" if row['accidents_total'] > row['ucl'] else "🟢 Abaixo do Limite",
+                        axis=1
+                    )
+                    
+                    display_cols = ['period', 'accidents_total', 'expected', 'ucl', 'lcl', 'Status']
+                    problem_display = out_of_control_data[display_cols].copy()
+                    problem_display.columns = ['Período', 'Acidentes', 'Esperado', 'Limite Superior', 'Limite Inferior', 'Status']
+                    
+                    st.dataframe(problem_display, use_container_width=True, hide_index=True)
+                
+                # Tendências ascendentes
+                if patterns['trend_up']:
+                    st.error(f"🚨 **{len(patterns['trend_up'])} Tendências Ascendentes Críticas**")
+                    st.markdown("**Períodos com tendência ascendente:**")
+                    trend_periods = [control_df.iloc[i]['period'] for i in patterns['trend_up']]
+                    for period in trend_periods:
+                        st.markdown(f"- {period}")
+                
+                # Tendências descendentes
+                if patterns['trend_down']:
+                    st.success(f"✅ **{len(patterns['trend_down'])} Tendências Descendentes Positivas**")
+                    st.markdown("**Períodos com tendência descendente:**")
+                    trend_periods = [control_df.iloc[i]['period'] for i in patterns['trend_down']]
+                    for period in trend_periods:
+                        st.markdown(f"- {period}")
+            
+            else:
+                st.success("🎉 **Excelente!** Nenhum padrão problemático detectado nos dados.")
+                st.info("📊 Os indicadores estão dentro dos limites estatísticos normais.")
+            
+            # Recomendações baseadas nos padrões
+            st.subheader("💡 Recomendações")
+            
+            if patterns['out_of_control']:
+                st.warning("""
+                **🔴 Ação Imediata Necessária:**
+                - Investigar causas dos pontos fora de controle
+                - Revisar procedimentos de segurança
+                - Implementar medidas corretivas urgentes
+                """)
+            
+            if patterns['trend_up']:
+                st.error("""
+                **🚨 Tendência Crítica Detectada:**
+                - Análise de causa raiz obrigatória
+                - Revisão completa dos processos
+                - Implementação de plano de ação emergencial
+                """)
+            
+            if patterns['trend_down']:
+                st.success("""
+                **✅ Tendência Positiva:**
+                - Manter práticas atuais
+                - Documentar boas práticas
+                - Compartilhar lições aprendidas
+                """)
+            
+            if not any([patterns['out_of_control'], patterns['trend_up'], patterns['trend_down']]):
+                st.info("""
+                **📊 Situação Estável:**
+                - Continuar monitoramento regular
+                - Manter padrões atuais
+                - Focar em melhorias contínuas
+                """)
+                
+        except Exception as e:
+            st.error(f"❌ **Erro na análise de padrões:** {str(e)}")
+            st.info("Verifique se os dados estão no formato correto e tente novamente.")
     
     with tab3:
         st.subheader("📊 Monitoramento Avançado de Tendências")
@@ -367,9 +465,15 @@ def app(filters=None):
                 axis=1
             )
             
-            display_cols = ['period', metric_choice, 'ewma', 'ewma_ucl', 'ewma_lcl', 'Status']
-            problem_display = problem_points[display_cols].copy()
-            problem_display.columns = ['Período', 'Valor Real', 'Tendência', 'Limite Superior', 'Limite Inferior', 'Status']
+            # Cria DataFrame com colunas renomeadas
+            problem_display = pd.DataFrame({
+                'Período': problem_points['period'],
+                'Valor Real': problem_points[metric_choice],
+                'Tendência': problem_points['ewma'],
+                'Limite Superior': problem_points['ewma_ucl'],
+                'Limite Inferior': problem_points['ewma_lcl'],
+                'Status': problem_points['Status']
+            })
             
             st.dataframe(problem_display, use_container_width=True, hide_index=True)
         else:
@@ -420,10 +524,12 @@ def app(filters=None):
         col1, col2 = st.columns(2)
         
         with col1:
-            report_start = st.date_input("Data Inicial do Relatório", value=df['period'].min())
+            min_date = pd.to_datetime(df['period'].min()).date()
+            report_start = st.date_input("Data Inicial do Relatório", value=min_date)
         
         with col2:
-            report_end = st.date_input("Data Final do Relatório", value=df['period'].max())
+            max_date = pd.to_datetime(df['period'].max()).date()
+            report_end = st.date_input("Data Final do Relatório", value=max_date)
         
         # Filtra dados para o relatório
         report_df = df[(df['period'] >= str(report_start)) & (df['period'] <= str(report_end))]
@@ -470,13 +576,22 @@ def app(filters=None):
             
             # Botão para exportar
             if st.button("📥 Exportar Relatório CSV"):
-                csv = report_df[available_cols].to_csv(index=False)
-                st.download_button(
-                    "💾 Baixar CSV",
-                    csv,
-                    f"relatorio_kpi_{report_start}_{report_end}.csv",
-                    "text/csv"
-                )
+                try:
+                    # Cria DataFrame para exportação
+                    export_data = pd.DataFrame()
+                    for col in available_cols:
+                        if col in report_df.columns:
+                            export_data[col] = report_df[col]
+                    
+                    csv_data = export_data.to_csv(index=False)
+                    st.download_button(
+                        "💾 Baixar CSV",
+                        csv_data,
+                        f"relatorio_kpi_{report_start}_{report_end}.csv",
+                        "text/csv"
+                    )
+                except Exception as e:
+                    st.error(f"Erro ao exportar CSV: {str(e)}")
         else:
             st.info("Nenhum dado encontrado para o período selecionado.")
 
