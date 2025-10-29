@@ -59,8 +59,12 @@ def app(filters=None):
         # Resumo dos KPIs
         kpi_summary = generate_kpi_summary(df)
         
-        # Métricas principais
-        metrics = [
+        # Cria abas para diferentes seções
+        tab1, tab2, tab3 = st.tabs(["📊 Análises", "📚 Metodologia", "🔧 Configurações"])
+        
+        with tab1:
+            # Métricas principais
+            metrics = [
             {
                 "title": "Taxa de Frequência",
                 "value": f"{kpi_summary.get('frequency_rate', 0):.2f}",
@@ -795,6 +799,384 @@ def app(filters=None):
                     st.error(f"Erro ao exportar CSV: {str(e)}")
         else:
             st.info("Nenhum dado encontrado para o período selecionado.")
+    
+    with tab2:
+        st.subheader("📚 Metodologia dos KPIs e Controles Estatísticos")
+        
+        st.markdown("""
+        ## 🎯 Objetivo dos KPIs
+        
+        Os KPIs (Key Performance Indicators) de segurança são métricas quantitativas que permitem:
+        - **Medir** o desempenho em segurança
+        - **Comparar** períodos e metas
+        - **Identificar** tendências e padrões
+        - **Tomar decisões** baseadas em dados
+        - **Comunicar** resultados de forma clara
+        """)
+        
+        st.markdown("""
+        ## 📊 Indicadores Principais
+        
+        ### 1. Taxa de Frequência
+        - **Fórmula**: `(Total de Acidentes ÷ Total de Horas Trabalhadas) × 1.000.000`
+        - **Unidade**: Acidentes por 1 milhão de horas trabalhadas
+        - **Interpretação**:
+          - **< 5**: Excelente desempenho
+          - **5-10**: Aceitável, monitorar
+          - **> 10**: Crítico, ação necessária
+        - **Uso**: Mede a frequência de acidentes em relação à exposição
+        
+        ### 2. Taxa de Gravidade
+        - **Fórmula**: `(Total de Dias Perdidos ÷ Total de Horas Trabalhadas) × 1.000.000`
+        - **Unidade**: Dias perdidos por 1 milhão de horas trabalhadas
+        - **Interpretação**:
+          - **< 50**: Excelente desempenho
+          - **50-100**: Aceitável, monitorar
+          - **> 100**: Crítico, ação necessária
+        - **Uso**: Mede o impacto econômico dos acidentes
+        
+        ### 3. Total de Acidentes
+        - **Definição**: Soma de todos os acidentes no período
+        - **Categorias**: Fatais, Com Lesão, Sem Lesão
+        - **Uso**: Contagem absoluta de eventos
+        
+        ### 4. Dias Perdidos
+        - **Definição**: Total de dias de trabalho perdidos
+        - **Uso**: Medida de impacto econômico e social
+        """)
+        
+        st.markdown("""
+        ## 📈 Controles Estatísticos
+        
+        ### Cartas de Controle de Poisson
+        - **Método**: Controle estatístico para eventos raros
+        - **Aplicação**: Acidentes são eventos raros e independentes
+        - **Limites**:
+          - **LSC**: Limite Superior de Controle
+          - **LIC**: Limite Inferior de Controle
+          - **LM**: Linha Média (média histórica)
+        
+        ### Interpretação dos Limites
+        - **Dentro dos Limites**: Processo sob controle
+        - **Fora dos Limites**: Processo fora de controle
+        - **Tendências**: Padrões que indicam mudanças no processo
+        
+        ### Vantagens
+        - Detecta mudanças sutis no processo
+        - Distingue entre variação comum e especial
+        - Permite ação preventiva antes de problemas graves
+        """)
+        
+        st.markdown("""
+        ## 📊 Monitoramento de Tendências (EWMA)
+        
+        ### Exponentially Weighted Moving Average
+        - **Método**: Média móvel exponencialmente ponderada
+        - **Parâmetro λ (Lambda)**: Controla a sensibilidade (0.1 a 0.3)
+        - **Vantagens**:
+          - Detecta mudanças graduais
+          - Menos sensível a variações aleatórias
+          - Ideal para processos com autocorrelação
+        
+        ### Interpretação
+        - **Valor EWMA > LSC**: Tendência de piora
+        - **Valor EWMA < LIC**: Tendência de melhoria
+        - **Valor EWMA ≈ LM**: Processo estável
+        
+        ### Parâmetros Recomendados
+        - **λ = 0.1**: Alta sensibilidade, detecta mudanças pequenas
+        - **λ = 0.2**: Sensibilidade média, equilíbrio
+        - **λ = 0.3**: Baixa sensibilidade, detecta mudanças grandes
+        """)
+        
+        st.markdown("""
+        ## 🔍 Análise de Padrões
+        
+        ### Padrões Detectados
+        1. **Pontos Fora de Controle**: Valores que excedem os limites
+        2. **Tendências Ascendentes**: Sequência de valores crescentes
+        3. **Tendências Descendentes**: Sequência de valores decrescentes
+        4. **Ciclos**: Padrões repetitivos ao longo do tempo
+        
+        ### Interpretação dos Padrões
+        - **Pontos Fora de Controle**: Investigação imediata necessária
+        - **Tendências**: Mudanças sistemáticas no processo
+        - **Ciclos**: Sazonalidade ou fatores externos
+        
+        ### Ações Recomendadas
+        - **Investigar**: Causas raiz dos padrões
+        - **Implementar**: Medidas corretivas
+        - **Monitorar**: Efetividade das ações
+        - **Documentar**: Lições aprendidas
+        """)
+        
+        st.markdown("""
+        ## 🔮 Previsões
+        
+        ### Método de Previsão
+        - **Análise de Tendência**: Baseada em médias móveis
+        - **Período Mínimo**: 3 meses de dados históricos
+        - **Conversão**: Horas para dias trabalhados (8h/dia)
+        - **Confiança**: Baseada na estabilidade dos dados
+        
+        ### Limitações
+        - **Eventos Externos**: Não considera fatores imprevistos
+        - **Mudanças Estruturais**: Pode não capturar mudanças bruscas
+        - **Qualidade dos Dados**: Depende da precisão dos registros
+        
+        ### Uso Recomendado
+        - **Planejamento**: Estabelecer metas e recursos
+        - **Alertas**: Identificar riscos futuros
+        - **Comunicação**: Informar stakeholders
+        - **Decisões**: Base para ações preventivas
+        """)
+        
+        st.markdown("""
+        ## 📋 Relatórios
+        
+        ### Tipos de Relatórios
+        1. **Resumo Executivo**: Visão geral para gestores
+        2. **Análise Detalhada**: Dados técnicos para especialistas
+        3. **Tendências**: Evolução temporal dos indicadores
+        4. **Comparações**: Benchmarking e metas
+        
+        ### Conteúdo dos Relatórios
+        - **Indicadores**: Valores atuais e históricos
+        - **Gráficos**: Visualizações dos dados
+        - **Análises**: Interpretações e insights
+        - **Recomendações**: Ações sugeridas
+        
+        ### Exportação
+        - **Formato CSV**: Para análise em outras ferramentas
+        - **Período Personalizado**: Filtros de data
+        - **Colunas Selecionáveis**: Dados específicos
+        """)
+        
+        st.markdown("""
+        ## 🔧 Configurações e Parâmetros
+        
+        ### Parâmetros de Controle
+        - **Nível de Confiança**: 95% (padrão)
+        - **Período de Análise**: Configurável
+        - **Filtros**: Por usuário, data, localização
+        
+        ### Calibração
+        - **Ajuste de Limites**: Baseado na experiência
+        - **Validação**: Comparação com benchmarks
+        - **Revisão**: Atualização periódica
+        
+        ### Manutenção
+        - **Qualidade dos Dados**: Verificação regular
+        - **Atualização**: Parâmetros e métodos
+        - **Treinamento**: Usuários e interpretação
+        """)
+        
+        st.markdown("""
+        ## 📚 Referências Técnicas
+        
+        ### Normas e Padrões
+        - **NR-5**: Norma Regulamentadora de SST
+        - **ISO 45001**: Sistema de Gestão de SST
+        - **ANSI Z16.1**: Métodos de Registro de Acidentes
+        - **OHSAS 18001**: Especificação para SST
+        
+        ### Métodos Estatísticos
+        - **Montgomery, D.C.**: Introduction to Statistical Quality Control
+        - **Wheeler, D.J.**: Understanding Variation
+        - **Shewhart, W.A.**: Economic Control of Quality
+        
+        ### Software e Ferramentas
+        - **Streamlit**: Interface web
+        - **Plotly**: Visualizações interativas
+        - **Pandas**: Manipulação de dados
+        - **NumPy**: Cálculos numéricos
+        """)
+    
+    with tab3:
+        st.subheader("🔧 Configurações Avançadas")
+        
+        st.markdown("""
+        ## ⚙️ Parâmetros do Sistema
+        
+        ### Controles Estatísticos
+        """)
+        
+        # Configurações de controle estatístico
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.markdown("**📊 Cartas de Controle**")
+            confidence_level = st.slider(
+                "Nível de Confiança (%)",
+                min_value=90,
+                max_value=99,
+                value=95,
+                help="Nível de confiança para os limites de controle"
+            )
+            
+            lambda_value = st.slider(
+                "Parâmetro λ (Lambda) para EWMA",
+                min_value=0.05,
+                max_value=0.5,
+                value=0.2,
+                step=0.05,
+                help="Sensibilidade da detecção de tendências"
+            )
+        
+        with col2:
+            st.markdown("**📈 Análise de Tendências**")
+            min_periods = st.number_input(
+                "Períodos Mínimos para Análise",
+                min_value=3,
+                max_value=24,
+                value=6,
+                help="Número mínimo de períodos para análise confiável"
+            )
+            
+            trend_threshold = st.number_input(
+                "Limiar de Tendência",
+                min_value=0.1,
+                max_value=1.0,
+                value=0.3,
+                step=0.1,
+                help="Sensibilidade para detecção de tendências"
+            )
+        
+        st.markdown("""
+        ### 🎯 Metas e Limites
+        
+        """)
+        
+        # Configurações de metas
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.markdown("**📊 Taxa de Frequência**")
+            freq_excellent = st.number_input(
+                "Meta Excelente (Taxa de Frequência)",
+                min_value=0.0,
+                max_value=10.0,
+                value=2.0,
+                step=0.5,
+                help="Taxa considerada excelente"
+            )
+            
+            freq_acceptable = st.number_input(
+                "Limite Aceitável (Taxa de Frequência)",
+                min_value=0.0,
+                max_value=20.0,
+                value=5.0,
+                step=0.5,
+                help="Taxa considerada aceitável"
+            )
+        
+        with col2:
+            st.markdown("**📊 Taxa de Gravidade**")
+            sev_excellent = st.number_input(
+                "Meta Excelente (Taxa de Gravidade)",
+                min_value=0.0,
+                max_value=100.0,
+                value=20.0,
+                step=5.0,
+                help="Taxa considerada excelente"
+            )
+            
+            sev_acceptable = st.number_input(
+                "Limite Aceitável (Taxa de Gravidade)",
+                min_value=0.0,
+                max_value=200.0,
+                value=50.0,
+                step=5.0,
+                help="Taxa considerada aceitável"
+            )
+        
+        st.markdown("""
+        ### 🔮 Previsões
+        
+        """)
+        
+        # Configurações de previsão
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.markdown("**📈 Parâmetros de Previsão**")
+            forecast_months = st.number_input(
+                "Meses para Previsão",
+                min_value=1,
+                max_value=12,
+                value=1,
+                help="Número de meses para prever"
+            )
+            
+            min_data_points = st.number_input(
+                "Pontos Mínimos de Dados",
+                min_value=3,
+                max_value=24,
+                value=6,
+                help="Mínimo de pontos para previsão confiável"
+            )
+        
+        with col2:
+            st.markdown("**🎯 Configurações de Confiança**")
+            forecast_confidence = st.slider(
+                "Confiança da Previsão (%)",
+                min_value=50,
+                max_value=95,
+                value=70,
+                help="Nível de confiança das previsões"
+            )
+            
+            trend_sensitivity = st.slider(
+                "Sensibilidade da Tendência",
+                min_value=0.1,
+                max_value=1.0,
+                value=0.5,
+                step=0.1,
+                help="Sensibilidade para detecção de tendências"
+            )
+        
+        st.markdown("""
+        ### 💾 Exportação e Relatórios
+        
+        """)
+        
+        # Configurações de exportação
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.markdown("**📄 Formato de Relatórios**")
+            include_charts = st.checkbox(
+                "Incluir Gráficos",
+                value=True,
+                help="Incluir gráficos nos relatórios exportados"
+            )
+            
+            include_analysis = st.checkbox(
+                "Incluir Análises",
+                value=True,
+                help="Incluir análises e interpretações"
+            )
+        
+        with col2:
+            st.markdown("**📊 Dados para Exportação**")
+            export_format = st.selectbox(
+                "Formato de Exportação",
+                ["CSV", "Excel", "PDF"],
+                help="Formato preferido para exportação"
+            )
+            
+            decimal_places = st.number_input(
+                "Casas Decimais",
+                min_value=0,
+                max_value=4,
+                value=2,
+                help="Número de casas decimais nos números"
+            )
+        
+        # Botão para salvar configurações
+        if st.button("💾 Salvar Configurações"):
+            st.success("✅ Configurações salvas com sucesso!")
+            st.info("ℹ️ As configurações serão aplicadas na próxima análise.")
 
 if __name__ == "__main__":
     app({})

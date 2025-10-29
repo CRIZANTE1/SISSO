@@ -376,5 +376,205 @@ def delete_attachment(attachment_id):
     except:
         return False
 
+    with tab2:
+        st.subheader("📚 Metodologia de Análise de Acidentes")
+        
+        st.markdown("""
+        ## 🎯 Objetivo da Análise
+        
+        A análise de acidentes tem como objetivo:
+        - **Identificar** padrões e tendências nos acidentes
+        - **Investigar** causas raiz dos eventos
+        - **Prevenir** ocorrências futuras
+        - **Melhorar** continuamente a segurança
+        - **Comunicar** lições aprendidas
+        """)
+        
+        st.markdown("""
+        ## 📊 Classificação de Acidentes
+        
+        ### Por Gravidade
+        1. **Fatais**: Acidentes que resultam em morte
+        2. **Com Lesão**: Acidentes que resultam em lesões físicas
+        3. **Sem Lesão**: Acidentes que não resultam em lesões físicas
+        
+        ### Por Tipo
+        - **Quedas**: Quedas de altura, escorregões, tropeços
+        - **Cortes**: Cortes por ferramentas, objetos cortantes
+        - **Queimaduras**: Queimaduras térmicas, químicas, elétricas
+        - **Impactos**: Colisões, golpes, esmagamentos
+        - **Outros**: Outros tipos de acidentes não classificados
+        
+        ### Por Localização
+        - **Área de Produção**: Locais onde ocorrem atividades produtivas
+        - **Escritórios**: Áreas administrativas
+        - **Área Externa**: Pátios, estacionamentos, áreas externas
+        - **Outros**: Outras localizações específicas
+        """)
+        
+        st.markdown("""
+        ## 📈 Métricas de Análise
+        
+        ### Métricas Quantitativas
+        1. **Total de Acidentes**: Contagem absoluta de eventos
+        2. **Taxa de Frequência**: Acidentes por 1M horas trabalhadas
+        3. **Taxa de Gravidade**: Dias perdidos por 1M horas trabalhadas
+        4. **Distribuição por Tipo**: Percentual de cada categoria
+        5. **Distribuição por Local**: Percentual por localização
+        
+        ### Métricas Temporais
+        1. **Evolução Mensal**: Tendência ao longo do tempo
+        2. **Sazonalidade**: Padrões por estação do ano
+        3. **Dias da Semana**: Análise por dia da semana
+        4. **Horários**: Análise por período do dia
+        
+        ### Métricas de Impacto
+        1. **Dias Perdidos**: Impacto econômico
+        2. **Custos Diretos**: Gastos com tratamento
+        3. **Custos Indiretos**: Perda de produtividade
+        4. **Impacto Social**: Efeitos na equipe
+        """)
+        
+        st.markdown("""
+        ## 🔍 Análise de Causas
+        
+        ### Método 5 Porquês
+        1. **Por que** o acidente aconteceu?
+        2. **Por que** essa causa ocorreu?
+        3. **Por que** essa condição existia?
+        4. **Por que** não foi detectada?
+        5. **Por que** não foi prevenida?
+        
+        ### Árvore de Causas
+        - **Causa Imediata**: Ação ou condição que causou o acidente
+        - **Causa Contributiva**: Fatores que contribuíram
+        - **Causa Raiz**: Fator fundamental que permitiu o evento
+        
+        ### Fatores Humanos
+        - **Comportamento**: Ações inseguras
+        - **Conhecimento**: Falta de treinamento
+        - **Atitude**: Negligência ou pressa
+        - **Fadiga**: Cansaço físico ou mental
+        
+        ### Fatores Ambientais
+        - **Condições de Trabalho**: Iluminação, temperatura, ruído
+        - **Equipamentos**: Falhas, manutenção inadequada
+        - **Procedimentos**: Instruções inadequadas ou ausentes
+        - **Organização**: Pressão por produtividade
+        """)
+        
+        st.markdown("""
+        ## 📊 Visualizações e Gráficos
+        
+        ### Gráficos de Barras
+        - **Comparação**: Entre diferentes categorias
+        - **Evolução**: Ao longo do tempo
+        - **Ranking**: Ordenação por frequência
+        
+        ### Gráficos de Pizza
+        - **Distribuição**: Percentual de cada categoria
+        - **Proporção**: Relação entre diferentes tipos
+        - **Composição**: Estrutura dos acidentes
+        
+        ### Gráficos de Linha
+        - **Tendências**: Evolução temporal
+        - **Sazonalidade**: Padrões repetitivos
+        - **Comparação**: Entre diferentes períodos
+        
+        ### Mapas de Calor
+        - **Localização**: Concentração por área
+        - **Temporal**: Padrões por horário
+        - **Gravidade**: Intensidade dos eventos
+        """)
+        
+        st.markdown("""
+        ## 🚨 Sistema de Alertas
+        
+        ### Critérios de Alerta
+        1. **Acidentes Fatais**: Sempre crítico
+        2. **Aumento de 50%**: Em relação ao período anterior
+        3. **Padrões Anômalos**: Sequências incomuns
+        4. **Concentração**: Muitos acidentes em uma área
+        
+        ### Níveis de Alerta
+        - **🔴 CRÍTICO**: Ação imediata necessária
+        - **🟡 ATENÇÃO**: Monitoramento intensivo
+        - **🟢 NORMAL**: Situação controlada
+        
+        ### Ações Recomendadas
+        - **Investigar**: Causas raiz imediatamente
+        - **Implementar**: Medidas corretivas
+        - **Comunicar**: Informar stakeholders
+        - **Monitorar**: Acompanhar efetividade
+        """)
+        
+        st.markdown("""
+        ## 📋 Relatórios e Documentação
+        
+        ### Relatório de Acidente
+        1. **Dados Básicos**: Data, hora, local, envolvidos
+        2. **Descrição**: Narrativa do evento
+        3. **Causas**: Análise de causas raiz
+        4. **Ações**: Medidas tomadas e recomendadas
+        5. **Anexos**: Fotos, documentos, evidências
+        
+        ### Relatório de Análise
+        1. **Resumo Executivo**: Visão geral para gestores
+        2. **Análise Detalhada**: Dados técnicos
+        3. **Tendências**: Padrões identificados
+        4. **Recomendações**: Ações sugeridas
+        5. **Acompanhamento**: Status das ações
+        
+        ### Documentação de Evidências
+        - **Fotografias**: Registro visual do local
+        - **Vídeos**: Gravações do evento
+        - **Documentos**: Relatórios, laudos
+        - **Depoimentos**: Testemunhas e envolvidos
+        """)
+        
+        st.markdown("""
+        ## 🔧 Ferramentas e Recursos
+        
+        ### Upload de Evidências
+        - **Formatos Suportados**: JPG, PNG, PDF, DOC, XLS
+        - **Tamanho Máximo**: 10MB por arquivo
+        - **Segurança**: Criptografia e controle de acesso
+        - **Organização**: Categorização automática
+        
+        ### Filtros e Busca
+        - **Por Período**: Data de ocorrência
+        - **Por Tipo**: Classificação do acidente
+        - **Por Local**: Área de ocorrência
+        - **Por Gravidade**: Nível de impacto
+        
+        ### Exportação de Dados
+        - **Formato CSV**: Para análise externa
+        - **Relatórios PDF**: Para apresentações
+        - **Dashboards**: Para monitoramento
+        - **Alertas**: Para notificações
+        """)
+        
+        st.markdown("""
+        ## 📚 Referências e Normas
+        
+        ### Normas Regulamentadoras
+        - **NR-5**: Comissão Interna de Prevenção de Acidentes
+        - **NR-7**: Programa de Controle Médico de Saúde Ocupacional
+        - **NR-18**: Condições e Meio Ambiente de Trabalho
+        - **NR-35**: Trabalho em Altura
+        
+        ### Padrões Internacionais
+        - **ISO 45001**: Sistema de Gestão de SST
+        - **OHSAS 18001**: Especificação para SST
+        - **ANSI Z16.1**: Métodos de Registro de Acidentes
+        - **OSHA**: Occupational Safety and Health Administration
+        
+        ### Metodologias de Análise
+        - **Análise de Árvore de Falhas**: FTA
+        - **Análise de Modos de Falha**: FMEA
+        - **Análise de Riscos**: HAZOP
+        - **Investigação de Acidentes**: Método TapRooT
+        """)
+
 if __name__ == "__main__":
     app({})
