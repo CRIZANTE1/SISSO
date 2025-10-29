@@ -33,16 +33,108 @@ def fetch_kpi_data(user_email: Optional[str] = None,
         return pd.DataFrame()
 
 def calculate_frequency_rate(accidents: int, hours_worked: float) -> float:
-    """Calcula taxa de frequência (acidentes por 1M de horas)"""
+    """
+    Calcula Taxa de Frequência (TF) conforme NBR 14280
+    
+    Fórmula: (N° de acidentes x 1.000.000) / hora-homem trabalhada
+    
+    A TF indica a quantidade de acidentes ocorridos numa empresa em função 
+    da exposição ao risco (horas-homem de exposição ao risco).
+    
+    Parâmetros de referência:
+    - TF até 20 = muito bom
+    - 20,1-40 = bom  
+    - 40,1-60 = ruim
+    - acima de 60 = péssima
+    """
     if hours_worked is None or hours_worked == 0:
         return 0.0
     return (accidents / hours_worked) * 1_000_000
 
-def calculate_severity_rate(lost_days: int, hours_worked: float) -> float:
-    """Calcula taxa de gravidade (dias perdidos por 1M de horas)"""
+def calculate_severity_rate(lost_days: int, hours_worked: float, debited_days: int = 0) -> float:
+    """
+    Calcula Taxa de Gravidade (TG) conforme NBR 14280
+    
+    Fórmula: ((dias perdidos + dias debitados) x 1.000.000) / hora-homem trabalhada
+    
+    A TG mede o impacto ou severidade dos acidentes em termos de tempo de trabalho 
+    perdido (ou que será perdido) por cada milhão de horas-homem de exposição ao risco.
+    
+    Args:
+        lost_days: Dias que o trabalhador ficou afastado por conta do acidente
+        hours_worked: Total de horas-homem trabalhadas
+        debited_days: Dias debitados para casos graves (incapacidade permanente, morte)
+                      Ex: morte = 6000 dias, amputação de mão = 3000 dias
+    """
     if hours_worked is None or hours_worked == 0:
         return 0.0
-    return (lost_days / hours_worked) * 1_000_000
+    return ((lost_days + debited_days) / hours_worked) * 1_000_000
+
+def get_frequency_rate_interpretation(tf_value: float) -> dict:
+    """
+    Retorna interpretação da Taxa de Frequência conforme parâmetros de referência
+    """
+    if tf_value <= 20:
+        return {
+            "classification": "Muito Bom",
+            "color": "success",
+            "icon": "✅",
+            "description": "Excelente desempenho em prevenção de acidentes"
+        }
+    elif tf_value <= 40:
+        return {
+            "classification": "Bom", 
+            "color": "info",
+            "icon": "📊",
+            "description": "Bom desempenho, manter práticas atuais"
+        }
+    elif tf_value <= 60:
+        return {
+            "classification": "Ruim",
+            "color": "warning", 
+            "icon": "⚠️",
+            "description": "Desempenho ruim, revisar procedimentos de segurança"
+        }
+    else:
+        return {
+            "classification": "Péssimo",
+            "color": "danger",
+            "icon": "🚨", 
+            "description": "Desempenho crítico, ação imediata necessária"
+        }
+
+def get_severity_rate_interpretation(tg_value: float) -> dict:
+    """
+    Retorna interpretação da Taxa de Gravidade
+    """
+    if tg_value <= 50:
+        return {
+            "classification": "Excelente",
+            "color": "success",
+            "icon": "✅",
+            "description": "Baixo impacto dos acidentes"
+        }
+    elif tg_value <= 100:
+        return {
+            "classification": "Aceitável",
+            "color": "info", 
+            "icon": "📊",
+            "description": "Impacto moderado, monitorar"
+        }
+    elif tg_value <= 200:
+        return {
+            "classification": "Elevado",
+            "color": "warning",
+            "icon": "⚠️",
+            "description": "Alto impacto, revisar medidas preventivas"
+        }
+    else:
+        return {
+            "classification": "Crítico",
+            "color": "danger",
+            "icon": "🚨",
+            "description": "Impacto crítico, investigação imediata necessária"
+        }
 
 def calculate_poisson_control_limits(df: pd.DataFrame, 
                                    accidents_col: str = 'accidents_total',
@@ -131,7 +223,7 @@ def detect_control_chart_patterns(df: pd.DataFrame,
     return patterns
 
 def generate_kpi_summary(df: pd.DataFrame) -> Dict[str, Any]:
-    """Gera resumo dos KPIs"""
+    """Gera resumo dos KPIs com interpretações conforme NBR 14280"""
     if df.empty:
         return {}
     
@@ -140,10 +232,15 @@ def generate_kpi_summary(df: pd.DataFrame) -> Dict[str, Any]:
     total_lost_days = df['lost_days_total'].sum()
     total_hours = df['hours'].sum()
     total_fatalities = df.get('fatalities', pd.Series([0] * len(df))).sum()
+    total_debited_days = df.get('debited_days', pd.Series([0] * len(df))).sum()
     
     # Cálculos acumulados para todo o período
     freq_rate = calculate_frequency_rate(total_accidents, total_hours)
-    sev_rate = calculate_severity_rate(total_lost_days, total_hours)
+    sev_rate = calculate_severity_rate(total_lost_days, total_hours, total_debited_days)
+    
+    # Interpretações conforme parâmetros de referência
+    freq_interpretation = get_frequency_rate_interpretation(freq_rate)
+    sev_interpretation = get_severity_rate_interpretation(sev_rate)
     
     # Comparação com período anterior (último período vs penúltimo)
     latest_period = df['period'].max()
@@ -158,7 +255,8 @@ def generate_kpi_summary(df: pd.DataFrame) -> Dict[str, Any]:
         )
         prev_sev_rate = calculate_severity_rate(
             prev_data['lost_days_total'], 
-            prev_data['hours']
+            prev_data['hours'],
+            prev_data.get('debited_days', 0)
         )
         
         # Evita variações artificiais quando o período anterior é zero ou inexistente
@@ -177,7 +275,10 @@ def generate_kpi_summary(df: pd.DataFrame) -> Dict[str, Any]:
         'total_accidents': total_accidents,
         'total_fatalities': total_fatalities,
         'total_lost_days': total_lost_days,
-        'total_hours': total_hours
+        'total_debited_days': total_debited_days,
+        'total_hours': total_hours,
+        'frequency_interpretation': freq_interpretation,
+        'severity_interpretation': sev_interpretation
     }
 
 def calculate_forecast(df: pd.DataFrame, months_ahead: int = 1) -> Dict[str, Any]:

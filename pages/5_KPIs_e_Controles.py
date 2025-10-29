@@ -63,23 +63,28 @@ def app(filters=None):
         tab1, tab2, tab3 = st.tabs(["📊 Análises", "📚 Metodologia", "🔧 Configurações"])
         
         with tab1:
-            # Métricas principais
-            metrics = [
+        # Métricas principais com interpretações
+        freq_interpretation = kpi_summary.get('frequency_interpretation', {})
+        sev_interpretation = kpi_summary.get('severity_interpretation', {})
+        
+        metrics = [
             {
-                "title": "Taxa de Frequência",
+                "title": "Taxa de Frequência (TF)",
                 "value": f"{kpi_summary.get('frequency_rate', 0):.2f}",
                 "change": kpi_summary.get('frequency_change'),
                 "change_label": "vs período anterior",
-                "icon": "📈",
-                "color": "danger" if kpi_summary.get('frequency_change', 0) > 0 else "success"
+                "icon": freq_interpretation.get('icon', '📈'),
+                "color": freq_interpretation.get('color', 'normal'),
+                "subtitle": freq_interpretation.get('classification', 'N/A')
             },
             {
-                "title": "Taxa de Gravidade",
+                "title": "Taxa de Gravidade (TG)",
                 "value": f"{kpi_summary.get('severity_rate', 0):.2f}",
                 "change": kpi_summary.get('severity_change'),
                 "change_label": "vs período anterior",
-                "icon": "⚠️",
-                "color": "danger" if kpi_summary.get('severity_change', 0) > 0 else "success"
+                "icon": sev_interpretation.get('icon', '⚠️'),
+                "color": sev_interpretation.get('color', 'normal'),
+                "subtitle": sev_interpretation.get('classification', 'N/A')
             },
             {
                 "title": "Total de Acidentes",
@@ -817,23 +822,45 @@ def app(filters=None):
         st.markdown("""
         ## 📊 Indicadores Principais
         
-        ### 1. Taxa de Frequência
-        - **Fórmula**: `(Total de Acidentes ÷ Total de Horas Trabalhadas) × 1.000.000`
+        ### 1. Taxa de Frequência (TF)
+        - **Fórmula**: `(N° de acidentes × 1.000.000) ÷ hora-homem trabalhada`
         - **Unidade**: Acidentes por 1 milhão de horas trabalhadas
-        - **Interpretação**:
-          - **< 5**: Excelente desempenho
-          - **5-10**: Aceitável, monitorar
-          - **> 10**: Crítico, ação necessária
-        - **Uso**: Mede a frequência de acidentes em relação à exposição
+        - **Conceito**: Indica a quantidade de acidentes ocorridos numa empresa em função da exposição ao risco
+        - **Interpretação conforme NBR 14280**:
+          - **≤ 20**: Muito bom
+          - **20,1-40**: Bom
+          - **40,1-60**: Ruim
+          - **> 60**: Péssimo
+        - **Uso**: Mede a "repetição" ou "ocorrência" de acidentes
         
-        ### 2. Taxa de Gravidade
-        - **Fórmula**: `(Total de Dias Perdidos ÷ Total de Horas Trabalhadas) × 1.000.000`
+        ### 2. Taxa de Gravidade (TG)
+        - **Fórmula**: `((dias perdidos + dias debitados) × 1.000.000) ÷ hora-homem trabalhada`
         - **Unidade**: Dias perdidos por 1 milhão de horas trabalhadas
+        - **Conceito**: Mede o "impacto" ou "severidade" dos acidentes em termos de tempo de trabalho perdido
+        - **Dias Debitados**: Para casos graves conforme NBR 14280:
+          - Morte = 6.000 dias
+          - Amputação de mão = 3.000 dias
+          - Amputação de pé = 2.400 dias
         - **Interpretação**:
-          - **< 50**: Excelente desempenho
-          - **50-100**: Aceitável, monitorar
-          - **> 100**: Crítico, ação necessária
-        - **Uso**: Mede o impacto econômico dos acidentes
+          - **≤ 50**: Excelente
+          - **50-100**: Aceitável
+          - **100-200**: Elevado
+          - **> 200**: Crítico
+        - **Uso**: Mede o impacto econômico e social dos acidentes
+        
+        ### Diferença entre TF e TG
+        
+        **Taxa de Frequência (TF)**:
+        - Mede a **quantidade** de acidentes num dado volume de horas de trabalho
+        - Responde: "Quantos acidentes acontecem para cada horário-homem de risco?"
+        - Foca na **repetição** ou **ocorrência** de acidentes
+        
+        **Taxa de Gravidade (TG)**:
+        - Mede a **severidade/impacto** desses acidentes em termos de dias de afastamento/débito
+        - Responde: "Quão graves foram os acidentes em termos de tempo perdido?"
+        - Foca no **impacto** dos acidentes
+        
+        **Resumo**: TF = quantos acidentes; TG = quão graves eles foram.
         
         ### 3. Total de Acidentes
         - **Definição**: Soma de todos os acidentes no período

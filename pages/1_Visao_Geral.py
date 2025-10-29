@@ -51,20 +51,24 @@ def app(filters=None):
         col1, col2, col3, col4 = st.columns(4)
         
         with col1:
+            freq_data = kpi_summary.get('frequency_interpretation', {})
             st.metric(
-                "Taxa de Frequência", 
+                "Taxa de Frequência (TF)", 
                 f"{kpi_summary.get('frequency_rate', 0):.0f}",
                 delta=f"{kpi_summary.get('frequency_change', 0):+.1f}%" if kpi_summary.get('frequency_change') else None,
-                help="Acidentes por 1 milhão de horas trabalhadas"
+                help=f"Acidentes por 1 milhão de horas trabalhadas\nClassificação: {freq_data.get('classification', 'N/A')}"
             )
+            st.caption(f"{freq_data.get('icon', '')} {freq_data.get('description', '')}")
         
         with col2:
+            sev_data = kpi_summary.get('severity_interpretation', {})
             st.metric(
-                "Taxa de Gravidade", 
+                "Taxa de Gravidade (TG)", 
                 f"{kpi_summary.get('severity_rate', 0):.0f}",
                 delta=f"{kpi_summary.get('severity_change', 0):+.1f}%" if kpi_summary.get('severity_change') else None,
-                help="Dias perdidos por 1 milhão de horas trabalhadas"
+                help=f"Dias perdidos + debitados por 1 milhão de horas trabalhadas\nClassificação: {sev_data.get('classification', 'N/A')}"
             )
+            st.caption(f"{sev_data.get('icon', '')} {sev_data.get('description', '')}")
         
         with col3:
             st.metric(
@@ -89,20 +93,24 @@ def app(filters=None):
         with col1:
             st.subheader("🎯 Status de Segurança")
             
-            # Calcula status baseado nos indicadores
+            # Calcula status baseado nos indicadores e interpretações
             freq_rate = kpi_summary.get('frequency_rate', 0)
             sev_rate = kpi_summary.get('severity_rate', 0)
             fatalities = kpi_summary.get('total_fatalities', 0)
+            freq_interpretation = kpi_summary.get('frequency_interpretation', {})
+            sev_interpretation = kpi_summary.get('severity_interpretation', {})
             
-            # Status geral
+            # Status geral baseado nas interpretações
             if fatalities > 0:
                 st.error("🚨 **CRÍTICO** - Acidentes fatais registrados")
-            elif freq_rate > 10 or sev_rate > 100:
-                st.warning("⚠️ **ATENÇÃO** - Indicadores elevados")
-            elif freq_rate > 5 or sev_rate > 50:
-                st.info("📊 **MONITORAR** - Indicadores dentro do aceitável")
+            elif freq_interpretation.get('classification') == 'Péssimo' or sev_interpretation.get('classification') == 'Crítico':
+                st.error("🚨 **CRÍTICO** - Indicadores em situação crítica")
+            elif freq_interpretation.get('classification') == 'Ruim' or sev_interpretation.get('classification') == 'Elevado':
+                st.warning("⚠️ **ATENÇÃO** - Indicadores elevados, revisão necessária")
+            elif freq_interpretation.get('classification') == 'Bom' or sev_interpretation.get('classification') == 'Aceitável':
+                st.info("📊 **BOM** - Indicadores dentro do aceitável")
             else:
-                st.success("✅ **EXCELENTE** - Indicadores dentro da meta")
+                st.success("✅ **EXCELENTE** - Indicadores em situação ideal")
         
         with col2:
             st.subheader("📊 Base de Cálculo")
@@ -194,21 +202,35 @@ def app(filters=None):
         # === ALERTAS SIMPLIFICADOS ===
         st.subheader("🚨 Alertas")
         
-        # Alertas baseados nos indicadores
+        # Alertas baseados nas interpretações dos indicadores
         alerts = []
+        freq_interpretation = kpi_summary.get('frequency_interpretation', {})
+        sev_interpretation = kpi_summary.get('severity_interpretation', {})
         
         if kpi_summary.get('total_fatalities', 0) > 0:
             alerts.append("🚨 **CRÍTICO:** Acidentes fatais registrados")
         
-        if kpi_summary.get('frequency_rate', 0) > 10:
-            alerts.append("⚠️ **ATENÇÃO:** Taxa de frequência muito elevada")
-        elif kpi_summary.get('frequency_rate', 0) > 5:
-            alerts.append("📊 **MONITORAR:** Taxa de frequência elevada")
+        # Alertas baseados na classificação da Taxa de Frequência
+        freq_classification = freq_interpretation.get('classification', '')
+        if freq_classification == 'Péssimo':
+            alerts.append("🚨 **CRÍTICO:** Taxa de frequência em situação péssima (acima de 60)")
+        elif freq_classification == 'Ruim':
+            alerts.append("⚠️ **ATENÇÃO:** Taxa de frequência em situação ruim (40,1-60)")
+        elif freq_classification == 'Bom':
+            alerts.append("📊 **BOM:** Taxa de frequência em situação boa (20,1-40)")
+        elif freq_classification == 'Muito Bom':
+            alerts.append("✅ **EXCELENTE:** Taxa de frequência em situação muito boa (até 20)")
         
-        if kpi_summary.get('severity_rate', 0) > 100:
-            alerts.append("⚠️ **ATENÇÃO:** Taxa de gravidade muito elevada")
-        elif kpi_summary.get('severity_rate', 0) > 50:
-            alerts.append("📊 **MONITORAR:** Taxa de gravidade elevada")
+        # Alertas baseados na classificação da Taxa de Gravidade
+        sev_classification = sev_interpretation.get('classification', '')
+        if sev_classification == 'Crítico':
+            alerts.append("🚨 **CRÍTICO:** Taxa de gravidade em situação crítica (acima de 200)")
+        elif sev_classification == 'Elevado':
+            alerts.append("⚠️ **ATENÇÃO:** Taxa de gravidade elevada (100-200)")
+        elif sev_classification == 'Aceitável':
+            alerts.append("📊 **ACEITÁVEL:** Taxa de gravidade em situação aceitável (50-100)")
+        elif sev_classification == 'Excelente':
+            alerts.append("✅ **EXCELENTE:** Taxa de gravidade em situação excelente (até 50)")
         
         if alerts:
             for alert in alerts:
@@ -342,22 +364,30 @@ def app(filters=None):
         st.markdown("""
         ## 📊 Indicadores Principais
         
-        ### 1. Taxa de Frequência
-        - **Fórmula**: `(Total de Acidentes ÷ Total de Horas Trabalhadas) × 1.000.000`
+        ### 1. Taxa de Frequência (TF)
+        - **Fórmula**: `(N° de acidentes × 1.000.000) ÷ hora-homem trabalhada`
         - **Unidade**: Acidentes por 1 milhão de horas trabalhadas
-        - **Interpretação**: 
-          - **< 5**: Excelente
-          - **5-10**: Aceitável
-          - **> 10**: Crítico
+        - **Conceito**: Indica a quantidade de acidentes ocorridos numa empresa em função da exposição ao risco
+        - **Interpretação conforme NBR 14280**:
+          - **≤ 20**: Muito bom
+          - **20,1-40**: Bom
+          - **40,1-60**: Ruim
+          - **> 60**: Péssimo
         - **Cálculo**: Baseado em dados acumulados do período selecionado
         
-        ### 2. Taxa de Gravidade
-        - **Fórmula**: `(Total de Dias Perdidos ÷ Total de Horas Trabalhadas) × 1.000.000`
+        ### 2. Taxa de Gravidade (TG)
+        - **Fórmula**: `((dias perdidos + dias debitados) × 1.000.000) ÷ hora-homem trabalhada`
         - **Unidade**: Dias perdidos por 1 milhão de horas trabalhadas
+        - **Conceito**: Mede o impacto ou severidade dos acidentes em termos de tempo de trabalho perdido
+        - **Dias Debitados**: Para casos graves conforme NBR 14280:
+          - Morte = 6.000 dias
+          - Amputação de mão = 3.000 dias
+          - Amputação de pé = 2.400 dias
         - **Interpretação**:
-          - **< 50**: Excelente
+          - **≤ 50**: Excelente
           - **50-100**: Aceitável
-          - **> 100**: Crítico
+          - **100-200**: Elevado
+          - **> 200**: Crítico
         - **Cálculo**: Baseado em dados acumulados do período selecionado
         
         ### 3. Total de Acidentes

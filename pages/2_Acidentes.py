@@ -34,12 +34,26 @@ def calculate_work_days_until_accident(accident_date, employee_email=None):
         # Calcula dias corridos entre admissão e acidente
         days_since_admission = (accident_date - admission_date).days
         
+        # Se a data de admissão for posterior ao acidente, retorna 0
+        if days_since_admission < 0:
+            return 0
+        
         # Busca horas trabalhadas mensais para calcular dias úteis
         if employee_email:
             hours_response = supabase.table("hours_worked_monthly").select("*").eq("created_by", employee_email).execute()
             if hours_response and hasattr(hours_response, 'data') and hours_response.data:
-                # Calcula dias úteis baseado nas horas trabalhadas
-                total_hours = sum([float(row.get('hours', 0)) for row in hours_response.data])
+                # Calcula dias úteis baseado nas horas trabalhadas até a data do acidente
+                total_hours = 0
+                for row in hours_response.data:
+                    # Verifica se as horas são anteriores ao acidente
+                    if 'year' in row and 'month' in row:
+                        try:
+                            month_date = pd.to_datetime(f"{row['year']}-{row['month']:02d}-01").date()
+                            if month_date <= accident_date:
+                                total_hours += float(row.get('hours', 0))
+                        except:
+                            continue
+                
                 # Assume 8 horas por dia útil
                 work_days = total_hours / 8
                 return min(work_days, days_since_admission)
@@ -73,17 +87,22 @@ def get_work_days_analysis(df):
                 row['accident_date'], 
                 row.get('created_by')
             )
+            # Garante que não há valores negativos
+            work_days = max(0, work_days)
             work_days_list.append(work_days)
         
         df_work['work_days_until_accident'] = work_days_list
         
+        # Filtra apenas valores válidos (maiores que 0)
+        valid_work_days = df_work[df_work['work_days_until_accident'] > 0]['work_days_until_accident']
+        
         # Estatísticas
         analysis = {
             'total_accidents': len(df_work),
-            'avg_work_days': df_work['work_days_until_accident'].mean(),
-            'median_work_days': df_work['work_days_until_accident'].median(),
-            'min_work_days': df_work['work_days_until_accident'].min(),
-            'max_work_days': df_work['work_days_until_accident'].max(),
+            'avg_work_days': valid_work_days.mean() if len(valid_work_days) > 0 else 0,
+            'median_work_days': valid_work_days.median() if len(valid_work_days) > 0 else 0,
+            'min_work_days': valid_work_days.min() if len(valid_work_days) > 0 else 0,
+            'max_work_days': valid_work_days.max() if len(valid_work_days) > 0 else 0,
             'accidents_first_week': len(df_work[df_work['work_days_until_accident'] <= 7]),
             'accidents_first_month': len(df_work[df_work['work_days_until_accident'] <= 30]),
             'accidents_first_year': len(df_work[df_work['work_days_until_accident'] <= 365])
@@ -126,19 +145,19 @@ def app(filters=None):
     tab1, tab2, tab3, tab4, tab5 = st.tabs(["📊 Análise", "📋 Registros", "📎 Evidências", "➕ Novo Acidente", "📚 Instruções"])
     
     # Busca dados uma única vez no início
-    with st.spinner("Carregando dados de acidentes..."):
-        df = fetch_accidents(
-            start_date=filters.get("start_date"),
-            end_date=filters.get("end_date")
-        )
-    
-    if df.empty:
-        st.warning("Nenhum acidente encontrado com os filtros aplicados.")
+        with st.spinner("Carregando dados de acidentes..."):
+            df = fetch_accidents(
+                start_date=filters.get("start_date"),
+                end_date=filters.get("end_date")
+            )
+        
+        if df.empty:
+            st.warning("Nenhum acidente encontrado com os filtros aplicados.")
         work_days_analysis = {}
         df_with_work_days = df
-    else:
-        # Aplica filtros adicionais
-        df = apply_filters_to_df(df, filters)
+        else:
+            # Aplica filtros adicionais
+            df = apply_filters_to_df(df, filters)
         
         # Análise de dias trabalhados até acidente
         work_days_analysis, df_with_work_days = get_work_days_analysis(df)
@@ -185,17 +204,25 @@ def app(filters=None):
             create_metric_row(metrics)
             
             # Análise de Dias Trabalhados até Acidente
-            if work_days_analysis:
+            if work_days_analysis and work_days_analysis.get('total_accidents', 0) > 0:
                 st.subheader("📅 Análise de Dias Trabalhados até Acidente")
                 
                 col1, col2, col3, col4 = st.columns(4)
                 
                 with col1:
-                    st.metric(
-                        "Média de Dias",
-                        f"{work_days_analysis.get('avg_work_days', 0):.0f}",
-                        help="Média de dias trabalhados até o acidente"
-                    )
+                    avg_days = work_days_analysis.get('avg_work_days', 0)
+                    if avg_days > 0:
+                        st.metric(
+                            "Média de Dias",
+                            f"{avg_days:.0f}",
+                            help="Média de dias trabalhados até o acidente"
+                        )
+                    else:
+                        st.metric(
+                            "Média de Dias",
+                            "N/A",
+                            help="Dados insuficientes para calcular média"
+                        )
                 
                 with col2:
                     st.metric(
@@ -218,34 +245,44 @@ def app(filters=None):
                         help="Acidentes nos primeiros 365 dias de trabalho"
                     )
                 
+                # Informação adicional sobre dados
+                if work_days_analysis.get('avg_work_days', 0) == 0:
+                    st.info("ℹ️ **Nota**: Para análise precisa de dias trabalhados, é necessário ter dados de funcionários e horas trabalhadas cadastrados no sistema.")
+                
                 # Gráfico de distribuição de dias trabalhados
                 if 'work_days_until_accident' in df_with_work_days.columns:
                     st.subheader("📊 Distribuição de Dias Trabalhados até Acidente")
                     
-                    # Cria faixas de dias
-                    df_with_work_days['work_days_range'] = pd.cut(
-                        df_with_work_days['work_days_until_accident'],
-                        bins=[0, 7, 30, 90, 365, float('inf')],
-                        labels=['0-7 dias', '8-30 dias', '31-90 dias', '91-365 dias', 'Mais de 1 ano'],
-                        include_lowest=True
-                    )
+                    # Filtra apenas valores válidos para o gráfico
+                    valid_data = df_with_work_days[df_with_work_days['work_days_until_accident'] > 0].copy()
                     
-                    range_counts = df_with_work_days['work_days_range'].value_counts()
-                    
-                    fig_work_days = px.bar(
-                        x=range_counts.index,
-                        y=range_counts.values,
-                        title="Acidentes por Faixa de Dias Trabalhados",
-                        color=range_counts.values,
-                        color_continuous_scale="Oranges"
-                    )
-                    fig_work_days.update_layout(
-                        xaxis_title="Faixa de Dias Trabalhados",
-                        yaxis_title="Número de Acidentes",
-                        showlegend=False,
-                        height=400
-                    )
-                    st.plotly_chart(fig_work_days, use_container_width=True)
+                    if len(valid_data) > 0:
+                        # Cria faixas de dias
+                        valid_data['work_days_range'] = pd.cut(
+                            valid_data['work_days_until_accident'],
+                            bins=[0, 7, 30, 90, 365, float('inf')],
+                            labels=['0-7 dias', '8-30 dias', '31-90 dias', '91-365 dias', 'Mais de 1 ano'],
+                            include_lowest=True
+                        )
+                        
+                        range_counts = valid_data['work_days_range'].value_counts()
+                        
+                        fig_work_days = px.bar(
+                            x=range_counts.index,
+                            y=range_counts.values,
+                            title="Acidentes por Faixa de Dias Trabalhados",
+                            color=range_counts.values,
+                            color_continuous_scale="Oranges"
+                        )
+                        fig_work_days.update_layout(
+                            xaxis_title="Faixa de Dias Trabalhados",
+                            yaxis_title="Número de Acidentes",
+                            showlegend=False,
+                            height=400
+                        )
+                        st.plotly_chart(fig_work_days, use_container_width=True)
+                    else:
+                        st.info("📊 **Distribuição de Dias Trabalhados**\n\nNão há dados suficientes para gerar o gráfico de distribuição.")
             
             # Gráficos
             col1, col2 = st.columns(2)
@@ -401,7 +438,7 @@ def app(filters=None):
                 
                 # Busca evidências
                 try:
-                    attachments = get_attachments("accident", str(accident_id))
+                attachments = get_attachments("accident", str(accident_id))
                 except:
                     attachments = []
                 
@@ -420,13 +457,13 @@ def app(filters=None):
                             if st.button("📥 Download", key=f"download_{attachment.get('id', 'unknown')}"):
                                 try:
                                     file_data = download_attachment(attachment.get('bucket', ''), attachment.get('path', ''))
-                                    if file_data:
-                                        st.download_button(
-                                            "💾 Baixar Arquivo",
-                                            file_data,
+                                if file_data:
+                                    st.download_button(
+                                        "💾 Baixar Arquivo",
+                                        file_data,
                                             attachment.get('filename', 'arquivo'),
                                             key=f"download_btn_{attachment.get('id', 'unknown')}"
-                                        )
+                                    )
                                 except:
                                     st.error("Erro ao baixar arquivo")
                         
@@ -434,8 +471,8 @@ def app(filters=None):
                             if st.button("🗑️ Remover", key=f"remove_{attachment.get('id', 'unknown')}"):
                                 try:
                                     if delete_attachment(attachment.get('id', '')):
-                                        st.success("Evidência removida!")
-                                        st.rerun()
+                                    st.success("Evidência removida!")
+                                    st.rerun()
                                 except:
                                     st.error("Erro ao remover evidência")
                 else:
@@ -552,6 +589,20 @@ def app(filters=None):
                             
                     except Exception as e:
                         st.error(f"Erro: {str(e)}")
+    
+    with tab5:
+        # Importa e exibe instruções
+        from components.instructions import create_instructions_page, get_accidents_instructions
+        
+        instructions_data = get_accidents_instructions()
+        create_instructions_page(
+            title=instructions_data["title"],
+            description=instructions_data["description"],
+            sections=instructions_data["sections"],
+            tips=instructions_data["tips"],
+            warnings=instructions_data["warnings"],
+            references=instructions_data["references"]
+        )
 
 
 def download_attachment(bucket, path):
@@ -575,20 +626,6 @@ def delete_attachment(attachment_id):
         return False
     except:
         return False
-
-    with tab5:
-        # Importa e exibe instruções
-        from components.instructions import create_instructions_page, get_accidents_instructions
-        
-        instructions_data = get_accidents_instructions()
-        create_instructions_page(
-            title=instructions_data["title"],
-            description=instructions_data["description"],
-            sections=instructions_data["sections"],
-            tips=instructions_data["tips"],
-            warnings=instructions_data["warnings"],
-            references=instructions_data["references"]
-        )
 
 if __name__ == "__main__":
     app({})

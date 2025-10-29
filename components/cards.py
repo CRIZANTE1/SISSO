@@ -9,7 +9,8 @@ def create_kpi_card(title: str,
                    change: Optional[float] = None,
                    change_label: str = "vs período anterior",
                    icon: str = "📊",
-                   color: str = "normal") -> None:
+                   color: str = "normal",
+                   subtitle: Optional[str] = None) -> None:
     """Cria card de KPI com valor e variação"""
     
     # Define cores baseadas no tipo
@@ -60,6 +61,10 @@ def create_kpi_card(title: str,
         st.markdown(f"<div style='font-size: 1.5em; font-weight: bold; color: {card_color};'>{formatted_value}</div>", 
                    unsafe_allow_html=True)
         
+        if subtitle:
+            st.markdown(f"<div style='font-size: 0.8em; color: {card_color}; font-style: italic;'>{subtitle}</div>", 
+                       unsafe_allow_html=True)
+        
         if change_text:
             st.markdown(f"<div style='font-size: 0.9em; color: {change_color};'>{change_text} {change_label}</div>", 
                        unsafe_allow_html=True)
@@ -76,7 +81,8 @@ def create_metric_row(metrics: List[Dict[str, Any]]) -> None:
                 change=metric.get("change"),
                 change_label=metric.get("change_label", "vs anterior"),
                 icon=metric.get("icon", "📊"),
-                color=metric.get("color", "normal")
+                color=metric.get("color", "normal"),
+                subtitle=metric.get("subtitle")
             )
 
 def create_trend_chart(df: pd.DataFrame, 
