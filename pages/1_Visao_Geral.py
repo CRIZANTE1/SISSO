@@ -158,13 +158,15 @@ def app(filters=None):
         
         with col4:
             lost_days = kpi_summary.get('total_lost_days', 0)
+            automatic_debited = kpi_summary.get('automatic_debited_days', 0)
+            total_impact = lost_days + automatic_debited
             
-            # Ícone baseado nos dias perdidos
-            if lost_days == 0:
+            # Ícone baseado no impacto total (dias perdidos + debitados)
+            if total_impact == 0:
                 days_icon = "🟢"
-            elif lost_days <= 10:
+            elif total_impact <= 100:
                 days_icon = "🟡"
-            elif lost_days <= 30:
+            elif total_impact <= 1000:
                 days_icon = "🟠"
             else:
                 days_icon = "🔴"
@@ -172,7 +174,8 @@ def app(filters=None):
             st.metric(
                 f"{days_icon} Dias de Trabalho Perdidos",
                 f"{lost_days}",
-                help="Quantos dias de trabalho foram perdidos devido a acidentes"
+                delta=f"+{automatic_debited} debitados" if automatic_debited > 0 else None,
+                help=f"Dias perdidos reais: {lost_days}\nDias debitados (fatais): {automatic_debited}\nTotal de impacto: {total_impact}"
             )
         
         # Resumo em linguagem simples
@@ -426,7 +429,11 @@ def app(filters=None):
         
         # Informação adicional simples
         if kpi_summary.get('total_hours', 0) > 0:
-            st.info(f"📊 **Base de cálculo**: {kpi_summary.get('total_hours', 0):,.0f} horas trabalhadas em {len(df)} meses")
+            automatic_debited = kpi_summary.get('automatic_debited_days', 0)
+            if automatic_debited > 0:
+                st.info(f"📊 **Base de cálculo**: {kpi_summary.get('total_hours', 0):,.0f} horas trabalhadas em {len(df)} meses\n\n⚠️ **Dias Debitados Automáticos**: {automatic_debited:,} dias adicionados automaticamente para acidentes fatais conforme NBR 14280 (6.000 dias por fatalidade)")
+            else:
+                st.info(f"📊 **Base de cálculo**: {kpi_summary.get('total_hours', 0):,.0f} horas trabalhadas em {len(df)} meses")
     
     with tab2:
         st.subheader("📚 Metodologia do Dashboard Executivo")

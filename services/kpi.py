@@ -235,6 +235,11 @@ def generate_kpi_summary(df: pd.DataFrame) -> Dict[str, Any]:
     total_fatalities = df.get('fatalities', pd.Series([0] * len(df))).sum()
     total_debited_days = df.get('debited_days', pd.Series([0] * len(df))).sum()
     
+    # Calcula automaticamente os dias debitados para acidentes fatais conforme NBR 14280
+    # Morte = 6.000 dias debitados
+    automatic_debited_days = total_fatalities * 6000
+    total_debited_days = total_debited_days + automatic_debited_days
+    
     # Verifica se as horas podem estar em minutos (se o valor for muito baixo)
     # Se as horas forem menores que 1000, assume que estão em minutos
     if total_hours > 0 and total_hours < 1000:
@@ -282,6 +287,7 @@ def generate_kpi_summary(df: pd.DataFrame) -> Dict[str, Any]:
         'total_fatalities': total_fatalities,
         'total_lost_days': total_lost_days,
         'total_debited_days': total_debited_days,
+        'automatic_debited_days': automatic_debited_days,
         'total_hours': total_hours,
         'frequency_interpretation': freq_interpretation,
         'severity_interpretation': sev_interpretation
