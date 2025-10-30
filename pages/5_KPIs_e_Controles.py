@@ -99,6 +99,68 @@ def app(filters=None):
         
         create_metric_row(metrics)
         
+        # ✅ NOVO: Mostrar métricas de conformidade ISO 45001
+        iso_metrics = kpi_summary.get('iso_compliance_metrics', {})
+        if iso_metrics:
+            with st.expander("📊 Conformidade ISO 45001:2018", expanded=False):
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    cont_improve = iso_metrics.get('continuous_improvement', {})
+                    if cont_improve:
+                        is_improving = cont_improve.get('is_improving', False)
+                        st.metric(
+                            "Melhoria Contínua",
+                            "✅ Em Progresso" if is_improving else "⚠️ Necessária",
+                            delta="Tendência de KPIs" if is_improving else "Ações requeridas"
+                        )
+                
+                with col2:
+                    monitoring = iso_metrics.get('monitoring_compliance', {})
+                    if monitoring:
+                        quality_score = monitoring.get('data_quality_score', 0)
+                        st.metric(
+                            "Qualidade dos Dados",
+                            f"{quality_score:.0f}%",
+                            delta="Conformidade com cláusula 9.1"
+                        )
+        
+        # ✅ NOVO: Mostrar análise de tendências NBR 14280
+        trend_analysis = kpi_summary.get('accident_trend_analysis', {})
+        if trend_analysis:
+            with st.expander("📈 Análise de Tendências - NBR 14280", expanded=False):
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    long_trend = trend_analysis.get('long_term_trend', {})
+                    if long_trend:
+                        change_pct = long_trend.get('change_percentage', 0)
+                        direction = long_trend.get('direction', 'stable')
+                        st.metric(
+                            "Tendência de Longo Prazo",
+                            direction.title(),
+                            delta=f"{change_pct:+.1f}%"
+                        )
+                
+                with col2:
+                    short_trend = trend_analysis.get('short_term_trend', {})
+                    if short_trend:
+                        change_pct = short_trend.get('change_percentage', 0)
+                        direction = short_trend.get('direction', 'stable')
+                        st.metric(
+                            "Tendência de Curto Prazo",
+                            direction.title(),
+                            delta=f"{change_pct:+.1f}%"
+                        )
+        
+        # ✅ NOVO: Relatório de conformidade ISO 45001
+        with st.expander("📋 Relatório de Conformidade - ISO 45001:2018", expanded=False):
+            from services.kpi import generate_iso_45001_compliance_report
+            iso_compliance_report = generate_iso_45001_compliance_report(kpi_summary)
+            
+            for line in iso_compliance_report:
+                st.write(line)
+        
         # Gráficos de tendência
         col1, col2 = st.columns(2)
         

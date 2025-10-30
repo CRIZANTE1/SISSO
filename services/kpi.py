@@ -228,7 +228,7 @@ def detect_control_chart_patterns(df: pd.DataFrame,
     return patterns
 
 def generate_kpi_summary(df: pd.DataFrame) -> Dict[str, Any]:
-    """Gera resumo dos KPIs com interpretações conforme NBR 14280"""
+    """Gera resumo dos KPIs com interpretações conforme NBR 14280 e ISO 45001"""
     if df.empty:
         return {}
     
@@ -334,6 +334,13 @@ def generate_kpi_summary(df: pd.DataFrame) -> Dict[str, Any]:
         if prev_sev > 0:
             sev_change = ((latest_sev - prev_sev) / prev_sev * 100)
     
+    # ✅ ISO 45001: Adicionando métricas de desempenho e análise de tendências
+    # Conformidade com requisitos ISO 45001:2018
+    iso_compliance_metrics = calculate_iso_compliance_metrics(df_with_rates)
+    
+    # ✅ NBR 14280: Análise de tendências de acidentes
+    accident_trend_analysis = analyze_accident_trends(df_with_rates)
+    
     return {
         'latest_period': df['period'].max(),
         
@@ -363,8 +370,172 @@ def generate_kpi_summary(df: pd.DataFrame) -> Dict[str, Any]:
         
         # ✅ NOVO: Metadados para transparência
         'periods_count': len(df),
-        'calculation_method': 'accumulated' if len(df) > 1 else 'single_period'
+        'calculation_method': 'accumulated' if len(df) > 1 else 'single_period',
+        
+        # ✅ NOVO: Métricas de conformidade ISO 45001:2018
+        'iso_compliance_metrics': iso_compliance_metrics,
+        
+        # ✅ NOVO: Análise de tendências de acidentes conforme NBR 14280
+        'accident_trend_analysis': accident_trend_analysis
     }
+
+def calculate_iso_compliance_metrics(df_with_rates: pd.DataFrame) -> Dict[str, Any]:
+    """
+    Calcula métricas de conformidade com ISO 45001:2018
+    A ISO 45001 exige monitoramento contínuo, investigação de incidentes,
+    implementação de ações corretivas e melhoria contínua
+    """
+    metrics = {}
+    
+    # Avaliação de melhoria contínua (tendência de melhoria nos KPIs)
+    if len(df_with_rates) >= 2:
+        recent_freq = df_with_rates['freq_rate_period'].tail(3)
+        recent_sev = df_with_rates['sev_rate_period'].tail(3)
+        
+        # Melhoria contínua - se os KPIs estão em tendência de melhoria
+        freq_trend = "improving" if len(recent_freq) >= 2 and recent_freq.iloc[-1] < recent_freq.iloc[-2] else "not_improving"
+        sev_trend = "improving" if len(recent_sev) >= 2 and recent_sev.iloc[-1] < recent_sev.iloc[-2] else "not_improving"
+        
+        metrics['continuous_improvement'] = {
+            'frequency_trend': freq_trend,
+            'severity_trend': sev_trend,
+            'is_improving': freq_trend == "improving" and sev_trend == "improving"
+        }
+    
+    # Monitoramento e medição (conformidade com cláusula 9.1)
+    metrics['monitoring_compliance'] = {
+        'has_consistent_data': len(df_with_rates) > 0 and df_with_rates['accidents_total'].sum() >= 0,
+        'data_quality_score': calculate_data_quality_score(df_with_rates)
+    }
+    
+    # Ações corretivas e preventivas (conformidade com cláusula 10.2)
+    # Isso seria implementado com base em dados de ações corretivas registradas
+    
+    return metrics
+
+def analyze_accident_trends(df_with_rates: pd.DataFrame) -> Dict[str, Any]:
+    """
+    Análise de tendências de acidentes conforme NBR 14280
+    """
+    if df_with_rates.empty:
+        return {}
+    
+    trends = {}
+    
+    # Tendência de longo prazo (últimos 6 meses vs 6 meses anteriores)
+    if len(df_with_rates) >= 12:
+        recent_6 = df_with_rates.tail(6)['freq_rate_period'].mean()
+        prev_6 = df_with_rates.head(6)['freq_rate_period'].mean()
+        
+        if prev_6 > 0:
+            change_pct = ((recent_6 - prev_6) / prev_6) * 100
+            trends['long_term_trend'] = {
+                'change_percentage': change_pct,
+                'direction': 'improving' if change_pct < 0 else 'worsening' if change_pct > 0 else 'stable'
+            }
+    
+    # Tendência de curto prazo (últimos 3 meses)
+    if len(df_with_rates) >= 6:
+        recent_3 = df_with_rates.tail(3)['freq_rate_period'].mean()
+        prev_3 = df_with_rates.iloc[-6:-3]['freq_rate_period'].mean()
+        
+        if prev_3 > 0:
+            change_pct = ((recent_3 - prev_3) / prev_3) * 100
+            trends['short_term_trend'] = {
+                'change_percentage': change_pct,
+                'direction': 'improving' if change_pct < 0 else 'worsening' if change_pct > 0 else 'stable'
+            }
+    
+    # Variação coeficiente de variação (medida de estabilidade)
+    if len(df_with_rates) >= 3:
+        freq_cv = df_with_rates['freq_rate_period'].std() / df_with_rates['freq_rate_period'].mean() if df_with_rates['freq_rate_period'].mean() > 0 else 0
+        trends['stability'] = {
+            'coefficient_of_variation': freq_cv,
+            'stability_level': 'high' if freq_cv < 0.2 else 'medium' if freq_cv < 0.5 else 'low'
+        }
+    
+    return trends
+
+def calculate_data_quality_score(df: pd.DataFrame) -> float:
+    """
+    Calcula um escore de qualidade dos dados
+    """
+    score = 100.0  # Pontuação base
+    
+    # Verifica completude dos dados
+    required_columns = ['accidents_total', 'hours', 'lost_days_total']
+    for col in required_columns:
+        if col in df.columns:
+            completeness = df[col].notna().sum() / len(df) * 100
+            score *= (completeness / 100)  # Reduz pontuação proporcionalmente
+    
+    # Verifica consistência temporal
+    if 'period' in df.columns:
+        expected_periods = len(df)
+        unique_periods = df['period'].nunique()
+        consistency = (unique_periods / expected_periods) * 100
+        score *= (consistency / 100)
+    
+    return max(0, min(100, score))  # Limita entre 0 e 100
+
+def calculate_corrective_actions_metrics(df_with_rates: pd.DataFrame) -> Dict[str, Any]:
+    """
+    Calcula métricas de eficácia de ações corretivas e preventivas
+    Conforme requisitos da ISO 45001:2018 cláusula 10.2
+    """
+    metrics = {}
+    
+    # Este cálculo seria baseado em dados de ações corretivas do sistema
+    # Por enquanto, implementando uma métrica baseada na redução de acidentes após eventos
+    if len(df_with_rates) >= 3:
+        # Comparando média móvel de acidentes
+        recent_accidents = df_with_rates['accidents_total'].tail(3).mean()
+        prev_accidents = df_with_rates['accidents_total'].head(3).mean()
+        
+        if prev_accidents > 0:
+            improvement_rate = ((prev_accidents - recent_accidents) / prev_accidents) * 100
+            metrics['corrective_effectiveness'] = {
+                'improvement_rate': improvement_rate,
+                'is_improving': improvement_rate > 0
+            }
+    
+    return metrics
+
+def generate_iso_45001_compliance_report(kpi_summary: Dict[str, Any]) -> List[str]:
+    """
+    Gera relatório de conformidade com ISO 45001:2018
+    """
+    report = []
+    
+    # Avaliação das cláusulas principais da ISO 45001
+    freq_rate = kpi_summary.get('frequency_rate', 0)
+    sev_rate = kpi_summary.get('severity_rate', 0)
+    
+    # Cláusula 9.1 - Monitoramento, medição, análise e avaliação
+    report.append("📊 **Cláusula 9.1 - Monitoramento e medição:**")
+    report.append(f"   - Taxa de Frequência: {freq_rate:.2f} acidentes/milhão de horas")
+    report.append(f"   - Taxa de Gravidade: {sev_rate:.2f} dias perdidos/milhão de horas")
+    
+    # Cláusula 10 - Melhoria
+    freq_change = kpi_summary.get('frequency_change', 0)
+    sev_change = kpi_summary.get('severity_change', 0)
+    
+    improvement_status = []
+    if freq_change is not None:
+        improvement_status.append(f"Taxa de Frequência: {'Melhorando' if freq_change < 0 else 'Piorando' if freq_change > 0 else 'Estável'} ({freq_change:+.1f}%)")
+    if sev_change is not None:
+        improvement_status.append(f"Taxa de Gravidade: {'Melhorando' if sev_change < 0 else 'Piorando' if sev_change > 0 else 'Estável'} ({sev_change:+.1f}%)")
+    
+    report.append("🔄 **Cláusula 10 - Melhoria contínua:**")
+    for status in improvement_status:
+        report.append(f"   - {status}")
+    
+    # Cláusula 10.2 - Ações corretivas e preventivas
+    report.append("🔧 **Cláusula 10.2 - Ações corretivas e preventivas:**")
+    report.append("   - Implemente acompanhamento de ações corretivas nos acidentes")
+    report.append("   - Verifique encerramento e eficácia das ações tomadas")
+    
+    return report
 
 def calculate_forecast(df: pd.DataFrame, months_ahead: int = 1) -> Dict[str, Any]:
     """Calcula previsões para os próximos meses baseadas em tendências históricas"""

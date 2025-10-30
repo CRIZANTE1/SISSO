@@ -333,9 +333,83 @@ def app(filters=None):
         if st.button("🔄 Recalcular KPIs", type="primary"):
             with st.spinner("Recalculando KPIs..."):
                 try:
-                    # Aqui você implementaria a lógica para recalcular os KPIs
-                    # Por exemplo, executando uma stored procedure ou função no Supabase
-                    st.success("✅ KPIs recalculados com sucesso!")
+                    from services.kpi import calculate_frequency_rate, calculate_severity_rate
+                    from managers.supabase_config import get_service_role_client
+                    import datetime
+                    
+                    supabase = get_service_role_client()
+                    
+                    # Busca todos os dados de acidentes e horas trabalhadas
+                    accidents_response = supabase.table("accidents").select(
+                        "id, occurred_at, created_by, lost_days, is_fatal"
+                    ).execute()
+                    
+                    hours_response = supabase.table("hours_worked_monthly").select(
+                        "id, year, month, hours, site_id, created_by"
+                    ).execute()
+                    
+                    accidents_data = accidents_response.data if accidents_response and hasattr(accidents_response, 'data') else []
+                    hours_data = hours_response.data if hours_response and hasattr(hours_response, 'data') else []
+                    
+                    # Agrupa acidentes por mês/criador
+                    from collections import defaultdict
+                    import pandas as pd
+                    
+                    accidents_by_period = defaultdict(lambda: {'count': 0, 'fatalities': 0, 'lost_days': 0})
+                    
+                    for accident in accidents_data:
+                        period = pd.to_datetime(accident['occurred_at']).strftime('%Y-%m')
+                        accidents_by_period[period]['count'] += 1
+                        if accident.get('is_fatal', False):
+                            accidents_by_period[period]['fatalities'] += 1
+                        accidents_by_period[period]['lost_days'] += int(accident.get('lost_days', 0))
+                    
+                    # Agrupa horas por mês/criador
+                    hours_by_period = defaultdict(lambda: 0)
+                    
+                    for hour_entry in hours_data:
+                        period = f"{hour_entry['year']}-{str(hour_entry['month']).zfill(2)}"
+                        hours_by_period[period] += float(hour_entry.get('hours', 0))
+                    
+                    # Limpa tabela de KPIs existentes (opcional - pode ser substituído por atualização incremental)
+                    # supabase.table("kpi_monthly").delete().neq("id", 0).execute()
+                    
+                    # Calcula KPIs mensais
+                    kpi_updates = []
+                    for period, acc_data in accidents_by_period.items():
+                        if period in hours_by_period:
+                            hours = hours_by_period[period]
+                            
+                            # Calcular dias debitados para acidentes fatais (NBR 14280)
+                            debited_days = acc_data['fatalities'] * 6000  # 6.000 dias por morte
+                            
+                            # Calcula taxas
+                            freq_rate = calculate_frequency_rate(acc_data['count'], hours)
+                            sev_rate = calculate_severity_rate(acc_data['lost_days'], hours, debited_days)
+                            
+                            # Verifica se já existe KPI para este período
+                            existing_kpi = supabase.table("kpi_monthly").select("id").eq("period", f"{period}-01").execute()
+                            
+                            kpi_data = {
+                                "period": f"{period}-01",
+                                "accidents_total": acc_data['count'],
+                                "fatalities": acc_data['fatalities'],
+                                "lost_days_total": acc_data['lost_days'],
+                                "hours": hours / 100,  # Ajuste para escala do sistema
+                                "frequency_rate": freq_rate,
+                                "severity_rate": sev_rate,
+                                "debited_days": debited_days
+                            }
+                            
+                            if existing_kpi.data:
+                                # Atualiza existente
+                                supabase.table("kpi_monthly").update(kpi_data).eq("period", f"{period}-01").execute()
+                            else:
+                                # Insere novo
+                                supabase.table("kpi_monthly").insert(kpi_data).execute()
+                    
+                    st.success(f"✅ KPIs recalculados com sucesso para {len(accidents_by_period)} períodos!")
+                    
                 except Exception as e:
                     st.error(f"Erro ao recalcular KPIs: {str(e)}")
         

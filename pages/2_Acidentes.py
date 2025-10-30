@@ -914,7 +914,8 @@ def app(filters=None):
                             "investigation_completed": investigation_completed,
                             "investigation_date": investigation_date.isoformat() if investigation_date else None,
                             "investigation_responsible": investigation_responsible if investigation_responsible else None,
-                            "investigation_notes": investigation_notes if investigation_notes else None
+                            "investigation_notes": investigation_notes if investigation_notes else None,
+                            "corrective_actions": corrective_actions if corrective_actions else None
                         }
                         if employee_id:
                             accident_data["employee_id"] = employee_id
