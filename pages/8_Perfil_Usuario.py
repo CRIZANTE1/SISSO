@@ -64,11 +64,33 @@ def update_investigation(accident_id: int, completed: bool, inv_date: date | Non
 
 def app():
     require_login()
+    
+    # Verifica e mostra informações do trial
+    try:
+        from services.trial_manager import show_trial_notification
+        show_trial_notification()
+    except ImportError:
+        pass  # Se não tiver o trial manager, continua normalmente
+    
     user = get_user_info() or {}
     user_email = user.get("email", "")
     user_name = user.get("full_name", "")
 
     st.title("👤 Perfil do Usuário")
+    # Ajuda da página
+    @st.dialog("Ajuda - Perfil do Usuário")
+    def _show_profile_help():
+        st.markdown(
+            "**O que você pode fazer**\n\n"
+            "- Atualizar dados de perfil (nome, email de contato, empresa).\n"
+            "- Gerenciar funcionários vinculados.\n"
+            "- Atualizar investigação de acidentes sob sua responsabilidade."
+        )
+        if st.button("Fechar", type="primary"):
+            st.rerun()
+    pl, pr = st.columns([6, 1])
+    with pr:
+        st.button("❓ Ajuda", key="profile_help_btn", on_click=_show_profile_help)
 
     # Perfil
     st.subheader("Dados de Perfil")

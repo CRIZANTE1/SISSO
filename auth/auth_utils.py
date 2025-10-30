@@ -31,6 +31,16 @@ def authenticate_user() -> bool:
 
     # Verifica se já está autenticado na sessão
     if st.session_state.get('authenticated_user_email') == user_email:
+        # Verifica o status do trial para sessões existentes
+        try:
+            from services.trial_manager import check_trial_status
+            trial_info = check_trial_status(user_email)
+            if trial_info.get('is_trial_expired', False) and trial_info.get('has_trial', False):
+                # Se o trial expirou, encerra a sessão
+                st.error("Seu período de trial expirou.")
+                return False
+        except:
+            pass  # Se não tiver o trial manager, continua normalmente
         return True
 
     # Busca informações do usuário na base de dados
@@ -38,6 +48,17 @@ def authenticate_user() -> bool:
     
     if not user_info:
         return False
+
+    # Verifica o status do trial
+    try:
+        from services.trial_manager import check_trial_status
+        trial_info = check_trial_status(user_email)
+        
+        if trial_info.get('is_trial_expired', False) and trial_info.get('has_trial', False):
+            st.error("Seu período de trial expirou.")
+            return False
+    except:
+        pass  # Se não tiver o trial manager, continua normalmente
 
     # Salva informações do usuário na sessão
     st.session_state.user_info = user_info
@@ -80,9 +101,39 @@ def check_user_in_database(email: str) -> Optional[Dict[str, Any]]:
                 "role": profile.get("role", "viewer")
             }
         
-        # Se não encontrou perfil, lista todos os emails para debug
-        logger.warning(f"Usuário {email} não está cadastrado no sistema")
-        logger.info(f"Query executada com sucesso, mas sem resultados para {email}")
+        # Se não encontrou perfil, tenta criar automaticamente com trial de 14 dias
+        logger.info(f"Usuário {email} não encontrado, criando perfil com trial automático")
+        
+        try:
+            # Importa o trial manager e cria usuário com trial
+            from services.trial_manager import create_new_trial_user
+            trial_info = create_new_trial_user(email)
+            
+            if trial_info.get('new_user'):
+                logger.info(f"Usuário de trial criado com sucesso: {email}")
+                st.success("Bem-vindo! Você tem 14 dias de acesso gratuito ao sistema.")
+                
+                return {
+                    "id": email,
+                    "email": email,
+                    "full_name": "",
+                    "role": "viewer"
+                }
+            else:
+                logger.warning(f"Falha ao criar usuário de trial para: {email}")
+                # Ainda tenta encontrar o perfil mesmo que tenha falhado a criação
+                response = supabase.table("profiles").select("*").eq("email", email).execute()
+                if response.data and len(response.data) > 0:
+                    profile = response.data[0]
+                    return {
+                        "id": profile["email"],
+                        "email": profile.get("email", email),
+                        "full_name": profile.get("full_name", ""),
+                        "role": profile.get("role", "viewer")
+                    }
+        
+        except ImportError:
+            logger.warning("Trial manager não disponível, usando comportamento padrão")
         
         # Debug: lista todos os emails na tabela profiles
         try:
@@ -214,6 +265,19 @@ def require_login():
         from auth.login_page import show_access_denied_page
         show_access_denied_page()
         st.stop()
+    
+    # Verifica status do trial após autenticação
+    try:
+        from services.trial_manager import check_trial_status
+        user_email = get_user_email()
+        if user_email:
+            trial_info = check_trial_status(user_email)
+            if trial_info.get('is_trial_expired', False) and trial_info.get('has_trial', False):
+                from services.trial_manager import show_trial_expired_page
+                show_trial_expired_page()
+                st.stop()
+    except ImportError:
+        pass  # Se não tiver o trial manager, continua normalmente
 
 def show_user_info():
     """Mostra informações do usuário logado na sidebar."""

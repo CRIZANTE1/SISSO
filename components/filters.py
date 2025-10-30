@@ -35,7 +35,8 @@ def user_filter(allow_multiple: bool = True,
             "👥 Usuários",
             options=list(user_options.keys()),
             default=default_selection,
-            key=f"{key_prefix}_users"
+            key=f"{key_prefix}_users",
+            help="Selecione um ou mais usuários para filtrar os registros pelo campo 'created_by'."
         )
         
         return [user_options[user] for user in selected_users]
@@ -43,7 +44,8 @@ def user_filter(allow_multiple: bool = True,
         selected_user = st.selectbox(
             "👥 Usuário",
             options=["Todos"] + list(user_options.keys()),
-            key=f"{key_prefix}_user"
+            key=f"{key_prefix}_user",
+            help="Selecione um usuário específico ou 'Todos' para incluir todos os criadores."
         )
         
         if selected_user == "Todos":
@@ -56,7 +58,8 @@ def date_range_filter(key_prefix: str = "") -> tuple[Optional[date], Optional[da
     enable_dates = st.checkbox(
         "Filtrar por data",
         value=False,
-        key=f"{key_prefix}_date_enabled"
+        key=f"{key_prefix}_date_enabled",
+        help="Ative para restringir os resultados a um intervalo de datas."
     )
     
     if not enable_dates:
@@ -67,13 +70,15 @@ def date_range_filter(key_prefix: str = "") -> tuple[Optional[date], Optional[da
     with col1:
         start_date = st.date_input(
             "📅 Data Inicial",
-            key=f"{key_prefix}_start_date"
+            key=f"{key_prefix}_start_date",
+            help="Data mínima considerada no filtro."
         )
     
     with col2:
         end_date = st.date_input(
             "📅 Data Final",
-            key=f"{key_prefix}_end_date"
+            key=f"{key_prefix}_end_date",
+            help="Data máxima considerada no filtro."
         )
     
     return start_date, end_date
@@ -92,7 +97,8 @@ def severity_filter(key_prefix: str = "") -> List[str]:
         "⚠️ Severidade",
         options=list(severity_options.keys()),
         default=list(severity_options.keys()),
-        key=f"{key_prefix}_severity"
+        key=f"{key_prefix}_severity",
+        help="Define quais severidades de acidente serão incluídas na análise."
     )
     
     return [severity_options[sev] for sev in selected_severities]
@@ -111,7 +117,8 @@ def event_type_filter(key_prefix: str = "") -> List[str]:
         "📋 Tipo de Evento",
         options=event_types,
         default=event_types,
-        key=f"{key_prefix}_event_type"
+        key=f"{key_prefix}_event_type",
+        help="Filtra os registros pelos tipos selecionados."
     )
     
     return selected_types
@@ -131,7 +138,8 @@ def root_cause_filter(key_prefix: str = "") -> List[str]:
         "🔍 Causa Raiz",
         options=root_causes,
         default=root_causes,
-        key=f"{key_prefix}_root_cause"
+        key=f"{key_prefix}_root_cause",
+        help="Mostra somente registros com as causas selecionadas."
     )
     
     return selected_causes
@@ -149,7 +157,8 @@ def period_filter(key_prefix: str = "") -> str:
     selected_period = st.selectbox(
         "📊 Período",
         options=list(period_options.keys()),
-        key=f"{key_prefix}_period"
+        key=f"{key_prefix}_period",
+        help="Aplica um recorte relativo no tempo (em meses). Use 'Todos os períodos' para não limitar."
     )
     
     return period_options[selected_period]
@@ -158,6 +167,39 @@ def create_filter_sidebar() -> Dict[str, Any]:
     """Cria sidebar com todos os filtros"""
     with st.sidebar:
         st.header("🔍 Filtros")
+        # Diálogo de ajuda dos filtros
+        @st.dialog("Ajuda sobre Filtros")
+        def _show_filters_help_dialog():
+            st.markdown(
+                "**Como os filtros funcionam**\n\n"
+                "- Os filtros aplicam-se às páginas de análise, registros e métricas.\n"
+                "- '📊 Período' limita pelos últimos N meses com base no dado mais recente.\n"
+                "- 'Filtrar por data' substitui o período com um intervalo específico.\n"
+                "- '👥 Usuários' filtra por quem criou o registro (created_by).\n"
+                "- Nem todas as páginas usam todos os filtros (ex.: causa raiz).\n\n"
+                "**Dicas**\n\n"
+                "- Se não retornar dados, experimente reduzir os filtros.\n"
+                "- Verifique se as colunas existem na sua base (ex.: root_cause)."
+            )
+            if st.button("Fechar", type="primary"):
+                st.rerun()
+
+        cols_help = st.columns([1, 1])
+        with cols_help[0]:
+            st.button("❓ Ajuda", use_container_width=True, key="filters_help_btn", on_click=_show_filters_help_dialog)
+        with st.expander("Como usar os filtros", expanded=False):
+            st.markdown(
+                "- Use os filtros para refinar a análise em todas as páginas.\n"
+                "- O período relativo (📊 Período) limita por meses a partir do dado mais recente.\n"
+                "- O intervalo de datas (📅) substitui o período quando ativado.\n"
+                "- Os filtros aplicam-se aos gráficos, tabelas e métricas."
+            )
+        with st.popover("❓ Dúvidas sobre filtros"):
+            st.markdown(
+                "- Se nada aparece, reduza os filtros.\n"
+                "- 'Usuários' filtra por quem criou o registro.\n"
+                "- Nem todas as páginas usam todos os filtros (ex.: causa raiz só onde existe)."
+            )
         
         # Usuários
         selected_users = user_filter()

@@ -7,6 +7,10 @@ from managers.supabase_config import test_connection
 import json
 
 def app(filters=None):
+    # Verifica autenticação e trial
+    from auth.auth_utils import require_login
+    require_login()
+    
     # Busca filtros do session state se não foram passados como parâmetro
     if filters is None:
         filters = st.session_state.get('filters', {})
@@ -16,6 +20,21 @@ def app(filters=None):
     
     st.title("📝 Logs do Sistema")
     st.markdown("Visualize e gerencie os logs do sistema de monitoramento SSO.")
+    # Ajuda da página
+    @st.dialog("Ajuda - Logs do Sistema")
+    def _show_logs_help():
+        st.markdown(
+            "**Como usar**\n\n"
+            "- 'Logs Recentes': filtrar níveis e atualizar.\n"
+            "- 'Filtros de Log': entender níveis e uso.\n"
+            "- 'Status do Sistema': testar conexão e ver sessão.\n"
+            "- 'Informações Técnicas': baixar/exportar e estatísticas."
+        )
+        if st.button("Fechar", type="primary"):
+            st.rerun()
+    ll, lr = st.columns([6, 1])
+    with lr:
+        st.button("❓ Ajuda", key="logs_help_btn", on_click=_show_logs_help)
     
     # Inicializa logger
     logger = get_logger()

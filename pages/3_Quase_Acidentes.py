@@ -27,6 +27,10 @@ def fetch_near_misses(start_date=None, end_date=None):
         return pd.DataFrame()
 
 def app(filters=None):
+    # Verifica autenticação e trial
+    from auth.auth_utils import require_login
+    require_login()
+    
     st.title("⚠️ Quase-Acidentes")
     
     # Busca filtros do session state se não foram passados como parâmetro
@@ -38,6 +42,34 @@ def app(filters=None):
     
     with tab1:
         st.subheader("Análise de Quase-Acidentes")
+        # Diálogo de ajuda detalhada
+        @st.dialog("Ajuda - Quase-Acidentes")
+        def _show_nearmiss_help():
+            st.markdown(
+                "**Como analisar**\n\n"
+                "- Acompanhe volume total e distribuição por severidade potencial.\n"
+                "- Verifique sazonalidade por mês e status (aberto/fechado).\n\n"
+                "**Sobre severidade potencial**\n\n"
+                "- Valores são normalizados em Baixo/Médio/Alto para padronização."
+            )
+            if st.button("Fechar", type="primary"):
+                st.rerun()
+
+        c1, c2 = st.columns([1, 1])
+        with c1:
+            st.button("❓ Ajuda", key="nearmiss_help_btn", on_click=_show_nearmiss_help)
+        with st.expander("Guia rápido de análise", expanded=False):
+            st.markdown(
+                "1. Ajuste os filtros (lado esquerdo) para recortar o período e usuários.\n"
+                "2. Verifique as métricas por risco (alto/médio/baixo).\n"
+                "3. Explore os gráficos por severidade e mês para tendências.\n"
+                "4. Use 'Registros' para buscar descrições específicas."
+            )
+        with st.popover("❓ Dicas"):
+            st.markdown(
+                "- A severidade potencial é normalizada em Baixo/Médio/Alto.\n"
+                "- Sem resultados? Amplie o período ou limpe filtros."
+            )
         
         # Busca dados
         with st.spinner("Carregando dados de quase-acidentes..."):

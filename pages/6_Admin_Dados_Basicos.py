@@ -5,6 +5,10 @@ from services.uploads import import_hours_csv, import_accidents_csv
 from managers.supabase_config import get_supabase_client
 
 def app(filters=None):
+    # Verifica autenticação e trial
+    from auth.auth_utils import require_login
+    require_login()
+    
     # Busca filtros do session state se não foram passados como parâmetro
     if filters is None:
         filters = st.session_state.get('filters', {})
@@ -13,6 +17,23 @@ def app(filters=None):
     check_permission('admin')
     
     st.title("⚙️ Admin - Dados Básicos")
+    # Ajuda da página
+    @st.dialog("Ajuda - Administração")
+    def _show_admin_help():
+        st.markdown(
+            "**O que você pode fazer aqui**\n\n"
+            "- Gerenciar Sites, Contratadas e Usuários.\n"
+            "- Importar dados (Horas e Acidentes) via CSV.\n"
+            "- Recalcular KPIs e ver estatísticas do sistema.\n\n"
+            "**Dicas**\n\n"
+            "- Confira o preview antes de importar.\n"
+            "- Para usuários já existentes, o perfil é atualizado."
+        )
+        if st.button("Fechar", type="primary"):
+            st.rerun()
+    al, ar = st.columns([6, 1])
+    with ar:
+        st.button("❓ Ajuda", key="admin_help_btn", on_click=_show_admin_help)
     
     # Tabs para diferentes funcionalidades administrativas
     tab1, tab2, tab3, tab4, tab5 = st.tabs([

@@ -68,6 +68,10 @@ def fetch_nonconformities(start_date=None, end_date=None):
         return pd.DataFrame()
 
 def app(filters=None):
+    # Verifica autenticação e trial
+    from auth.auth_utils import require_login
+    require_login()
+    
     # Busca filtros do session state se não foram passados como parâmetro
     st.title("📋 Não Conformidades")
     
@@ -76,6 +80,36 @@ def app(filters=None):
     
     with tab1:
         st.subheader("Análise de Não Conformidades")
+        # Diálogo de ajuda detalhada
+        @st.dialog("Ajuda - Não Conformidades")
+        def _show_nc_help():
+            st.markdown(
+                "**Como analisar**\n\n"
+                "1) Ajuste filtros (datas/período) e verifique volume.\n"
+                "2) Avalie status (abertas/encerradas) e tempo médio.\n"
+                "3) Explore normas, gravidade e distribuição por mês.\n\n"
+                "**Observações**\n\n"
+                "- Em ausência de 'opened_at', usamos 'occurred_at' para séries temporais.\n"
+                "- Campos podem variar por ambiente (ex.: site_id)."
+            )
+            if st.button("Fechar", type="primary"):
+                st.rerun()
+
+        c1, c2 = st.columns([1, 1])
+        with c1:
+            st.button("❓ Ajuda", key="nc_help_btn", on_click=_show_nc_help)
+        with st.expander("Guia rápido de análise", expanded=False):
+            st.markdown(
+                "1. Ajuste o período na sidebar e confirme se há dados.\n"
+                "2. Use as métricas para panorama (abertas, fechadas, tempo médio).\n"
+                "3. Explore gráficos por status, mês, norma e gravidade.\n"
+                "4. Vá em 'Registros' para filtrar por norma e buscar texto."
+            )
+        with st.popover("❓ Dicas"):
+            st.markdown(
+                "- Alguns campos podem variar entre ambientes (ex.: site).\n"
+                "- Se não houver 'opened_at', os gráficos usam 'occurred_at' como fallback."
+            )
         
         # Busca dados de forma independente - FORÇANDO a busca de TODOS os registros
         with st.spinner("Carregando dados de não conformidades..."):

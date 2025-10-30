@@ -14,7 +14,25 @@ from services.kpi import (
 from components.filters import apply_filters_to_df
 
 def app(filters=None):
+    # Verifica autenticação e trial
+    from auth.auth_utils import require_login
+    require_login()
+    
     st.title("📊 Dashboard Executivo - SSO")
+    # Ajuda da página
+    @st.dialog("Ajuda - Visão Geral")
+    def _show_overview_help():
+        st.markdown(
+            "**Como usar a Visão Geral**\n\n"
+            "- Ajuste filtros na barra lateral.\n"
+            "- Leia os cartões de status e indicadores principais.\n"
+            "- Use as abas para metodologia e instruções detalhadas."
+        )
+        if st.button("Fechar", type="primary"):
+            st.rerun()
+    c1, c2 = st.columns([6, 1])
+    with c2:
+        st.button("❓ Ajuda", key="overview_help_btn", on_click=_show_overview_help)
     
     # Busca filtros do session state se não foram passados como parâmetro
     if filters is None:

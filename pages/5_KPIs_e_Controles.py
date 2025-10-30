@@ -19,7 +19,26 @@ from components.cards import create_control_chart, create_trend_chart, create_me
 from components.filters import apply_filters_to_df
 
 def app(filters=None):
+    # Verifica autenticação e trial
+    from auth.auth_utils import require_login
+    require_login()
+    
     st.title("📈 KPIs e Controles Estatísticos")
+    # Ajuda da página
+    @st.dialog("Ajuda - KPIs e Controles")
+    def _show_kpi_help():
+        st.markdown(
+            "**Fluxo recomendado**\n\n"
+            "1) KPIs Básicos: visão geral e interpretações.\n"
+            "2) Controles Estatísticos: limites e padrões.\n"
+            "3) Tendências (EWMA) e Previsões.\n"
+            "4) Relatórios e Exportação."
+        )
+        if st.button("Fechar", type="primary"):
+            st.rerun()
+    hl, hr = st.columns([6, 1])
+    with hr:
+        st.button("❓ Ajuda", key="kpi_help_btn", on_click=_show_kpi_help)
     
     # Busca filtros do session state se não foram passados como parâmetro
     if filters is None:

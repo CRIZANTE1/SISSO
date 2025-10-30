@@ -338,6 +338,10 @@ def fetch_accidents(start_date=None, end_date=None):
         return pd.DataFrame()
 
 def app(filters=None):
+    # Verifica autenticação e trial
+    from auth.auth_utils import require_login
+    require_login()
+    
     st.title("🚨 Acidentes")
     
     # Busca filtros do session state se não foram passados como parâmetro
@@ -367,6 +371,39 @@ def app(filters=None):
     
     with tab1:
         st.subheader("Análise de Acidentes")
+        # Diálogo de ajuda detalhada
+        @st.dialog("Ajuda - Análise de Acidentes")
+        def _show_accidents_help():
+            st.markdown(
+                "**Passo a passo sugerido**\n\n"
+                "1) Ajuste filtros na sidebar (usuários, período ou datas).\n"
+                "2) Leia as métricas para avaliar volume, gravidade e dias perdidos.\n"
+                "3) Explore gráficos por tipo, mês, causa raiz e classificações (NBR 14280).\n"
+                "4) Use a aba 'Registros' para buscas textuais e filtros adicionais.\n\n"
+                "**Dias trabalhados até acidente**\n\n"
+                "- Para cálculos mais precisos, cadastre funcionários e horas trabalhadas.\n"
+                "- Sem dados de horas, será usada aproximação por datas de admissão/perfil."
+            )
+            if st.button("Fechar", type="primary"):
+                st.rerun()
+
+        c1, c2 = st.columns([1, 1])
+        with c1:
+            st.button("❓ Ajuda", key="acc_help_btn", on_click=_show_accidents_help)
+        with st.expander("Guia rápido de análise", expanded=False):
+            st.markdown(
+                "1. Confira os filtros na barra lateral para definir escopo.\n"
+                "2. Leia as métricas para um panorama imediato (totais, lesões, dias).\n"
+                "3. Use os gráficos para identificar tendências por mês, tipo e causa raiz.\n"
+                "4. Se necessário, vá para 'Registros' para detalhamento e busca textual.\n"
+                "5. Consulte a aba '📚 Instruções' para o passo a passo completo."
+            )
+        with st.popover("❓ Dicas" ):
+            st.markdown(
+                "- Os filtros afetam todas as seções desta página.\n"
+                "- Sem dados? Tente desmarcar 'Filtrar por data' ou ampliar o período.\n"
+                "- Para análise de 'Dias Trabalhados', cadastre funcionários e horas."
+            )
         
         if not df.empty:
             
