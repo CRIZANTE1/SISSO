@@ -25,7 +25,40 @@ def fetch_nonconformities(site_codes=None, start_date=None, end_date=None):
             query = query.lte("occurred_at", end_date.isoformat())
             
         data = query.order("occurred_at", desc=True).execute().data
-        return pd.DataFrame(data)
+        df = pd.DataFrame(data)
+
+        # Normalizações para UI
+        if not df.empty:
+            # Renomeia standard_ref -> norm_reference (se existir)
+            if 'standard_ref' in df.columns and 'norm_reference' not in df.columns:
+                df['norm_reference'] = df['standard_ref']
+            # Mapeia status pt-br -> status normalizado (open/in_progress/closed)
+            if 'status' in df.columns:
+                status_map = {
+                    'aberta': 'open',
+                    'tratando': 'in_progress',
+                    'encerrada': 'closed',
+                    'open': 'open',
+                    'in_progress': 'in_progress',
+                    'closed': 'closed'
+                }
+                df['status'] = df['status'].astype(str).str.lower().map(status_map).fillna(df['status'])
+            # Mapeia severidade pt-br -> low/medium/high/critical
+            if 'severity' in df.columns:
+                sev_map = {
+                    'leve': 'low',
+                    'moderada': 'medium',
+                    'grave': 'high',
+                    'critica': 'critical',
+                    'crítica': 'critical',
+                    'low': 'low',
+                    'medium': 'medium',
+                    'high': 'high',
+                    'critical': 'critical'
+                }
+                df['severity'] = df['severity'].astype(str).str.lower().map(sev_map).fillna(df['severity'])
+        
+        return df
     except Exception as e:
         st.error(f"Erro ao buscar não conformidades: {str(e)}")
         return pd.DataFrame()
@@ -284,16 +317,16 @@ def app(filters=None):
                 date_input = st.date_input("Data da N/C", value=date.today())
                 norm_reference = st.selectbox(
                     "Norma de Referência",
-                    options=["NR-12", "NR-20", "NR-35", "ISO 45001", "OHSAS 18001", "Outras"]
+                    options=["NR-12", "NR-18", "NR-35", "ISO 45001", "OHSAS 18001", "Outras"]
                 )
                 severity = st.selectbox(
                     "Gravidade",
-                    options=["low", "medium", "high", "critical"],
+                    options=["leve", "moderada", "grave", "critica"],
                     format_func=lambda x: {
-                        "low": "Baixa",
-                        "medium": "Média", 
-                        "high": "Alta",
-                        "critical": "Crítica"
+                        "leve": "Baixa",
+                        "moderada": "Média", 
+                        "grave": "Alta",
+                        "critica": "Crítica"
                     }[x]
                 )
             
@@ -306,11 +339,11 @@ def app(filters=None):
                 
                 status = st.selectbox(
                     "Status",
-                    options=["open", "in_progress", "closed"],
+                    options=["aberta", "tratando", "encerrada"],
                     format_func=lambda x: {
-                        "open": "Aberta",
-                        "in_progress": "Em Andamento", 
-                        "closed": "Fechada"
+                        "aberta": "Aberta",
+                        "tratando": "Em Tratamento", 
+                        "encerrada": "Encerrada"
                     }[x]
                 )
 
@@ -324,8 +357,8 @@ def app(filters=None):
             description = st.text_area("Descrição da Não Conformidade", height=100)
             corrective_actions = st.text_area("Ações Corretivas", height=100)
             
-            # Data de resolução se fechada
-            if status == "closed":
+            # Data de resolução se encerrada
+            if status == "encerrada":
                 resolution_date = st.date_input("Data de Resolução", value=date.today())
             else:
                 resolution_date = None
@@ -348,11 +381,12 @@ def app(filters=None):
                     try:
                         supabase = get_supabase_client()
                         
-                        # Insere não conformidade
+                        # Insere não conformidade nos campos reais
                         nc_data = {
                             "site_id": site_id,
+                            "opened_at": date_input.isoformat(),
                             "occurred_at": date_input.isoformat(),
-                            "norm_reference": norm_reference,
+                            "standard_ref": norm_reference,
                             "severity": severity,
                             "status": status,
                             "description": description,
