@@ -360,6 +360,47 @@ def app(filters=None):
             else:
                 st.info("📋 **Análise por Causa Raiz**\n\nNenhum dado de causa raiz disponível.")
     
+            # Análise por Classificação (NBR 14280)
+            if 'classification' in df.columns and not df['classification'].isna().all():
+                st.subheader("📚 Análise por Classificação (NBR 14280)")
+                class_counts = df['classification'].value_counts()
+
+                fig_class = px.pie(
+                    values=class_counts.values,
+                    names=class_counts.index,
+                    title="Distribuição por Classificação",
+                    color_discrete_sequence=px.colors.qualitative.Set2
+                )
+                fig_class.update_layout(height=380, font=dict(size=12))
+                st.plotly_chart(fig_class, use_container_width=True)
+            else:
+                st.info("📚 **Classificação (NBR 14280)**\n\nNenhum dado de classificação disponível.")
+
+            # Análise por Parte do Corpo Afetada (NBR 14280)
+            if 'body_part' in df.columns and not df['body_part'].isna().all():
+                st.subheader("🧍 Análise por Parte do Corpo Afetada (NBR 14280)")
+                body_counts = df['body_part'].value_counts().sort_values(ascending=True)
+
+                fig_body = px.bar(
+                    x=body_counts.values,
+                    y=body_counts.index,
+                    orientation='h',
+                    title="Acidentes por Parte do Corpo",
+                    color=body_counts.values,
+                    color_continuous_scale="Tealgrn"
+                )
+                fig_body.update_layout(
+                    height=420,
+                    xaxis_title="Número de Acidentes",
+                    yaxis_title="Parte do Corpo",
+                    showlegend=False,
+                    font=dict(size=12)
+                )
+                fig_body.update_traces(marker_line_width=0)
+                st.plotly_chart(fig_body, use_container_width=True)
+            else:
+                st.info("🧍 **Parte do Corpo Afetada (NBR 14280)**\n\nNenhum dado disponível.")
+
     with tab2:
         st.subheader("Registros de Acidentes")
         
@@ -501,8 +542,36 @@ def app(filters=None):
                 is_fatal = st.checkbox("Acidente Fatal", value=False, help="Marque se o acidente resultou em morte")
             
             with col2:
-                classification = st.text_input("Classificação")
-                body_part = st.text_input("Parte do Corpo Afetada")
+                classification_options = [
+                    "Típico",
+                    "Trajeto",
+                    "Doença do Trabalho",
+                    "Outro"
+                ]
+                classification_sel = st.selectbox("Classificação", options=classification_options)
+                classification = (
+                    st.text_input("Classificação (Outro)") if classification_sel == "Outro" else classification_sel
+                )
+
+                body_part_options = [
+                    "Cabeça",
+                    "Olhos",
+                    "Face",
+                    "Pescoço",
+                    "Membros Superiores",
+                    "Mãos",
+                    "Membros Inferiores",
+                    "Pés",
+                    "Tronco",
+                    "Abdome",
+                    "Coluna Vertebral",
+                    "Múltiplas Partes",
+                    "Outras"
+                ]
+                body_part_sel = st.selectbox("Parte do Corpo Afetada", options=body_part_options)
+                body_part = (
+                    st.text_input("Parte do Corpo (Outra)") if body_part_sel == "Outras" else body_part_sel
+                )
                 root_cause = st.selectbox(
                     "Causa Raiz",
                     options=["Fator Humano", "Fator Material", "Fator Ambiental", 
@@ -527,6 +596,17 @@ def app(filters=None):
             
             description = st.text_area("Descrição do Acidente", height=100)
             corrective_actions = st.text_area("Ações Corretivas", height=100)
+
+            # Status padronizado
+            status = st.selectbox(
+                "Status",
+                options=["aberto", "em_investigacao", "fechado"],
+                format_func=lambda x: {
+                    "aberto": "Aberto",
+                    "em_investigacao": "Em investigação",
+                    "fechado": "Fechado"
+                }[x]
+            )
             
             # Upload de evidências
             uploaded_files = st.file_uploader(
@@ -554,7 +634,7 @@ def app(filters=None):
                             "description": description,
                             "lost_days": lost_days,
                             "root_cause": root_cause,
-                            "status": "fechado",
+                            "status": status,
                             "is_fatal": is_fatal,
                             "cat_number": cat_number if cat_number else None,
                             "communication_date": communication_date.isoformat() if communication_date else None,
