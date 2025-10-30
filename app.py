@@ -38,6 +38,9 @@ def main():
         "📈 Controles": [
             st.Page("pages/5_KPIs_e_Controles.py", title="KPIs e Controles", icon="📈"),
         ],
+        "👤 Conta": [
+            st.Page("pages/8_Perfil_Usuario.py", title="Perfil do Usuário", icon="👤"),
+        ],
         "⚙️ Administração": [
             st.Page("pages/6_Admin_Dados_Basicos.py", title="Dados Básicos", icon="⚙️"),
             st.Page("pages/7_Logs_Sistema.py", title="Logs do Sistema", icon="📝"),
