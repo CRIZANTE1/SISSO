@@ -12,6 +12,9 @@ except ImportError:
     SCIPY_AVAILABLE = False
     print("⚠️ SciPy não está disponível. Algumas funcionalidades estatísticas podem estar limitadas.")
 
+# Escala das horas: dados cadastrados em centenas (ex: 176 representa 17.600 horas)
+HOURS_SCALE = 100
+
 def fetch_kpi_data(user_email: Optional[str] = None,
                    start_date: Optional[str] = None, 
                    end_date: Optional[str] = None) -> pd.DataFrame:
@@ -50,7 +53,7 @@ def calculate_frequency_rate(accidents: int, hours_worked: float) -> float:
     """
     if hours_worked is None or hours_worked == 0:
         return 0.0
-    return (accidents / hours_worked) * 1_000_000
+    return (accidents / (hours_worked * HOURS_SCALE)) * 1_000_000
 
 def calculate_severity_rate(lost_days: int, hours_worked: float, debited_days: int = 0) -> float:
     """
@@ -69,7 +72,7 @@ def calculate_severity_rate(lost_days: int, hours_worked: float, debited_days: i
     """
     if hours_worked is None or hours_worked == 0:
         return 0.0
-    return ((lost_days + debited_days) / hours_worked) * 1_000_000
+    return ((lost_days + debited_days) / (hours_worked * HOURS_SCALE)) * 1_000_000
 
 def get_frequency_rate_interpretation(tf_value: float) -> dict:
     """
@@ -146,10 +149,11 @@ def calculate_poisson_control_limits(df: pd.DataFrame,
     # Taxa média de acidentes por hora
     total_accidents = df[accidents_col].sum()
     total_hours = df[hours_col].sum()
-    mean_rate = total_accidents / total_hours if total_hours > 0 else 0
+    total_hours_corrected = total_hours * HOURS_SCALE
+    mean_rate = total_accidents / total_hours_corrected if total_hours_corrected > 0 else 0
     
     # Valor esperado para cada período
-    df['expected'] = df[hours_col] * mean_rate
+    df['expected'] = (df[hours_col] * HOURS_SCALE) * mean_rate
     
     # Limites de controle (3-sigma)
     df['ucl'] = df['expected'] + 3 * np.sqrt(df['expected'])
@@ -232,6 +236,7 @@ def generate_kpi_summary(df: pd.DataFrame) -> Dict[str, Any]:
     total_accidents = df['accidents_total'].sum()
     total_lost_days = df['lost_days_total'].sum()
     total_hours = df['hours'].sum()
+    total_hours_corrected = total_hours * HOURS_SCALE
     total_fatalities = df.get('fatalities', pd.Series([0] * len(df))).sum()
     total_debited_days = df.get('debited_days', pd.Series([0] * len(df))).sum()
     
@@ -240,57 +245,125 @@ def generate_kpi_summary(df: pd.DataFrame) -> Dict[str, Any]:
     automatic_debited_days = total_fatalities * 6000
     total_debited_days = total_debited_days + automatic_debited_days
     
-    # Verifica se as horas podem estar em minutos (se o valor for muito baixo)
-    # Se as horas forem menores que 1000, assume que estão em minutos
-    if total_hours > 0 and total_hours < 1000:
-        total_hours = total_hours / 60  # Converte minutos para horas
+    # ✅ VALIDAÇÃO: Verifica se há horas válidas
+    if total_hours_corrected <= 0:
+        st.warning("⚠️ Total de horas trabalhadas é zero ou inválido. Verifique os dados cadastrados.")
+        return {
+            'frequency_rate': 0,
+            'severity_rate': 0,
+            'total_accidents': total_accidents,
+            'total_fatalities': total_fatalities,
+            'total_lost_days': total_lost_days,
+            'total_hours': 0,
+            'error': 'Horas inválidas'
+        }
     
-    # Cálculos acumulados para todo o período
+    # ✅ Cálculos ACUMULADOS para todo o período (correto para visão geral)
     freq_rate = calculate_frequency_rate(total_accidents, total_hours)
     sev_rate = calculate_severity_rate(total_lost_days, total_hours, total_debited_days)
+    
+    # ✅ NOVO: Calcula também taxas POR PERÍODO para análise mais precisa
+    df_with_rates = df.copy()
+    df_with_rates['freq_rate_period'] = df_with_rates.apply(
+        lambda row: calculate_frequency_rate(
+            row['accidents_total'], 
+            row['hours']
+        ) if row['hours'] > 0 else 0, 
+        axis=1
+    )
+    
+    # Calcula dias debitados por período (fatalidades * 6000)
+    df_with_rates['period_debited_days'] = (
+        df_with_rates.get('debited_days', 0) + 
+        (df_with_rates.get('fatalities', 0) * 6000)
+    )
+    
+    df_with_rates['sev_rate_period'] = df_with_rates.apply(
+        lambda row: calculate_severity_rate(
+            row['lost_days_total'], 
+            row['hours'],
+            row['period_debited_days']
+        ) if row['hours'] > 0 else 0, 
+        axis=1
+    )
+    
+    # Taxa média por período (mais representativa para períodos múltiplos)
+    avg_freq_rate = df_with_rates['freq_rate_period'].mean()
+    avg_sev_rate = df_with_rates['sev_rate_period'].mean()
     
     # Interpretações conforme parâmetros de referência
     freq_interpretation = get_frequency_rate_interpretation(freq_rate)
     sev_interpretation = get_severity_rate_interpretation(sev_rate)
     
-    # Comparação com período anterior (último período vs penúltimo)
-    latest_period = df['period'].max()
-    latest_data = df[df['period'] == latest_period].iloc[0]
+    # ✅ MELHORADO: Comparação com média dos últimos 3 períodos (mais estável)
+    freq_change = None
+    sev_change = None
     
-    prev_period_data = df[df['period'] < latest_period]
-    if not prev_period_data.empty:
-        prev_data = prev_period_data.iloc[-1]
-        prev_freq_rate = calculate_frequency_rate(
-            prev_data['accidents_total'], 
-            prev_data['hours']
-        )
-        prev_sev_rate = calculate_severity_rate(
-            prev_data['lost_days_total'], 
-            prev_data['hours'],
-            prev_data.get('debited_days', 0)
-        )
+    if len(df_with_rates) >= 4:
+        # Ordena por período
+        df_sorted = df_with_rates.sort_values('period')
         
-        # Evita variações artificiais quando o período anterior é zero ou inexistente
-        freq_change = ((freq_rate - prev_freq_rate) / prev_freq_rate * 100) if prev_freq_rate and prev_freq_rate > 0 else None
-        sev_change = ((sev_rate - prev_sev_rate) / prev_sev_rate * 100) if prev_sev_rate and prev_sev_rate > 0 else None
-    else:
-        freq_change = None
-        sev_change = None
+        # Último período
+        latest_freq = df_sorted['freq_rate_period'].iloc[-1]
+        latest_sev = df_sorted['sev_rate_period'].iloc[-1]
+        
+        # Média dos 3 períodos anteriores
+        prev_3_freq = df_sorted['freq_rate_period'].iloc[-4:-1].mean()
+        prev_3_sev = df_sorted['sev_rate_period'].iloc[-4:-1].mean()
+        
+        # Calcula variação percentual
+        if prev_3_freq > 0:
+            freq_change = ((latest_freq - prev_3_freq) / prev_3_freq * 100)
+        
+        if prev_3_sev > 0:
+            sev_change = ((latest_sev - prev_3_sev) / prev_3_sev * 100)
+    
+    elif len(df_with_rates) >= 2:
+        # Se tiver apenas 2-3 períodos, compara com o anterior
+        df_sorted = df_with_rates.sort_values('period')
+        
+        latest_freq = df_sorted['freq_rate_period'].iloc[-1]
+        latest_sev = df_sorted['sev_rate_period'].iloc[-1]
+        
+        prev_freq = df_sorted['freq_rate_period'].iloc[-2]
+        prev_sev = df_sorted['sev_rate_period'].iloc[-2]
+        
+        if prev_freq > 0:
+            freq_change = ((latest_freq - prev_freq) / prev_freq * 100)
+        
+        if prev_sev > 0:
+            sev_change = ((latest_sev - prev_sev) / prev_sev * 100)
     
     return {
-        'latest_period': latest_period,
+        'latest_period': df['period'].max(),
+        
+        # Taxas acumuladas (total do período)
         'frequency_rate': freq_rate,
         'severity_rate': sev_rate,
+        
+        # ✅ NOVO: Taxas médias por período
+        'avg_frequency_rate': avg_freq_rate,
+        'avg_severity_rate': avg_sev_rate,
+        
+        # Variações
         'frequency_change': freq_change,
         'severity_change': sev_change,
-        'total_accidents': total_accidents,
-        'total_fatalities': total_fatalities,
-        'total_lost_days': total_lost_days,
-        'total_debited_days': total_debited_days,
-        'automatic_debited_days': automatic_debited_days,
-        'total_hours': total_hours,
+        
+        # Totalizadores
+        'total_accidents': int(total_accidents),
+        'total_fatalities': int(total_fatalities),
+        'total_lost_days': int(total_lost_days),
+        'total_debited_days': int(total_debited_days),
+        'automatic_debited_days': int(automatic_debited_days),
+        'total_hours': float(total_hours_corrected),
+        
+        # Interpretações
         'frequency_interpretation': freq_interpretation,
-        'severity_interpretation': sev_interpretation
+        'severity_interpretation': sev_interpretation,
+        
+        # ✅ NOVO: Metadados para transparência
+        'periods_count': len(df),
+        'calculation_method': 'accumulated' if len(df) > 1 else 'single_period'
     }
 
 def calculate_forecast(df: pd.DataFrame, months_ahead: int = 1) -> Dict[str, Any]:
@@ -310,7 +383,7 @@ def calculate_forecast(df: pd.DataFrame, months_ahead: int = 1) -> Dict[str, Any
         
         # Taxa de Frequência - usa média móvel dos últimos 3 meses
         if 'hours' in df_sorted.columns and 'accidents_total' in df_sorted.columns:
-            df_sorted['freq_rate'] = (df_sorted['accidents_total'] / df_sorted['hours']) * 1_000_000
+            df_sorted['freq_rate'] = (df_sorted['accidents_total'] / (df_sorted['hours'] * HOURS_SCALE)) * 1_000_000
             
             # Calcula tendência simples comparando últimos 3 meses
             recent_freq = df_sorted['freq_rate'].tail(3).values
@@ -330,7 +403,7 @@ def calculate_forecast(df: pd.DataFrame, months_ahead: int = 1) -> Dict[str, Any
         
         # Taxa de Gravidade - usa média móvel dos últimos 3 meses
         if 'hours' in df_sorted.columns and 'lost_days_total' in df_sorted.columns:
-            df_sorted['sev_rate'] = (df_sorted['lost_days_total'] / df_sorted['hours']) * 1_000_000
+            df_sorted['sev_rate'] = (df_sorted['lost_days_total'] / (df_sorted['hours'] * HOURS_SCALE)) * 1_000_000
             
             recent_sev = df_sorted['sev_rate'].tail(3).values
             if len(recent_sev) >= 2:
@@ -377,7 +450,7 @@ def calculate_forecast(df: pd.DataFrame, months_ahead: int = 1) -> Dict[str, Any
         
         # Horas trabalhadas (assume valor médio dos últimos 3 meses)
         if 'hours' in df_sorted.columns:
-            avg_hours = float(recent_data['hours'].mean())
+            avg_hours = float(recent_data['hours'].mean()) * HOURS_SCALE
             forecasts['hours'] = {
                 'predicted': round(avg_hours),
                 'trend': 'stable',

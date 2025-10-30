@@ -54,8 +54,8 @@ def calculate_work_days_until_accident(accident_date, employee_email=None):
                         except:
                             continue
                 
-                # Assume 8 horas por dia útil
-                work_days = total_hours / 8
+                # Horas gravadas em centenas: converter para horas reais e assumir 8h/dia útil
+                work_days = (total_hours * 100) / 8
                 return min(work_days, days_since_admission)
         
         # Se não encontrar dados de horas, retorna dias corridos

@@ -746,7 +746,8 @@ def app(filters=None):
             st.subheader("📊 Resumo Executivo")
             
             total_accidents = report_df['accidents_total'].sum()
-            total_hours = report_df['hours'].sum()
+            # Horas gravadas em centenas: converter para horas reais
+            total_hours = report_df['hours'].sum() * 100
             total_lost_days = report_df['lost_days_total'].sum()
             
             overall_freq_rate = (total_accidents / total_hours) * 1_000_000 if total_hours > 0 else 0

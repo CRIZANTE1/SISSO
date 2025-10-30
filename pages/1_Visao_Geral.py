@@ -56,11 +56,26 @@ def app(filters=None):
         # === RESUMO SIMPLES E CLARO ===
         st.subheader("📊 Resumo da Segurança no Trabalho")
         
+        # ✅ NOVO: Aviso quando há dados acumulados
+        if kpi_summary.get('periods_count', 0) > 1:
+            st.info(f"📊 **Dados acumulados de {kpi_summary['periods_count']} períodos** | "
+                    f"Total de {kpi_summary.get('total_hours', 0):,.0f} horas trabalhadas")
+        
         # Status geral em destaque
         freq_rate = kpi_summary.get('frequency_rate', 0)
         sev_rate = kpi_summary.get('severity_rate', 0)
         total_accidents = kpi_summary.get('total_accidents', 0)
         fatalities = kpi_summary.get('total_fatalities', 0)
+        
+        # ✅ NOVO: Usa taxa MÉDIA para classificação quando há múltiplos períodos
+        if kpi_summary.get('periods_count', 0) > 1:
+            display_freq_rate = kpi_summary.get('avg_frequency_rate', freq_rate)
+            display_sev_rate = kpi_summary.get('avg_severity_rate', sev_rate)
+            rate_label = "Média por Período"
+        else:
+            display_freq_rate = freq_rate
+            display_sev_rate = sev_rate
+            rate_label = "Taxa do Período"
         
         # Determina status geral
         if fatalities > 0:
@@ -90,11 +105,16 @@ def app(filters=None):
         
         # Métricas principais simplificadas
         st.subheader("📈 Indicadores Principais")
+        
+        # ✅ Mostra se é acumulado ou média
+        if kpi_summary.get('periods_count', 0) > 1:
+            st.caption(f"**{rate_label}** - Baseado em {kpi_summary['periods_count']} períodos de dados")
+        
         col1, col2, col3, col4 = st.columns(4)
         
         with col1:
             freq_data = kpi_summary.get('frequency_interpretation', {})
-            freq_value = kpi_summary.get('frequency_rate', 0)
+            freq_value = display_freq_rate  # ✅ Usa valor correto
             freq_class = freq_data.get('classification', 'N/A')
             
             # Ícone baseado na classificação
@@ -111,12 +131,12 @@ def app(filters=None):
                 f"{freq_icon} Acidentes por Milhão de Horas",
                 f"{freq_value:.0f}",
                 delta=f"{kpi_summary.get('frequency_change', 0):+.1f}%" if kpi_summary.get('frequency_change') else None,
-                help=f"Quantos acidentes acontecem a cada 1 milhão de horas trabalhadas\nClassificação: {freq_class}"
+                help=f"Quantos acidentes acontecem a cada 1 milhão de horas trabalhadas\nClassificação: {freq_class}\n{rate_label}"
             )
         
         with col2:
             sev_data = kpi_summary.get('severity_interpretation', {})
-            sev_value = kpi_summary.get('severity_rate', 0)
+            sev_value = display_sev_rate  # ✅ Usa valor correto
             sev_class = sev_data.get('classification', 'N/A')
             
             # Ícone baseado na classificação
@@ -133,7 +153,7 @@ def app(filters=None):
                 f"{sev_icon} Dias Perdidos por Milhão de Horas",
                 f"{sev_value:.0f}",
                 delta=f"{kpi_summary.get('severity_change', 0):+.1f}%" if kpi_summary.get('severity_change') else None,
-                help=f"Quantos dias de trabalho são perdidos a cada 1 milhão de horas trabalhadas\nClassificação: {sev_class}"
+                help=f"Quantos dias de trabalho são perdidos a cada 1 milhão de horas trabalhadas\nClassificação: {sev_class}\n{rate_label}"
             )
         
         with col3:
@@ -427,13 +447,31 @@ def app(filters=None):
         else:
             st.warning("⚠️ **CUIDADO**: Número de acidentes acima do ideal. Revisar procedimentos.")
         
-        # Informação adicional simples
+        # Informação adicional com taxas corretas
         if kpi_summary.get('total_hours', 0) > 0:
             automatic_debited = kpi_summary.get('automatic_debited_days', 0)
+            periods_count = kpi_summary.get('periods_count', 1)
+            
+            info_text = f"""
+            📊 **Base de cálculo**: 
+            - {kpi_summary.get('total_hours', 0):,.0f} horas trabalhadas em {periods_count} período(s)
+            - Taxa de Frequência Acumulada: {freq_rate:.1f} acidentes/milhão de horas
+            - Taxa de Gravidade Acumulada: {sev_rate:.1f} dias perdidos/milhão de horas
+            """
+            
+            if periods_count > 1:
+                info_text += f"""
+            - Taxa de Frequência Média: {kpi_summary.get('avg_frequency_rate', 0):.1f} acidentes/milhão de horas
+            - Taxa de Gravidade Média: {kpi_summary.get('avg_severity_rate', 0):.1f} dias perdidos/milhão de horas
+                """
+            
             if automatic_debited > 0:
-                st.info(f"📊 **Base de cálculo**: {kpi_summary.get('total_hours', 0):,.0f} horas trabalhadas em {len(df)} meses\n\n⚠️ **Dias Debitados Automáticos**: {automatic_debited:,} dias adicionados automaticamente para acidentes fatais conforme NBR 14280 (6.000 dias por fatalidade)")
-            else:
-                st.info(f"📊 **Base de cálculo**: {kpi_summary.get('total_hours', 0):,.0f} horas trabalhadas em {len(df)} meses")
+                info_text += f"""
+            
+            ⚠️ **Dias Debitados Automáticos**: {automatic_debited:,} dias adicionados automaticamente para acidentes fatais conforme NBR 14280 (6.000 dias por fatalidade)
+                """
+            
+            st.info(info_text)
     
     with tab2:
         st.subheader("📚 Metodologia do Dashboard Executivo")
@@ -579,6 +617,57 @@ def app(filters=None):
         - **ISO 45001**: Sistema de Gestão de Segurança e Saúde Ocupacional
         - **OHSAS 18001**: Especificação para Sistemas de Gestão de SST
         - **ANSI Z16.1**: Métodos de Registro e Medição de Acidentes
+        """)
+        
+        # ✅ NOVO: Explicação detalhada da base de cálculo e exemplos
+        st.markdown("""
+        ## 🧮 Metodologia de Cálculo Aplicada
+        
+        ### Base de Cálculo
+        O sistema utiliza duas abordagens para cálculo das taxas:
+        
+        **1. Taxa Acumulada (Período Total)**
+        - **Uso**: Visão consolidada de todo o período filtrado
+        - **Cálculo**: `(Total de acidentes / Total de horas) × 1.000.000`
+        - **Quando usar**: Relatórios anuais, comparações de longo prazo
+        
+        **2. Taxa Média por Período**
+        - **Uso**: Análise de desempenho médio mensal
+        - **Cálculo**: Média das taxas calculadas para cada mês
+        - **Quando usar**: Identificar tendências, comparar meses específicos
+        
+        ### Exemplo Prático
+        
+        **Cenário**: 3 meses de dados
+        
+        | Mês | Acidentes | Horas | Taxa Individual |
+        |-----|-----------|-------|-----------------|
+        | Jan | 2 | 10.000 | 200 |
+        | Fev | 0 | 10.000 | 0 |
+        | Mar | 1 | 10.000 | 100 |
+        
+        **Taxa Acumulada**: (3 / 30.000) × 1.000.000 = **100**
+        **Taxa Média**: (200 + 0 + 100) / 3 = **100**
+        
+        Neste caso, os valores coincidem. Porém, com horas variáveis:
+        
+        | Mês | Acidentes | Horas | Taxa Individual |
+        |-----|-----------|-------|-----------------|
+        | Jan | 2 | 5.000 | 400 |
+        | Fev | 0 | 15.000 | 0 |
+        | Mar | 1 | 10.000 | 100 |
+        
+        **Taxa Acumulada**: (3 / 30.000) × 1.000.000 = **100**
+        **Taxa Média**: (400 + 0 + 100) / 3 = **166,7**
+        
+        A taxa média é mais alta porque janeiro teve muitos acidentes com poucas horas.
+        
+        ### Qual Taxa Usar?
+        
+        - **Taxa Acumulada**: Melhor para relatórios oficiais e comparações totais
+        - **Taxa Média**: Melhor para identificar meses problemáticos e tendências
+        
+        **Neste sistema**: Exibimos a **taxa acumulada** por padrão, mas calculamos ambas para análises internas.
         """)
     
     with tab3:
