@@ -3,6 +3,7 @@ from auth.auth_utils import require_login, get_user_info
 from managers.supabase_config import get_service_role_client
 import pandas as pd
 from datetime import date
+from services.employees import get_all_employees, create_employee, employee_form, list_employees_table
 
 
 def load_profile(email: str) -> dict:
@@ -98,6 +99,18 @@ def app():
                 st.success("Perfil salvo com sucesso!")
             else:
                 st.error("Falha ao salvar perfil.")
+
+    st.markdown("---")
+
+    # Gerenciamento de Funcionários
+    st.subheader("👷 Gerenciar Funcionários")
+    list_employees_table()
+    
+    st.subheader("Adicionar Novo Funcionário")
+    employee_data = employee_form()
+    if employee_data:
+        create_employee(employee_data)
+        st.rerun()
 
     st.markdown("---")
 

@@ -8,6 +8,7 @@ from services.uploads import upload_evidence, get_attachments
 from components.cards import create_metric_row, create_bar_chart, create_pie_chart
 from components.filters import apply_filters_to_df
 from managers.supabase_config import get_supabase_client
+from services.employees import get_all_employees
 # Imports da NBR 14280 removidos
 
 def calculate_work_days_until_accident(accident_date, employee_identifier=None, employee_id=None):
@@ -132,10 +133,159 @@ def get_work_days_analysis(df):
         df_work['occurred_at'] = pd.to_datetime(df_work['occurred_at'])
         df_work['accident_date'] = df_work['occurred_at'].dt.date
         
-        # Calcula dias trabalhados para cada acidente
+        # Otimização: pré-carregar todos os dados necessários
+        from managers.supabase_config import get_service_role_client
+        supabase = get_service_role_client()
+        
+        # Carregar todos os funcionários de uma vez
+        all_employees = {}
+        try:
+            emp_response = supabase.table("employees").select("id, email, admission_date, user_id").execute()
+            if emp_response and hasattr(emp_response, 'data'):
+                for emp in emp_response.data:
+                    all_employees[emp['id']] = emp
+        except Exception:
+            pass  # Se não tiver permissão ou erro, continua sem dados de funcionários
+        
+        # Carregar todos os perfis de uma vez
+        all_profiles = {}
+        try:
+            profile_response = supabase.table("profiles").select("id, email, created_at").execute()
+            if profile_response and hasattr(profile_response, 'data'):
+                for profile in profile_response.data:
+                    all_profiles[profile['id']] = profile
+                    all_profiles[profile['email']] = profile  # Adiciona também pelo email para busca direta
+        except Exception:
+            pass
+        
+        # Carregar todas as horas trabalhadas de uma vez
+        all_hours = {}
+        try:
+            hours_response = supabase.table("hours_worked_monthly").select("year, month, hours, employee_id, created_by").execute()
+            if hours_response and hasattr(hours_response, 'data'):
+                for hour_row in hours_response.data:
+                    # Agrupa por employee_id
+                    emp_id = hour_row.get('employee_id')
+                    if emp_id:
+                        if emp_id not in all_hours:
+                            all_hours[emp_id] = []
+                        all_hours[emp_id].append(hour_row)
+                    else:
+                        # Agrupa por created_by (email)
+                        created_by = hour_row.get('created_by')
+                        if created_by:
+                            if created_by not in all_hours:
+                                all_hours[created_by] = []
+                            all_hours[created_by].append(hour_row)
+        except Exception:
+            pass
+        
+        # Carregar primeiros acidentes por criador (para fallback)
+        first_accidents = {}
+        try:
+            first_accs_response = supabase.table("accidents").select("occurred_at, created_by").order("occurred_at").execute()
+            if first_accs_response and hasattr(first_accs_response, 'data'):
+                for acc in first_accs_response.data:
+                    created_by = acc.get('created_by')
+                    if created_by and created_by not in first_accidents:
+                        first_accidents[created_by] = acc
+        except Exception:
+            pass
+        
+        # Função interna otimizada que usa os dados pré-carregados
+        def calculate_work_days_optimized(accident_date, employee_identifier=None, employee_id=None):
+            """
+            Calcula dias trabalhados usando dados pré-carregados
+            """
+            try:
+                admission_date = None
+                user_email = None
+                user_profile_id = None
+
+                # 1) Prioriza employees.employee_id
+                if employee_id and employee_id in all_employees:
+                    emp = all_employees[employee_id]
+                    if emp.get('admission_date'):
+                        admission_date = pd.to_datetime(emp['admission_date']).date()
+                    user_email = emp.get('email')
+                    user_profile_id = emp.get('user_id')
+
+                # 2) Resolve identificador do funcionário para fallback (profiles)
+                if not user_email and not user_profile_id and employee_identifier:
+                    if isinstance(employee_identifier, str) and '@' in employee_identifier:
+                        user_email = employee_identifier
+                    else:
+                        user_profile_id = employee_identifier
+
+                # 3) Busca perfil nos dados pré-carregados
+                if admission_date is None and (user_email or user_profile_id):
+                    profile = None
+                    if user_email and user_email in all_profiles:
+                        profile = all_profiles[user_email]
+                    elif user_profile_id and user_profile_id in all_profiles:
+                        profile = all_profiles[user_profile_id]
+                    
+                    if profile:
+                        # created_at como proxy de admissão
+                        if profile.get('created_at'):
+                            admission_date = pd.to_datetime(profile['created_at']).date()
+                        user_profile_id = profile.get('id', user_profile_id)
+                        user_email = profile.get('email', user_email)
+
+                # 4) Calcula dias corridos entre admissão e acidente (se conhecido)
+                days_since_admission = None
+                if admission_date is not None:
+                    days_since_admission = (accident_date - admission_date).days
+                    if days_since_admission < 0:
+                        days_since_admission = 0
+
+                # 5) Busca horas trabalhadas nos dados pré-carregados
+                total_hours = 0.0
+                hours_list = []
+                
+                # 5.1) Por employee_id
+                if employee_id and employee_id in all_hours:
+                    hours_list = all_hours[employee_id]
+                # 5.2) Por email (apenas se NÃO houver employee_id)
+                elif (not employee_id) and user_email and user_email in all_hours:
+                    hours_list = all_hours[user_email]
+
+                if hours_list:
+                    for row in hours_list:
+                        if 'year' in row and 'month' in row:
+                            try:
+                                month_date = pd.to_datetime(f"{row['year']}-{int(row['month']):02d}-01").date()
+                                if month_date <= accident_date:
+                                    total_hours += float(row.get('hours', 0) or 0)
+                            except Exception:
+                                continue
+
+                # 6) Converte horas para dias úteis (8h/dia) com escala *100
+                if total_hours > 0:
+                    work_days = (total_hours * 100.0) / 8.0
+                    return min(work_days, days_since_admission) if days_since_admission is not None else work_days
+
+                # 7) Fallback: sem horas, usar dias corridos desde admissão
+                if days_since_admission is not None:
+                    return days_since_admission
+
+                # 8) Último fallback: aproximar pela diferença desde o primeiro acidente do mesmo criador
+                if employee_identifier and employee_identifier in first_accidents:
+                    first_acc = first_accidents[employee_identifier]
+                    first_date = pd.to_datetime(first_acc['occurred_at']).date()
+                    approx_days = (accident_date - first_date).days
+                    return max(0, approx_days)
+
+                return 0
+
+            except Exception as e:
+                # st.error(f"Erro ao calcular dias trabalhados: {str(e)}")  # Comentei para não poluir a interface
+                return 0
+        
+        # Calcula dias trabalhados para cada acidente usando a função otimizada
         work_days_list = []
         for idx, row in df_work.iterrows():
-            work_days = calculate_work_days_until_accident(
+            work_days = calculate_work_days_optimized(
                 row['accident_date'],
                 row.get('created_by'),
                 row.get('employee_id') if 'employee_id' in row else None
@@ -642,6 +792,69 @@ def app(filters=None):
             selected_emp = st.selectbox("Funcionário (opcional)", options=list(emp_options.keys()))
             employee_id = emp_options[selected_emp]
             
+            # Opção para adicionar novo acidentado
+            if st.checkbox("Adicionar novo acidentado", key="add_new_employee_accident"):
+                st.subheader("Adicionar Novo Funcionário")
+                with st.form("new_employee_accident_form"):
+                    col1, col2 = st.columns(2)
+                    
+                    with col1:
+                        full_name = st.text_input("Nome Completo")
+                        cpf = st.text_input("CPF")
+                        email = st.text_input("E-mail")
+                        phone = st.text_input("Telefone")
+                        employee_id_input = st.text_input("ID do Funcionário")
+                        
+                    with col2:
+                        department = st.text_input("Departamento")
+                        position = st.text_input("Cargo")
+                        admission_date = st.date_input("Data de Admissão", value=date.today())
+                        is_active = st.checkbox("Funcionário Ativo", value=True)
+                        site_id = st.text_input("ID do Site")
+                    
+                    submitted_new = st.form_submit_button("Adicionar Funcionário", type="secondary")
+                    if submitted_new:
+                        # Validação de campos obrigatórios
+                        errors = []
+                        if not full_name:
+                            errors.append("Nome completo é obrigatório.")
+                        if not cpf:
+                            errors.append("CPF é obrigatório.")
+                        if not email:
+                            errors.append("E-mail é obrigatório.")
+                        
+                        if errors:
+                            for error in errors:
+                                st.error(error)
+                        else:
+                            try:
+                                from managers.supabase_config import get_service_role_client
+                                supabase = get_service_role_client()
+                                
+                                employee_data = {
+                                    "full_name": full_name,
+                                    "cpf": cpf,
+                                    "email": email,
+                                    "phone": phone,
+                                    "employee_id": employee_id_input,
+                                    "department": department,
+                                    "position": position,
+                                    "admission_date": admission_date.isoformat(),
+                                    "is_active": is_active,
+                                    "site_id": site_id
+                                }
+                                
+                                result = supabase.table("employees").insert(employee_data).execute()
+                                
+                                if result.data:
+                                    st.success("✅ Funcionário cadastrado com sucesso!")
+                                    st.rerun()
+                                else:
+                                    st.error("Erro ao cadastrar funcionário.")
+                                    
+                            except Exception as e:
+                                st.error(f"Erro: {str(e)}")
+            
             # Campos de investigação
             st.subheader("🔍 Investigação do Acidente")
             col3, col4 = st.columns(2)
@@ -772,9 +985,7 @@ def delete_attachment(attachment_id):
 def get_employees():
     """Busca funcionários (employees)"""
     try:
-        supabase = get_supabase_client()
-        response = supabase.table("employees").select("id, full_name, department").order("full_name").execute()
-        return response.data
+        return get_all_employees()
     except:
         return []
 
