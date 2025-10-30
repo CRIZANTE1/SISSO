@@ -91,7 +91,10 @@ def app(filters=None):
                     "3) Explore status, mês, norma e gravidade.\n\n"
                     "**Dicas**\n\n"
                     "- Sem 'opened_at', usamos 'occurred_at' nos gráficos.\n"
-                    "- Campos podem variar (ex.: site_id)."
+                    "- Campos podem variar (ex.: site_id).\n\n"
+                    "**Definições**\n\n"
+                    "- 'opened_at': data em que a N/C foi aberta/registrada no sistema.\n"
+                    "- 'occurred_at': data em que a N/C (ou fato gerador) aconteceu em campo."
                 )
         with st.expander("Guia rápido de análise", expanded=False):
             st.markdown(
