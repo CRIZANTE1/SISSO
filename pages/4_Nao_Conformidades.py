@@ -15,8 +15,7 @@ def fetch_nonconformities(start_date=None, end_date=None):
         query = supabase.table("nonconformities").select("*")
         
         # NOTA: A tabela não tem campo site_id como mostrado no INSERT, então não aplicamos filtro por site
-        # Os filtros de data são aplicados apenas se fornecidos, mas para garantir exibição, 
-        # vamos buscar todos e aplicar filtros posteriores se necessário
+        # Buscamos todos os registros independentemente de quem criou
         
         data = query.order("occurred_at", desc=True).execute().data
         df = pd.DataFrame(data)
@@ -52,12 +51,14 @@ def fetch_nonconformities(start_date=None, end_date=None):
                 }
                 df['severity'] = df['severity'].astype(str).str.lower().map(sev_map).fillna(df['severity'])
         
-        # Aplica filtro de data após carregar os dados, permitindo manipulação mais flexível
+        # Aplica filtro de data após carregar os dados
         if start_date and 'occurred_at' in df.columns:
+            df = df.copy()  # Evita SettingWithCopyWarning
             df['occurred_at'] = pd.to_datetime(df['occurred_at'], errors='coerce').dt.date
             df = df[df['occurred_at'] >= start_date]
         
         if end_date and 'occurred_at' in df.columns:
+            df = df.copy()  # Evita SettingWithCopyWarning
             df['occurred_at'] = pd.to_datetime(df['occurred_at'], errors='coerce').dt.date
             df = df[df['occurred_at'] <= end_date]
         
@@ -68,19 +69,6 @@ def fetch_nonconformities(start_date=None, end_date=None):
 
 def app(filters=None):
     # Busca filtros do session state se não foram passados como parâmetro
-    # Mas ignora os filtros que não se aplicam a não conformidades
-    if filters is None:
-        filters = st.session_state.get('filters', {})
-    
-    # Remove filtros que não se aplicam à tabela de não conformidades
-    # pois os dados existentes podem ter sido criados por outros usuários
-    filters_for_nonconformities = {}
-    if filters:
-        filters_for_nonconformities = {
-            k: v for k, v in filters.items() 
-            if k not in ['users', 'sites']  # Ignora filtro de usuários e sites
-        }
-    
     st.title("📋 Não Conformidades")
     
     # Tabs para diferentes visualizações
@@ -89,22 +77,38 @@ def app(filters=None):
     with tab1:
         st.subheader("Análise de Não Conformidades")
         
-        # Busca dados
+        # Busca dados de forma independente - FORÇANDO a busca de TODOS os registros
         with st.spinner("Carregando dados de não conformidades..."):
-            # Usando os filtros apropriados para não conformidades
-            start_date = filters_for_nonconformities.get("start_date")
-            end_date = filters_for_nonconformities.get("end_date")
+            # Ignoramos completamente os filtros do sistema para garantir que dados existentes sejam exibidos
+            supabase = get_supabase_client()
             
-            df = fetch_nonconformities(
-                start_date=start_date,
-                end_date=end_date
-            )
+            # Busca todos os registros sem filtros
+            try:
+                data = supabase.table("nonconformities").select("*").order("occurred_at", desc=True).execute().data
+                df = pd.DataFrame(data)
+                
+                # Se houver filtros de data, aplicamos somente eles
+                if df.empty:
+                    pass  # df já está vazio
+                else:
+                    if filters and filters.get("start_date"):
+                        df['occurred_at'] = pd.to_datetime(df['occurred_at'], errors='coerce')
+                        df = df[df['occurred_at'] >= pd.to_datetime(filters["start_date"])]
+                    
+                    if filters and filters.get("end_date"):
+                        df['occurred_at'] = pd.to_datetime(df['occurred_at'], errors='coerce')
+                        df = df[df['occurred_at'] <= pd.to_datetime(filters["end_date"])]
+                
+            except Exception as e:
+                st.error(f"Erro ao buscar dados: {str(e)}")
+                df = pd.DataFrame()
         
         if df.empty:
-            st.warning("Nenhuma não conformidade encontrada com os filtros aplicados.")
+            st.warning("Nenhuma não conformidade encontrada.")
         else:
-            # Aplica filtros adicionais que foram devidamente filtrados
-            df = apply_filters_to_df(df, filters_for_nonconformities)
+            # Não aplicamos mais nenhum filtro adicional que possa excluir os dados
+            # pois o objetivo é mostrar os dados existentes independentemente dos filtros do sistema
+            pass  # df já está carregado com os dados
             
             # Métricas principais
             total_nc = len(df)
