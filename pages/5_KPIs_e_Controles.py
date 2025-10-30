@@ -27,7 +27,7 @@ def app(filters=None):
     # Ajuda da página (popover)
     hl, hr = st.columns([6, 1])
     with hr:
-        with st.popover("❓ Ajuda", key="kpi_help_popover"):
+        with st.popover("❓ Ajuda"):
             st.markdown(
                 "**Fluxo recomendado**\n\n"
                 "1) KPIs Básicos: visão geral e interpretações.\n"

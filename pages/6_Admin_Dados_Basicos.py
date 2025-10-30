@@ -20,7 +20,7 @@ def app(filters=None):
     # Ajuda da página (popover)
     al, ar = st.columns([6, 1])
     with ar:
-        with st.popover("❓ Ajuda", key="admin_help_popover"):
+        with st.popover("❓ Ajuda"):
             st.markdown(
                 "**O que você pode fazer aqui**\n\n"
                 "- Gerenciar Sites, Contratadas e Usuários.\n"

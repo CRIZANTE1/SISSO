@@ -170,7 +170,7 @@ def create_filter_sidebar() -> Dict[str, Any]:
         # Ajuda dos filtros via popover
         cols_help = st.columns([1, 1])
         with cols_help[0]:
-            with st.popover("❓ Ajuda", key="filters_help_popover"):
+            with st.popover("❓ Ajuda"):
                 st.markdown(
                     "**Como os filtros funcionam**\n\n"
                     "- Os filtros aplicam-se às páginas de análise, registros e métricas.\n"

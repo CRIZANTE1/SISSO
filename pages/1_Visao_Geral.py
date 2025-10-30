@@ -22,7 +22,7 @@ def app(filters=None):
     # Ajuda da página (popover)
     c1, c2 = st.columns([6, 1])
     with c2:
-        with st.popover("❓ Ajuda", key="overview_help_popover"):
+        with st.popover("❓ Ajuda"):
             st.markdown(
                 "**Como usar a Visão Geral**\n\n"
                 "- Ajuste filtros na barra lateral.\n"

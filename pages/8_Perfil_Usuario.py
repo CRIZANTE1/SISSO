@@ -80,7 +80,7 @@ def app():
     # Ajuda da página (popover)
     pl, pr = st.columns([6, 1])
     with pr:
-        with st.popover("❓ Ajuda", key="profile_help_popover"):
+        with st.popover("❓ Ajuda"):
             st.markdown(
                 "**O que você pode fazer**\n\n"
                 "- Atualizar dados de perfil (nome, email de contato, empresa).\n"

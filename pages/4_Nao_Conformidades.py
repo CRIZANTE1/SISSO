@@ -83,7 +83,7 @@ def app(filters=None):
         # Ajuda via popover
         c1, c2 = st.columns([1, 1])
         with c1:
-            with st.popover("❓ Ajuda", key="nc_help_popover"):
+            with st.popover("❓ Ajuda"):
                 st.markdown(
                     "**Como analisar**\n\n"
                     "1) Ajuste filtros (datas/período) e verifique volume.\n"

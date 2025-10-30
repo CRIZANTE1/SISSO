@@ -34,7 +34,7 @@ def main():
     # Ajuda global do sistema (popover)
     top_l, top_r = st.columns([6, 1])
     with top_r:
-        with st.popover("❓ Ajuda", key="global_help_popover"):
+        with st.popover("❓ Ajuda"):
             st.markdown(
                 "**Como navegar e analisar**\n\n"
                 "- Use o menu superior para acessar: Visão Geral, Acidentes, Quase-Acidentes, N/C, KPIs.\n"

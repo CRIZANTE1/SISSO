@@ -23,7 +23,7 @@ def app(filters=None):
     # Ajuda da página (popover)
     ll, lr = st.columns([6, 1])
     with lr:
-        with st.popover("❓ Ajuda", key="logs_help_popover"):
+        with st.popover("❓ Ajuda"):
             st.markdown(
                 "**Como usar**\n\n"
                 "- 'Logs Recentes': filtrar níveis e atualizar.\n"

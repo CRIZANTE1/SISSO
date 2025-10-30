@@ -45,7 +45,7 @@ def app(filters=None):
         # Ajuda via popover
         c1, c2 = st.columns([1, 1])
         with c1:
-            with st.popover("❓ Ajuda", key="nearmiss_help_popover"):
+            with st.popover("❓ Ajuda"):
                 st.markdown(
                     "**Como analisar**\n\n"
                     "- Acompanhe volume total e distribuição por severidade potencial.\n"
