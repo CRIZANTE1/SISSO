@@ -395,7 +395,7 @@ def app(filters=None):
                                 "accidents_total": acc_data['count'],
                                 "fatalities": acc_data['fatalities'],
                                 "lost_days_total": acc_data['lost_days'],
-                                "hours": hours / 100,  # Ajuste para escala do sistema
+                                "hours": hours / 100,  # Armazena como centenas (176 representa 17.600 horas)
                                 "frequency_rate": freq_rate,
                                 "severity_rate": sev_rate,
                                 "debited_days": debited_days

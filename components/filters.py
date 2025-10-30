@@ -52,20 +52,27 @@ def user_filter(allow_multiple: bool = True,
             return [user_options[selected_user]]
 
 def date_range_filter(key_prefix: str = "") -> tuple[Optional[date], Optional[date]]:
-    """Filtro de período"""
+    """Filtro de período opcional (só aplica se ativado pelo usuário)."""
+    enable_dates = st.checkbox(
+        "Filtrar por data",
+        value=False,
+        key=f"{key_prefix}_date_enabled"
+    )
+    
+    if not enable_dates:
+        return None, None
+    
     col1, col2 = st.columns(2)
     
     with col1:
         start_date = st.date_input(
             "📅 Data Inicial",
-            value=None,
             key=f"{key_prefix}_start_date"
         )
     
     with col2:
         end_date = st.date_input(
             "📅 Data Final",
-            value=None,
             key=f"{key_prefix}_end_date"
         )
     
