@@ -52,11 +52,31 @@ def app(filters=None):
             # Aplica filtros adicionais
             df = apply_filters_to_df(df, filters)
             
+            # Normaliza severidade potencial para 3 níveis: low/medium/high
+            if 'potential_severity' in df.columns:
+                sev_map = {
+                    'leve': 'low',
+                    'low': 'low',
+                    'moderada': 'medium',
+                    'medium': 'medium',
+                    'grave': 'high',
+                    'high': 'high'
+                }
+                df['_severity_norm'] = (
+                    df['potential_severity']
+                    .astype(str)
+                    .str.lower()
+                    .map(sev_map)
+                    .fillna(df['potential_severity'].astype(str).str.lower())
+                )
+            else:
+                df['_severity_norm'] = []
+
             # Métricas principais
             total_near_misses = len(df)
-            high_risk = len(df[df['potential_severity'] == 'high']) if 'potential_severity' in df.columns else 0
-            medium_risk = len(df[df['potential_severity'] == 'medium']) if 'potential_severity' in df.columns else 0
-            low_risk = len(df[df['potential_severity'] == 'low']) if 'potential_severity' in df.columns else 0
+            high_risk = len(df[df['_severity_norm'] == 'high']) if '_severity_norm' in df.columns else 0
+            medium_risk = len(df[df['_severity_norm'] == 'medium']) if '_severity_norm' in df.columns else 0
+            low_risk = len(df[df['_severity_norm'] == 'low']) if '_severity_norm' in df.columns else 0
             
             metrics = [
                 {
@@ -92,8 +112,8 @@ def app(filters=None):
             
             with col1:
                 # Distribuição por severidade potencial - Simplificada
-                if 'potential_severity' in df.columns:
-                    severity_counts = df['potential_severity'].value_counts()
+                if '_severity_norm' in df.columns and not df['_severity_norm'].empty:
+                    severity_counts = df['_severity_norm'].value_counts()
                     severity_names = {'low': 'Baixo', 'medium': 'Médio', 'high': 'Alto'}
                     
                     fig1 = px.pie(
