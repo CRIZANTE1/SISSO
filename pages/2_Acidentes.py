@@ -34,19 +34,17 @@ def calculate_work_days_until_accident(accident_date, employee_identifier=None):
         # Busca perfil para obter email e uma possível data de admissão
         profile_response = None
         if user_email:
-            profile_response = supabase.table("profiles").select("id, email, created_at, admission_date").eq("email", user_email).limit(1).execute()
+            profile_response = supabase.table("profiles").select("id, email, created_at").eq("email", user_email).limit(1).execute()
         elif user_id:
-            profile_response = supabase.table("profiles").select("id, email, created_at, admission_date").eq("id", user_id).limit(1).execute()
+            profile_response = supabase.table("profiles").select("id, email, created_at").eq("id", user_id).limit(1).execute()
 
         if profile_response and hasattr(profile_response, 'data') and profile_response.data:
             profile = profile_response.data[0]
             user_id = profile.get('id', user_id)
             user_email = profile.get('email', user_email)
 
-            # Preferir campo admission_date se existir; senão usar created_at
-            if profile.get('admission_date'):
-                admission_date = pd.to_datetime(profile['admission_date']).date()
-            elif profile.get('created_at'):
+            # Usar 'created_at' como data de admissão padrão
+            if profile.get('created_at'):
                 admission_date = pd.to_datetime(profile['created_at']).date()
 
         # Calcula dias corridos entre admissão e acidente (se conhecido)
