@@ -43,15 +43,17 @@ def app(filters=None):
     with tab1:
         st.subheader("Análise de Quase-Acidentes")
         # Ajuda via popover
-        c1, c2 = st.columns([1, 1])
-        with c1:
+        c1, c2 = st.columns([6, 1])
+        with c2:
             with st.popover("❓ Ajuda"):
                 st.markdown(
-                    "**Como analisar**\n\n"
-                    "- Acompanhe volume total e distribuição por severidade potencial.\n"
-                    "- Verifique sazonalidade por mês e status (aberto/fechado).\n\n"
-                    "**Sobre severidade potencial**\n\n"
-                    "- Valores são normalizados em Baixo/Médio/Alto para padronização."
+                    "**Guia rápido**\n\n"
+                    "1) Ajuste filtros (datas/usuários) na sidebar.\n"
+                    "2) Veja métricas por risco (alto/médio/baixo).\n"
+                    "3) Explore gráficos por severidade e mês.\n\n"
+                    "**Dicas**\n\n"
+                    "- Severidade potencial é normalizada em Baixo/Médio/Alto.\n"
+                    "- Sem resultados? Amplie o período ou limpe filtros."
                 )
         with st.expander("Guia rápido de análise", expanded=False):
             st.markdown(

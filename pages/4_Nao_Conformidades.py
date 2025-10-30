@@ -81,17 +81,17 @@ def app(filters=None):
     with tab1:
         st.subheader("Análise de Não Conformidades")
         # Ajuda via popover
-        c1, c2 = st.columns([1, 1])
-        with c1:
+        c1, c2 = st.columns([6, 1])
+        with c2:
             with st.popover("❓ Ajuda"):
                 st.markdown(
-                    "**Como analisar**\n\n"
-                    "1) Ajuste filtros (datas/período) e verifique volume.\n"
-                    "2) Avalie status (abertas/encerradas) e tempo médio.\n"
-                    "3) Explore normas, gravidade e distribuição por mês.\n\n"
-                    "**Observações**\n\n"
-                    "- Em ausência de 'opened_at', usamos 'occurred_at' para séries temporais.\n"
-                    "- Campos podem variar por ambiente (ex.: site_id)."
+                    "**Guia rápido**\n\n"
+                    "1) Ajuste filtros (datas/período) na sidebar.\n"
+                    "2) Revise métricas: abertas/encerradas e tempo médio.\n"
+                    "3) Explore status, mês, norma e gravidade.\n\n"
+                    "**Dicas**\n\n"
+                    "- Sem 'opened_at', usamos 'occurred_at' nos gráficos.\n"
+                    "- Campos podem variar (ex.: site_id)."
                 )
         with st.expander("Guia rápido de análise", expanded=False):
             st.markdown(

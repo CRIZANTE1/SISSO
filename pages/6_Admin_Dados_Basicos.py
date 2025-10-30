@@ -22,13 +22,13 @@ def app(filters=None):
     with ar:
         with st.popover("❓ Ajuda"):
             st.markdown(
-                "**O que você pode fazer aqui**\n\n"
-                "- Gerenciar Sites, Contratadas e Usuários.\n"
-                "- Importar dados (Horas e Acidentes) via CSV.\n"
-                "- Recalcular KPIs e ver estatísticas do sistema.\n\n"
+                "**Guia rápido**\n\n"
+                "- Gerencie Sites, Contratadas e Usuários.\n"
+                "- Importe Horas e Acidentes via CSV.\n"
+                "- Recalcule KPIs e veja estatísticas.\n\n"
                 "**Dicas**\n\n"
                 "- Confira o preview antes de importar.\n"
-                "- Para usuários já existentes, o perfil é atualizado."
+                "- Usuário existente tem perfil atualizado."
             )
     
     # Tabs para diferentes funcionalidades administrativas

@@ -82,10 +82,12 @@ def app():
     with pr:
         with st.popover("❓ Ajuda"):
             st.markdown(
-                "**O que você pode fazer**\n\n"
-                "- Atualizar dados de perfil (nome, email de contato, empresa).\n"
-                "- Gerenciar funcionários vinculados.\n"
-                "- Atualizar investigação de acidentes sob sua responsabilidade."
+                "**Guia rápido**\n\n"
+                "- Atualize dados de perfil e contatos.\n"
+                "- Gerencie funcionários vinculados.\n"
+                "- Atualize investigações sob sua responsabilidade.\n\n"
+                "**Dicas**\n\n"
+                "- E-mail de contato é obrigatório para salvar."
             )
 
     # Perfil

@@ -25,11 +25,11 @@ def app(filters=None):
     with lr:
         with st.popover("❓ Ajuda"):
             st.markdown(
-                "**Como usar**\n\n"
-                "- 'Logs Recentes': filtrar níveis e atualizar.\n"
-                "- 'Filtros de Log': entender níveis e uso.\n"
-                "- 'Status do Sistema': testar conexão e ver sessão.\n"
-                "- 'Informações Técnicas': baixar/exportar e estatísticas."
+                "**Guia rápido**\n\n"
+                "- Logs Recentes: filtre níveis e atualize.\n"
+                "- Status do Sistema: teste conexão e veja sessão.\n\n"
+                "**Dicas**\n\n"
+                "- Baixe logs em JSON para auditoria."
             )
     
     # Inicializa logger
