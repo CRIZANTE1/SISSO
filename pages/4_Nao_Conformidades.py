@@ -133,19 +133,36 @@ def app(filters=None):
             # Mostra informações sobre os dados encontrados
             st.success(f"📊 **{len(df)} não conformidade(s) encontrada(s)**")
             
+            # Mostra informações de debug para verificar os dados reais
+            if 'status' in df.columns:
+                status_counts = df['status'].value_counts()
+                st.write(f"**Status encontrados:** {dict(status_counts)}")
+            
+            if 'opened_at' in df.columns:
+                df['opened_at'] = pd.to_datetime(df['opened_at'], errors='coerce')
+                months_count = df['opened_at'].dt.to_period('M').value_counts()
+                st.write(f"**Meses com registros:** {len(months_count)} diferentes")
+            
             # Não aplicamos mais nenhum filtro adicional que possa excluir os dados
             # pois o objetivo é mostrar os dados existentes independentemente dos filtros do sistema
             pass  # df já está carregado com os dados
             
-            # Métricas principais
+            # Métricas principais - considerando os status em português originais
             total_nc = len(df)
-            open_nc = len(df[df['status'] == 'open']) if 'status' in df.columns else 0
-            closed_nc = len(df[df['status'] == 'closed']) if 'status' in df.columns else 0
-            overdue_nc = len(df[df['status'] == 'overdue']) if 'status' in df.columns else 0
+            
+            if 'status' in df.columns:
+                # Conta status em português que estão nos dados
+                open_nc = len(df[df['status'].isin(['aberta', 'open'])])
+                closed_nc = len(df[df['status'].isin(['encerrada', 'closed'])])
+                in_progress_nc = len(df[df['status'].isin(['tratando', 'in_progress'])])
+                overdue_nc = len(df[df['status'] == 'overdue'])
+            else:
+                open_nc = closed_nc = in_progress_nc = overdue_nc = 0
             
             # Calcula dias médios de resolução
             if 'status' in df.columns and 'resolution_date' in df.columns:
-                closed_df = df[df['status'] == 'closed']
+                # Filtra registros fechados considerando ambos os formatos
+                closed_df = df[df['status'].isin(['encerrada', 'closed'])]
                 if not closed_df.empty and 'occurred_at' in closed_df.columns:
                     closed_df['resolution_days'] = (pd.to_datetime(closed_df['resolution_date']) - pd.to_datetime(closed_df['occurred_at'])).dt.days
                     avg_resolution_days = closed_df['resolution_days'].mean()
@@ -202,17 +219,35 @@ def app(filters=None):
                     st.plotly_chart(fig1, use_container_width=True)
             
             with col2:
-                # N/C por mês
-                if 'occurred_at' in df.columns:
-                    df['month'] = pd.to_datetime(df['occurred_at']).dt.to_period('M')
-                    monthly_counts = df.groupby('month').size().reset_index(name='count')
+                # N/C por mês - usando opened_at em vez de occurred_at para análise temporal
+                # porque no INSERT fornecido, occurred_at tem todos o mesmo valor ('2025-10-28')
+                if 'opened_at' in df.columns:
+                    df_temp = df.copy()
+                    df_temp['opened_at'] = pd.to_datetime(df_temp['opened_at'])
+                    df_temp['month'] = df_temp['opened_at'].dt.to_period('M')
+                    monthly_counts = df_temp.groupby('month').size().reset_index(name='count')
                     monthly_counts['month'] = monthly_counts['month'].astype(str)
                     
                     fig2 = create_bar_chart(
                         monthly_counts,
                         'month',
                         'count',
-                        'Não Conformidades por Mês'
+                        'Não Conformidades por Mês (abertura)'
+                    )
+                    st.plotly_chart(fig2, use_container_width=True)
+                elif 'occurred_at' in df.columns:
+                    # Fallback para occurred_at se opened_at não estiver disponível
+                    df_temp = df.copy()
+                    df_temp['occurred_at'] = pd.to_datetime(df_temp['occurred_at'])
+                    df_temp['month'] = df_temp['occurred_at'].dt.to_period('M')
+                    monthly_counts = df_temp.groupby('month').size().reset_index(name='count')
+                    monthly_counts['month'] = monthly_counts['month'].astype(str)
+                    
+                    fig2 = create_bar_chart(
+                        monthly_counts,
+                        'month',
+                        'count',
+                        'Não Conformidades por Mês (ocorrência)'
                     )
                     st.plotly_chart(fig2, use_container_width=True)
             
