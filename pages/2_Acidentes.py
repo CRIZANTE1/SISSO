@@ -77,8 +77,8 @@ def calculate_work_days_until_accident(accident_date, employee_identifier=None, 
                 hours_response = supabase.table("hours_worked_monthly").select("year, month, hours, employee_id").eq("employee_id", employee_id).execute()
             except Exception:
                 hours_response = None
-        # 5.2) Por email
-        if (not hours_response or not getattr(hours_response, 'data', None)) and user_email:
+        # 5.2) Por email (apenas se NÃO houver employee_id)
+        if (not employee_id) and (not hours_response or not getattr(hours_response, 'data', None)) and user_email:
             hours_response = supabase.table("hours_worked_monthly").select("year, month, hours, created_by").eq("created_by", user_email).execute()
 
         if hours_response and hasattr(hours_response, 'data') and hours_response.data:
@@ -635,6 +635,13 @@ def app(filters=None):
                 cat_number = st.text_input("Número da CAT", placeholder="Ex: 2024001234")
                 communication_date = st.date_input("Data de Comunicação", value=date.today())
             
+            # Seleção opcional do acidentado
+            employees = get_employees()
+            emp_options = {"— (Sem funcionário) —": None}
+            emp_options.update({f"{e.get('full_name','Sem Nome')} ({e.get('department','-')})": e['id'] for e in employees})
+            selected_emp = st.selectbox("Funcionário (opcional)", options=list(emp_options.keys()))
+            employee_id = emp_options[selected_emp]
+            
             # Campos de investigação
             st.subheader("🔍 Investigação do Acidente")
             col3, col4 = st.columns(2)
@@ -696,6 +703,8 @@ def app(filters=None):
                             "investigation_responsible": investigation_responsible if investigation_responsible else None,
                             "investigation_notes": investigation_notes if investigation_notes else None
                         }
+                        if employee_id:
+                            accident_data["employee_id"] = employee_id
                         
                         result = supabase.table("accidents").insert(accident_data).execute()
                         
@@ -759,6 +768,15 @@ def delete_attachment(attachment_id):
         return False
     except:
         return False
+
+def get_employees():
+    """Busca funcionários (employees)"""
+    try:
+        supabase = get_supabase_client()
+        response = supabase.table("employees").select("id, full_name, department").order("full_name").execute()
+        return response.data
+    except:
+        return []
 
 if __name__ == "__main__":
     app({})

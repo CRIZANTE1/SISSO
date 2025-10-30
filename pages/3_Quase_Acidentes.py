@@ -317,6 +317,13 @@ def app(filters=None):
                     }[x]
                 )
             
+            # Seleção opcional de funcionário (acidentado potencial)
+            employees = get_employees()
+            emp_options = {"— (Sem funcionário) —": None}
+            emp_options.update({f"{e.get('full_name','Sem Nome')} ({e.get('department','-')})": e['id'] for e in employees})
+            selected_emp = st.selectbox("Funcionário (opcional)", options=list(emp_options.keys()))
+            employee_id = emp_options[selected_emp]
+            
             description = st.text_area("Descrição do Quase-Acidente", height=100)
             preventive_actions = st.text_area("Ações Preventivas", height=100)
             
@@ -344,6 +351,8 @@ def app(filters=None):
                             "description": description,
                             "status": status
                         }
+                        if employee_id:
+                            near_miss_data["employee_id"] = employee_id
                         
                         result = supabase.table("near_misses").insert(near_miss_data).execute()
                         
@@ -389,6 +398,15 @@ def delete_attachment(attachment_id):
         return True
     except:
         return False
+
+def get_employees():
+    """Busca funcionários (employees)"""
+    try:
+        supabase = get_supabase_client()
+        response = supabase.table("employees").select("id, full_name, department").order("full_name").execute()
+        return response.data
+    except:
+        return []
 
 if __name__ == "__main__":
     app({})

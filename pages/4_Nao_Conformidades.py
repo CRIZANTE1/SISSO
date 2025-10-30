@@ -20,11 +20,11 @@ def fetch_nonconformities(site_codes=None, start_date=None, end_date=None):
             query = query.in_("site_id", site_ids)
         
         if start_date:
-            query = query.gte("date", start_date.isoformat())
+            query = query.gte("occurred_at", start_date.isoformat())
         if end_date:
-            query = query.lte("date", end_date.isoformat())
+            query = query.lte("occurred_at", end_date.isoformat())
             
-        data = query.order("date", desc=True).execute().data
+        data = query.order("occurred_at", desc=True).execute().data
         return pd.DataFrame(data)
     except Exception as e:
         st.error(f"Erro ao buscar não conformidades: {str(e)}")
@@ -65,8 +65,8 @@ def app(filters=None):
             # Calcula dias médios de resolução
             if 'status' in df.columns and 'resolution_date' in df.columns:
                 closed_df = df[df['status'] == 'closed']
-                if not closed_df.empty and 'date' in closed_df.columns:
-                    closed_df['resolution_days'] = (pd.to_datetime(closed_df['resolution_date']) - pd.to_datetime(closed_df['date'])).dt.days
+                if not closed_df.empty and 'occurred_at' in closed_df.columns:
+                    closed_df['resolution_days'] = (pd.to_datetime(closed_df['resolution_date']) - pd.to_datetime(closed_df['occurred_at'])).dt.days
                     avg_resolution_days = closed_df['resolution_days'].mean()
                 else:
                     avg_resolution_days = 0
@@ -122,8 +122,8 @@ def app(filters=None):
             
             with col2:
                 # N/C por mês
-                if 'date' in df.columns:
-                    df['month'] = pd.to_datetime(df['date']).dt.to_period('M')
+                if 'occurred_at' in df.columns:
+                    df['month'] = pd.to_datetime(df['occurred_at']).dt.to_period('M')
                     monthly_counts = df.groupby('month').size().reset_index(name='count')
                     monthly_counts['month'] = monthly_counts['month'].astype(str)
                     
@@ -204,7 +204,7 @@ def app(filters=None):
                 filtered_df = filtered_df[filtered_df['description'].str.contains(search_term, case=False, na=False)]
             
             # Exibe tabela
-            display_cols = ['date', 'norm_reference', 'severity', 'status', 'description', 'corrective_actions']
+            display_cols = ['occurred_at', 'norm_reference', 'severity', 'status', 'description', 'corrective_actions']
             available_cols = [col for col in display_cols if col in filtered_df.columns]
             
             if available_cols:
@@ -227,7 +227,7 @@ def app(filters=None):
             for idx, row in df.iterrows():
                 nc_id = row.get('id', idx)
                 description = row.get('description', f'N/C {nc_id}')[:50]
-                date_str = row.get('date', 'Data não informada')
+                date_str = row.get('occurred_at', 'Data não informada')
                 nc_options[f"{date_str} - {description}..."] = nc_id
             
             selected_nc = st.selectbox(
@@ -313,6 +313,13 @@ def app(filters=None):
                         "closed": "Fechada"
                     }[x]
                 )
+
+            # Seleção opcional do acidentado (quando aplicável)
+            employees = get_employees()
+            emp_options = {"— (Sem funcionário) —": None}
+            emp_options.update({f"{e.get('full_name','Sem Nome')} ({e.get('department','-')})": e['id'] for e in employees})
+            selected_emp = st.selectbox("Funcionário (opcional)", options=list(emp_options.keys()))
+            employee_id = emp_options[selected_emp]
             
             description = st.text_area("Descrição da Não Conformidade", height=100)
             corrective_actions = st.text_area("Ações Corretivas", height=100)
@@ -344,13 +351,15 @@ def app(filters=None):
                         # Insere não conformidade
                         nc_data = {
                             "site_id": site_id,
-                            "date": date_input.isoformat(),
+                            "occurred_at": date_input.isoformat(),
                             "norm_reference": norm_reference,
                             "severity": severity,
                             "status": status,
                             "description": description,
                             "corrective_actions": corrective_actions
                         }
+                        if employee_id:
+                            nc_data["employee_id"] = employee_id
                         
                         if resolution_date:
                             nc_data["resolution_date"] = resolution_date.isoformat()
@@ -386,6 +395,15 @@ def get_sites():
     try:
         supabase = get_supabase_client()
         response = supabase.table("sites").select("id, code, name").execute()
+        return response.data
+    except:
+        return []
+
+def get_employees():
+    """Busca funcionários (employees)"""
+    try:
+        supabase = get_supabase_client()
+        response = supabase.table("employees").select("id, full_name, department").order("full_name").execute()
         return response.data
     except:
         return []
