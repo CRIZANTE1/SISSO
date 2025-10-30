@@ -79,18 +79,23 @@ def app(filters=None):
         
         # Busca dados de forma independente - FORÇANDO a busca de TODOS os registros
         with st.spinner("Carregando dados de não conformidades..."):
-            # Ignoramos completamente os filtros do sistema para garantir que dados existentes sejam exibidos
-            supabase = get_supabase_client()
-            
-            # Busca todos os registros sem filtros
+            # Usamos o service role client para garantir acesso a todos os dados
+            from managers.supabase_config import get_service_role_client
             try:
-                data = supabase.table("nonconformities").select("*").order("occurred_at", desc=True).execute().data
-                df = pd.DataFrame(data)
+                supabase = get_service_role_client()
                 
-                # Se houver filtros de data, aplicamos somente eles
-                if df.empty:
-                    pass  # df já está vazio
+                # Busca todos os registros sem filtros
+                response = supabase.table("nonconformities").select("*").order("occurred_at", desc=True).execute()
+                
+                if response and hasattr(response, 'data') and response.data:
+                    df = pd.DataFrame(response.data)
+                    st.info(f"✅ Dados carregados: {len(response.data)} registros encontrados")
                 else:
+                    df = pd.DataFrame()
+                    st.warning("⚠️ Nenhum registro encontrado na tabela")
+                
+                # Aplica filtros de data apenas se necessário
+                if not df.empty:
                     if filters and filters.get("start_date"):
                         df['occurred_at'] = pd.to_datetime(df['occurred_at'], errors='coerce')
                         df = df[df['occurred_at'] >= pd.to_datetime(filters["start_date"])]
@@ -101,11 +106,33 @@ def app(filters=None):
                 
             except Exception as e:
                 st.error(f"Erro ao buscar dados: {str(e)}")
-                df = pd.DataFrame()
+                st.error("Tentando com cliente anônimo...")
+                try:
+                    # Tenta com cliente anônimo como fallback
+                    supabase = get_supabase_client()
+                    response = supabase.table("nonconformities").select("*").order("occurred_at", desc=True).execute()
+                    
+                    if response and hasattr(response, 'data') and response.data:
+                        df = pd.DataFrame(response.data)
+                        st.info(f"✅ Dados carregados com cliente anônimo: {len(response.data)} registros encontrados")
+                    else:
+                        df = pd.DataFrame()
+                        
+                except Exception as e2:
+                    st.error(f"Erro com cliente anônimo também: {str(e2)}")
+                    df = pd.DataFrame()
         
         if df.empty:
             st.warning("Nenhuma não conformidade encontrada.")
+            # Mostra informações para debug
+            st.info("ℹ️ **Dica de debug:**")
+            st.write("- Verifique se a tabela 'nonconformities' existe no banco de dados")
+            st.write("- Verifique se há registros na tabela")
+            st.write("- Confirme que o Supabase está configurado corretamente")
         else:
+            # Mostra informações sobre os dados encontrados
+            st.success(f"📊 **{len(df)} não conformidade(s) encontrada(s)**")
+            
             # Não aplicamos mais nenhum filtro adicional que possa excluir os dados
             # pois o objetivo é mostrar os dados existentes independentemente dos filtros do sistema
             pass  # df já está carregado com os dados
@@ -271,6 +298,11 @@ def app(filters=None):
                 st.dataframe(filtered_df, use_container_width=True, hide_index=True)
         else:
             st.info("Nenhuma não conformidade encontrada.")
+            # Mostra informações para debug
+            st.info("ℹ️ **Dica de debug:**")
+            st.write("- Verifique se a tabela 'nonconformities' existe no banco de dados")
+            st.write("- Verifique as configurações de acesso ao Supabase")
+            st.write("- Confirme que os dados foram inseridos corretamente")
     
     with tab3:
         st.subheader("Evidências das Não Conformidades")
