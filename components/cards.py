@@ -317,7 +317,7 @@ def create_data_table(df: pd.DataFrame,
     
     st.dataframe(
         df.iloc[start_idx:end_idx],
-        use_container_width=True,
+        width='stretch',
         hide_index=True
     )
     

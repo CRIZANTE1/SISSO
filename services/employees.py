@@ -135,6 +135,6 @@ def list_employees_table():
         employees_df = pd.DataFrame(employees)
         display_cols = ['full_name', 'cpf', 'email', 'department', 'position', 'admission_date', 'is_active']
         available_cols = [col for col in display_cols if col in employees_df.columns]
-        st.dataframe(employees_df[available_cols], use_container_width=True, hide_index=True)
+        st.dataframe(employees_df[available_cols], width='stretch', hide_index=True)
     else:
         st.info("Nenhum funcionário cadastrado.")

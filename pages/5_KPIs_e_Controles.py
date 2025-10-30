@@ -24,21 +24,17 @@ def app(filters=None):
     require_login()
     
     st.title("📈 KPIs e Controles Estatísticos")
-    # Ajuda da página
-    @st.dialog("Ajuda - KPIs e Controles")
-    def _show_kpi_help():
-        st.markdown(
-            "**Fluxo recomendado**\n\n"
-            "1) KPIs Básicos: visão geral e interpretações.\n"
-            "2) Controles Estatísticos: limites e padrões.\n"
-            "3) Tendências (EWMA) e Previsões.\n"
-            "4) Relatórios e Exportação."
-        )
-        if st.button("Fechar", type="primary"):
-            st.rerun()
+    # Ajuda da página (popover)
     hl, hr = st.columns([6, 1])
     with hr:
-        st.button("❓ Ajuda", key="kpi_help_btn", on_click=_show_kpi_help)
+        with st.popover("❓ Ajuda", key="kpi_help_popover"):
+            st.markdown(
+                "**Fluxo recomendado**\n\n"
+                "1) KPIs Básicos: visão geral e interpretações.\n"
+                "2) Controles Estatísticos: limites e padrões.\n"
+                "3) Tendências (EWMA) e Previsões.\n"
+                "4) Relatórios e Exportação."
+            )
     
     # Busca filtros do session state se não foram passados como parâmetro
     if filters is None:
@@ -190,7 +186,7 @@ def app(filters=None):
                 "freq_rate_per_million",
                 "Evolução da Taxa de Frequência"
             )
-            st.plotly_chart(fig1, use_container_width=True)
+            st.plotly_chart(fig1, width='stretch')
         
         with col2:
             fig2 = create_trend_chart(
@@ -199,7 +195,7 @@ def app(filters=None):
                 "sev_rate_per_million",
                 "Evolução da Taxa de Gravidade"
             )
-            st.plotly_chart(fig2, use_container_width=True)
+            st.plotly_chart(fig2, width='stretch')
         
         # Análise por site
         if 'site_code' in df.columns:
@@ -224,7 +220,7 @@ def app(filters=None):
                     title='Taxa de Frequência por Site',
                     labels={'freq_rate': 'Taxa de Frequência', 'site_code': 'Site'}
                 )
-                st.plotly_chart(fig3, use_container_width=True)
+                st.plotly_chart(fig3, width='stretch')
             
             with col2:
                 fig4 = px.bar(
@@ -234,7 +230,7 @@ def app(filters=None):
                     title='Taxa de Gravidade por Site',
                     labels={'sev_rate': 'Taxa de Gravidade', 'site_code': 'Site'}
                 )
-                st.plotly_chart(fig4, use_container_width=True)
+                st.plotly_chart(fig4, width='stretch')
     
     with tab2:
         st.subheader("📈 Controles Estatísticos")
@@ -252,7 +248,7 @@ def app(filters=None):
             "expected",
             "Controle de Acidentes (Limites Poisson)"
         )
-        st.plotly_chart(fig1, use_container_width=True)
+        st.plotly_chart(fig1, width='stretch')
         
         # Análise de padrões
         try:
@@ -319,7 +315,7 @@ def app(filters=None):
                     problem_display = out_of_control_data[display_cols].copy()
                     problem_display.columns = ['Período', 'Acidentes', 'Esperado', 'Limite Superior', 'Limite Inferior', 'Status']
                     
-                    st.dataframe(problem_display, use_container_width=True, hide_index=True)
+                    st.dataframe(problem_display, width='stretch', hide_index=True)
                 
                 # Tendências ascendentes
                 if patterns['trend_up']:
@@ -510,7 +506,7 @@ def app(filters=None):
             font=dict(size=12)
         )
         
-        st.plotly_chart(fig1, use_container_width=True)
+        st.plotly_chart(fig1, width='stretch')
         
         # Interpretação do gráfico
         st.subheader("🔍 Como Interpretar o Gráfico")
@@ -564,7 +560,7 @@ def app(filters=None):
                 'Status': problem_points['Status']
             })
             
-            st.dataframe(problem_display, use_container_width=True, hide_index=True)
+            st.dataframe(problem_display, width='stretch', hide_index=True)
         else:
             st.success("✅ **Excelente!** Todos os períodos estão dentro da zona de controle normal.")
         
@@ -767,7 +763,7 @@ def app(filters=None):
                         font=dict(size=12)
                     )
                     
-                    st.plotly_chart(fig, use_container_width=True)
+                    st.plotly_chart(fig, width='stretch')
                 
                 # Recomendações baseadas nas previsões
                 st.subheader("💡 Recomendações Baseadas nas Previsões")
@@ -859,7 +855,7 @@ def app(filters=None):
             
             st.dataframe(
                 report_df[available_cols],
-                use_container_width=True,
+                width='stretch',
                 hide_index=True
             )
             

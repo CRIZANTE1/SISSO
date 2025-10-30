@@ -80,24 +80,19 @@ def app(filters=None):
     
     with tab1:
         st.subheader("Análise de Não Conformidades")
-        # Diálogo de ajuda detalhada
-        @st.dialog("Ajuda - Não Conformidades")
-        def _show_nc_help():
-            st.markdown(
-                "**Como analisar**\n\n"
-                "1) Ajuste filtros (datas/período) e verifique volume.\n"
-                "2) Avalie status (abertas/encerradas) e tempo médio.\n"
-                "3) Explore normas, gravidade e distribuição por mês.\n\n"
-                "**Observações**\n\n"
-                "- Em ausência de 'opened_at', usamos 'occurred_at' para séries temporais.\n"
-                "- Campos podem variar por ambiente (ex.: site_id)."
-            )
-            if st.button("Fechar", type="primary"):
-                st.rerun()
-
+        # Ajuda via popover
         c1, c2 = st.columns([1, 1])
         with c1:
-            st.button("❓ Ajuda", key="nc_help_btn", on_click=_show_nc_help)
+            with st.popover("❓ Ajuda", key="nc_help_popover"):
+                st.markdown(
+                    "**Como analisar**\n\n"
+                    "1) Ajuste filtros (datas/período) e verifique volume.\n"
+                    "2) Avalie status (abertas/encerradas) e tempo médio.\n"
+                    "3) Explore normas, gravidade e distribuição por mês.\n\n"
+                    "**Observações**\n\n"
+                    "- Em ausência de 'opened_at', usamos 'occurred_at' para séries temporais.\n"
+                    "- Campos podem variar por ambiente (ex.: site_id)."
+                )
         with st.expander("Guia rápido de análise", expanded=False):
             st.markdown(
                 "1. Ajuste o período na sidebar e confirme se há dados.\n"
@@ -250,7 +245,7 @@ def app(filters=None):
                         'count',
                         'Distribuição por Status'
                     )
-                    st.plotly_chart(fig1, use_container_width=True)
+                    st.plotly_chart(fig1, width='stretch')
             
             with col2:
                 # N/C por mês - usando opened_at em vez de occurred_at para análise temporal
@@ -268,7 +263,7 @@ def app(filters=None):
                         'count',
                         'Não Conformidades por Mês (abertura)'
                     )
-                    st.plotly_chart(fig2, use_container_width=True)
+                    st.plotly_chart(fig2, width='stretch')
                 elif 'occurred_at' in df.columns:
                     # Fallback para occurred_at se opened_at não estiver disponível
                     df_temp = df.copy()
@@ -283,7 +278,7 @@ def app(filters=None):
                         'count',
                         'Não Conformidades por Mês (ocorrência)'
                     )
-                    st.plotly_chart(fig2, use_container_width=True)
+                    st.plotly_chart(fig2, width='stretch')
             
             # Análise por norma
             if 'norm_reference' in df.columns:
@@ -299,7 +294,7 @@ def app(filters=None):
                     'count',
                     'Não Conformidades por Norma'
                 )
-                st.plotly_chart(fig3, use_container_width=True)
+                st.plotly_chart(fig3, width='stretch')
             
             # Análise por gravidade
             if 'severity' in df.columns:
@@ -315,7 +310,7 @@ def app(filters=None):
                     'count',
                     'Não Conformidades por Gravidade'
                 )
-                st.plotly_chart(fig4, use_container_width=True)
+                st.plotly_chart(fig4, width='stretch')
     
     with tab2:
         st.subheader("Registros de Não Conformidades")
@@ -360,11 +355,11 @@ def app(filters=None):
             if available_cols:
                 st.dataframe(
                     filtered_df[available_cols],
-                    use_container_width=True,
+                    width='stretch',
                     hide_index=True
                 )
             else:
-                st.dataframe(filtered_df, use_container_width=True, hide_index=True)
+                st.dataframe(filtered_df, width='stretch', hide_index=True)
         else:
             st.info("Nenhuma não conformidade encontrada.")
             # Mostra informações para debug

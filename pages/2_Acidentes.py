@@ -520,7 +520,7 @@ def app(filters=None):
                             showlegend=False,
                             height=400
                         )
-                        st.plotly_chart(fig_work_days, use_container_width=True)
+                        st.plotly_chart(fig_work_days, width='stretch')
                     else:
                         st.info("📊 **Distribuição de Dias Trabalhados**\n\nNão há dados suficientes para gerar o gráfico de distribuição.")
             
@@ -543,7 +543,7 @@ def app(filters=None):
                         height=400,
                         font=dict(size=12)
                     )
-                    st.plotly_chart(fig1, use_container_width=True)
+                    st.plotly_chart(fig1, width='stretch')
                 else:
                     st.info("📊 **Distribuição por Tipo**\n\nNenhum dado de tipo disponível.")
             
@@ -571,7 +571,7 @@ def app(filters=None):
                         font=dict(size=12)
                     )
                     fig2.update_traces(marker_line_width=0)
-                    st.plotly_chart(fig2, use_container_width=True)
+                    st.plotly_chart(fig2, width='stretch')
                 else:
                     st.info("📅 **Acidentes por Mês**\n\nNenhum dado de data disponível.")
             
@@ -596,7 +596,7 @@ def app(filters=None):
                     font=dict(size=12)
                 )
                 fig3.update_traces(marker_line_width=0)
-                st.plotly_chart(fig3, use_container_width=True)
+                st.plotly_chart(fig3, width='stretch')
             else:
                 st.info("📋 **Análise por Causa Raiz**\n\nNenhum dado de causa raiz disponível.")
     
@@ -612,7 +612,7 @@ def app(filters=None):
                     color_discrete_sequence=px.colors.qualitative.Set2
                 )
                 fig_class.update_layout(height=380, font=dict(size=12))
-                st.plotly_chart(fig_class, use_container_width=True)
+                st.plotly_chart(fig_class, width='stretch')
             else:
                 st.info("📚 **Classificação (NBR 14280)**\n\nNenhum dado de classificação disponível.")
 
@@ -637,7 +637,7 @@ def app(filters=None):
                     font=dict(size=12)
                 )
                 fig_body.update_traces(marker_line_width=0)
-                st.plotly_chart(fig_body, use_container_width=True)
+                st.plotly_chart(fig_body, width='stretch')
             else:
                 st.info("🧍 **Parte do Corpo Afetada (NBR 14280)**\n\nNenhum dado disponível.")
 
@@ -688,11 +688,11 @@ def app(filters=None):
             if available_cols:
                 st.dataframe(
                     filtered_df[available_cols],
-                    use_container_width=True,
+                    width='stretch',
                     hide_index=True
                 )
             else:
-                st.dataframe(filtered_df, use_container_width=True, hide_index=True)
+                st.dataframe(filtered_df, width='stretch', hide_index=True)
         else:
             st.info("Nenhum acidente encontrado.")
     

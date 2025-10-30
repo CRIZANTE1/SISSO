@@ -31,24 +31,20 @@ def main():
     # Cria filtros na sidebar
     filters = create_filter_sidebar()
     
-    # Ajuda global do sistema
-    @st.dialog("Ajuda do Sistema")
-    def _show_global_help():
-        st.markdown(
-            "**Como navegar e analisar**\n\n"
-            "- Use o menu superior para acessar: Visão Geral, Acidentes, Quase-Acidentes, N/C, KPIs.\n"
-            "- Use a barra lateral para aplicar filtros (usuários, período, datas, causas).\n"
-            "- Em cada página, clique em '❓ Ajuda' para instruções específicas.\n\n"
-            "**Dicas rápidas**\n\n"
-            "- Se não aparecerem dados, reduza filtros ou amplie o período.\n"
-            "- Evidências: acesse a aba '📎 Evidências' em cada módulo.\n"
-            "- Para registrar, use as abas '➕ Novo ...' das páginas."
-        )
-        if st.button("Fechar", type="primary"):
-            st.rerun()
+    # Ajuda global do sistema (popover)
     top_l, top_r = st.columns([6, 1])
     with top_r:
-        st.button("❓ Ajuda", key="global_help_btn", on_click=_show_global_help)
+        with st.popover("❓ Ajuda", key="global_help_popover"):
+            st.markdown(
+                "**Como navegar e analisar**\n\n"
+                "- Use o menu superior para acessar: Visão Geral, Acidentes, Quase-Acidentes, N/C, KPIs.\n"
+                "- Use a barra lateral para aplicar filtros (usuários, período, datas, causas).\n"
+                "- Em cada página, clique em '❓ Ajuda' para instruções específicas.\n\n"
+                "**Dicas rápidas**\n\n"
+                "- Se não aparecerem dados, reduza filtros ou amplie o período.\n"
+                "- Evidências: acesse a aba '📎 Evidências' em cada módulo.\n"
+                "- Para registrar, use as abas '➕ Novo ...' das páginas."
+            )
     
     # Armazena filtros no session state para as páginas acessarem
     st.session_state.filters = filters

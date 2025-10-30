@@ -79,7 +79,7 @@ def create_instructions_page(
             if table_data:
                 import pandas as pd
                 df = pd.DataFrame(table_data)
-                st.dataframe(df, use_container_width=True, hide_index=True)
+                st.dataframe(df, width='stretch', hide_index=True)
     
     # Dicas importantes
     if tips:

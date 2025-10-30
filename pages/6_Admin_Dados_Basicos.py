@@ -17,23 +17,19 @@ def app(filters=None):
     check_permission('admin')
     
     st.title("⚙️ Admin - Dados Básicos")
-    # Ajuda da página
-    @st.dialog("Ajuda - Administração")
-    def _show_admin_help():
-        st.markdown(
-            "**O que você pode fazer aqui**\n\n"
-            "- Gerenciar Sites, Contratadas e Usuários.\n"
-            "- Importar dados (Horas e Acidentes) via CSV.\n"
-            "- Recalcular KPIs e ver estatísticas do sistema.\n\n"
-            "**Dicas**\n\n"
-            "- Confira o preview antes de importar.\n"
-            "- Para usuários já existentes, o perfil é atualizado."
-        )
-        if st.button("Fechar", type="primary"):
-            st.rerun()
+    # Ajuda da página (popover)
     al, ar = st.columns([6, 1])
     with ar:
-        st.button("❓ Ajuda", key="admin_help_btn", on_click=_show_admin_help)
+        with st.popover("❓ Ajuda", key="admin_help_popover"):
+            st.markdown(
+                "**O que você pode fazer aqui**\n\n"
+                "- Gerenciar Sites, Contratadas e Usuários.\n"
+                "- Importar dados (Horas e Acidentes) via CSV.\n"
+                "- Recalcular KPIs e ver estatísticas do sistema.\n\n"
+                "**Dicas**\n\n"
+                "- Confira o preview antes de importar.\n"
+                "- Para usuários já existentes, o perfil é atualizado."
+            )
     
     # Tabs para diferentes funcionalidades administrativas
     tab1, tab2, tab3, tab4, tab5 = st.tabs([
@@ -53,7 +49,7 @@ def app(filters=None):
         if sites:
             st.write("**Sites Cadastrados:**")
             sites_df = pd.DataFrame(sites)
-            st.dataframe(sites_df, use_container_width=True, hide_index=True)
+            st.dataframe(sites_df, width='stretch', hide_index=True)
         else:
             st.info("Nenhum site cadastrado.")
         
@@ -113,7 +109,7 @@ def app(filters=None):
         if contractors:
             st.write("**Contratadas Cadastradas:**")
             contractors_df = pd.DataFrame(contractors)
-            st.dataframe(contractors_df, use_container_width=True, hide_index=True)
+            st.dataframe(contractors_df, width='stretch', hide_index=True)
         else:
             st.info("Nenhuma contratada cadastrada.")
         
@@ -170,7 +166,7 @@ def app(filters=None):
         if users:
             st.write("**Usuários Cadastrados:**")
             users_df = pd.DataFrame(users)
-            st.dataframe(users_df, use_container_width=True, hide_index=True)
+            st.dataframe(users_df, width='stretch', hide_index=True)
         else:
             st.info("Nenhum usuário cadastrado.")
         
@@ -304,7 +300,7 @@ def app(filters=None):
             try:
                 hours_df = pd.read_csv(uploaded_hours)
                 st.write("**Preview dos dados:**")
-                st.dataframe(hours_df.head(), use_container_width=True)
+                st.dataframe(hours_df.head(), width='stretch')
                 
                 # Mapeamento de sites
                 sites = get_sites()
@@ -332,7 +328,7 @@ def app(filters=None):
             try:
                 accidents_df = pd.read_csv(uploaded_accidents)
                 st.write("**Preview dos dados:**")
-                st.dataframe(accidents_df.head(), use_container_width=True)
+                st.dataframe(accidents_df.head(), width='stretch')
                 
                 # Mapeamento de sites
                 sites = get_sites()

@@ -77,20 +77,16 @@ def app():
     user_name = user.get("full_name", "")
 
     st.title("👤 Perfil do Usuário")
-    # Ajuda da página
-    @st.dialog("Ajuda - Perfil do Usuário")
-    def _show_profile_help():
-        st.markdown(
-            "**O que você pode fazer**\n\n"
-            "- Atualizar dados de perfil (nome, email de contato, empresa).\n"
-            "- Gerenciar funcionários vinculados.\n"
-            "- Atualizar investigação de acidentes sob sua responsabilidade."
-        )
-        if st.button("Fechar", type="primary"):
-            st.rerun()
+    # Ajuda da página (popover)
     pl, pr = st.columns([6, 1])
     with pr:
-        st.button("❓ Ajuda", key="profile_help_btn", on_click=_show_profile_help)
+        with st.popover("❓ Ajuda", key="profile_help_popover"):
+            st.markdown(
+                "**O que você pode fazer**\n\n"
+                "- Atualizar dados de perfil (nome, email de contato, empresa).\n"
+                "- Gerenciar funcionários vinculados.\n"
+                "- Atualizar investigação de acidentes sob sua responsabilidade."
+            )
 
     # Perfil
     st.subheader("Dados de Perfil")

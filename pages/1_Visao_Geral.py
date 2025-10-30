@@ -19,20 +19,16 @@ def app(filters=None):
     require_login()
     
     st.title("📊 Dashboard Executivo - SSO")
-    # Ajuda da página
-    @st.dialog("Ajuda - Visão Geral")
-    def _show_overview_help():
-        st.markdown(
-            "**Como usar a Visão Geral**\n\n"
-            "- Ajuste filtros na barra lateral.\n"
-            "- Leia os cartões de status e indicadores principais.\n"
-            "- Use as abas para metodologia e instruções detalhadas."
-        )
-        if st.button("Fechar", type="primary"):
-            st.rerun()
+    # Ajuda da página (popover)
     c1, c2 = st.columns([6, 1])
     with c2:
-        st.button("❓ Ajuda", key="overview_help_btn", on_click=_show_overview_help)
+        with st.popover("❓ Ajuda", key="overview_help_popover"):
+            st.markdown(
+                "**Como usar a Visão Geral**\n\n"
+                "- Ajuste filtros na barra lateral.\n"
+                "- Leia os cartões de status e indicadores principais.\n"
+                "- Use as abas para metodologia e instruções detalhadas."
+            )
     
     # Busca filtros do session state se não foram passados como parâmetro
     if filters is None:
@@ -361,7 +357,7 @@ def app(filters=None):
                         font=dict(size=12)
                     )
                     
-                    st.plotly_chart(fig, use_container_width=True)
+                    st.plotly_chart(fig, width='stretch')
         
         st.markdown("---")
         
@@ -421,7 +417,7 @@ def app(filters=None):
                 font=dict(size=12)
             )
             
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width='stretch')
     
         # === TABELA MENSAL SIMPLES ===
         if not df.empty:
@@ -448,7 +444,7 @@ def app(filters=None):
             
             st.dataframe(
                 period_summary,
-                use_container_width=True,
+                width='stretch',
                 hide_index=True
             )
         

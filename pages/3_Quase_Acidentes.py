@@ -42,22 +42,17 @@ def app(filters=None):
     
     with tab1:
         st.subheader("Análise de Quase-Acidentes")
-        # Diálogo de ajuda detalhada
-        @st.dialog("Ajuda - Quase-Acidentes")
-        def _show_nearmiss_help():
-            st.markdown(
-                "**Como analisar**\n\n"
-                "- Acompanhe volume total e distribuição por severidade potencial.\n"
-                "- Verifique sazonalidade por mês e status (aberto/fechado).\n\n"
-                "**Sobre severidade potencial**\n\n"
-                "- Valores são normalizados em Baixo/Médio/Alto para padronização."
-            )
-            if st.button("Fechar", type="primary"):
-                st.rerun()
-
+        # Ajuda via popover
         c1, c2 = st.columns([1, 1])
         with c1:
-            st.button("❓ Ajuda", key="nearmiss_help_btn", on_click=_show_nearmiss_help)
+            with st.popover("❓ Ajuda", key="nearmiss_help_popover"):
+                st.markdown(
+                    "**Como analisar**\n\n"
+                    "- Acompanhe volume total e distribuição por severidade potencial.\n"
+                    "- Verifique sazonalidade por mês e status (aberto/fechado).\n\n"
+                    "**Sobre severidade potencial**\n\n"
+                    "- Valores são normalizados em Baixo/Médio/Alto para padronização."
+                )
         with st.expander("Guia rápido de análise", expanded=False):
             st.markdown(
                 "1. Ajuste os filtros (lado esquerdo) para recortar o período e usuários.\n"
@@ -158,7 +153,7 @@ def app(filters=None):
                         height=400,
                         font=dict(size=12)
                     )
-                    st.plotly_chart(fig1, use_container_width=True)
+                    st.plotly_chart(fig1, width='stretch')
                 else:
                     st.info("📊 **Distribuição por Severidade**\n\nNenhum dado de severidade disponível.")
             
@@ -185,7 +180,7 @@ def app(filters=None):
                         font=dict(size=12)
                     )
                     fig2.update_traces(marker_line_width=0)
-                    st.plotly_chart(fig2, use_container_width=True)
+                    st.plotly_chart(fig2, width='stretch')
                 else:
                     st.info("📅 **Quase-Acidentes por Mês**\n\nNenhum dado de data disponível.")
             
@@ -210,7 +205,7 @@ def app(filters=None):
                     font=dict(size=12)
                 )
                 fig3.update_traces(marker_line_width=0)
-                st.plotly_chart(fig3, use_container_width=True)
+                st.plotly_chart(fig3, width='stretch')
             else:
                 st.info("📊 **Análise por Status**\n\nNenhum dado de status disponível.")
     
@@ -257,11 +252,11 @@ def app(filters=None):
             if available_cols:
                 st.dataframe(
                     filtered_df[available_cols],
-                    use_container_width=True,
+                    width='stretch',
                     hide_index=True
                 )
             else:
-                st.dataframe(filtered_df, use_container_width=True, hide_index=True)
+                st.dataframe(filtered_df, width='stretch', hide_index=True)
         else:
             st.info("Nenhum quase-acidente encontrado.")
     

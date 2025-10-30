@@ -167,26 +167,21 @@ def create_filter_sidebar() -> Dict[str, Any]:
     """Cria sidebar com todos os filtros"""
     with st.sidebar:
         st.header("🔍 Filtros")
-        # Diálogo de ajuda dos filtros
-        @st.dialog("Ajuda sobre Filtros")
-        def _show_filters_help_dialog():
-            st.markdown(
-                "**Como os filtros funcionam**\n\n"
-                "- Os filtros aplicam-se às páginas de análise, registros e métricas.\n"
-                "- '📊 Período' limita pelos últimos N meses com base no dado mais recente.\n"
-                "- 'Filtrar por data' substitui o período com um intervalo específico.\n"
-                "- '👥 Usuários' filtra por quem criou o registro (created_by).\n"
-                "- Nem todas as páginas usam todos os filtros (ex.: causa raiz).\n\n"
-                "**Dicas**\n\n"
-                "- Se não retornar dados, experimente reduzir os filtros.\n"
-                "- Verifique se as colunas existem na sua base (ex.: root_cause)."
-            )
-            if st.button("Fechar", type="primary"):
-                st.rerun()
-
+        # Ajuda dos filtros via popover
         cols_help = st.columns([1, 1])
         with cols_help[0]:
-            st.button("❓ Ajuda", use_container_width=True, key="filters_help_btn", on_click=_show_filters_help_dialog)
+            with st.popover("❓ Ajuda", key="filters_help_popover"):
+                st.markdown(
+                    "**Como os filtros funcionam**\n\n"
+                    "- Os filtros aplicam-se às páginas de análise, registros e métricas.\n"
+                    "- '📊 Período' limita pelos últimos N meses com base no dado mais recente.\n"
+                    "- 'Filtrar por data' substitui o período com um intervalo específico.\n"
+                    "- '👥 Usuários' filtra por quem criou o registro (created_by).\n"
+                    "- Nem todas as páginas usam todos os filtros (ex.: causa raiz).\n\n"
+                    "**Dicas**\n\n"
+                    "- Se não retornar dados, experimente reduzir os filtros.\n"
+                    "- Verifique se as colunas existem na sua base (ex.: root_cause)."
+                )
         with st.expander("Como usar os filtros", expanded=False):
             st.markdown(
                 "- Use os filtros para refinar a análise em todas as páginas.\n"

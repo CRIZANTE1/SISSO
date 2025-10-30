@@ -27,7 +27,7 @@ def show_login_page():
         
         st.markdown("---")
         
-        if st.button("🔗 Fazer Login com Google", type="primary", use_container_width=True):
+        if st.button("🔗 Fazer Login com Google", type="primary", width='stretch'):
             try:
                 st.login()  # Função nativa do Streamlit para OIDC
             except Exception as e:
@@ -78,11 +78,11 @@ def show_access_denied_page():
         col_btn1, col_btn2 = st.columns(2)
         
         with col_btn1:
-            if st.button("🔄 Tentar Novamente", use_container_width=True):
+            if st.button("🔄 Tentar Novamente", width='stretch'):
                 st.rerun()
         
         with col_btn2:
-            if st.button("🚪 Sair / Trocar de Conta", use_container_width=True):
+            if st.button("🚪 Sair / Trocar de Conta", width='stretch'):
                 try:
                     st.logout()
                 except Exception:
@@ -101,7 +101,7 @@ def show_logout_button():
     """Botão de logout na sidebar."""
     with st.sidebar:
         st.markdown("---")
-        if st.button("🚪 Sair do Sistema", use_container_width=True):
+        if st.button("🚪 Sair do Sistema", width='stretch'):
             try:
                 st.logout()
             except Exception as e:
