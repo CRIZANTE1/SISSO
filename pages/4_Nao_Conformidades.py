@@ -8,7 +8,7 @@ from components.cards import create_metric_row, create_bar_chart, create_pie_cha
 from components.filters import apply_filters_to_df
 from managers.supabase_config import get_supabase_client
 
-def fetch_nonconformities(site_codes=None, start_date=None, end_date=None):
+def fetch_nonconformities(start_date=None, end_date=None):
     """Busca dados de não conformidades"""
     try:
         supabase = get_supabase_client()
@@ -74,7 +74,6 @@ def app(filters=None):
         
         # Busca dados
         with st.spinner("Carregando dados de não conformidades..."):
-            # Ignora filtro de sites pois a tabela não tem campo site_id
             df = fetch_nonconformities(
                 start_date=filters.get("start_date"),
                 end_date=filters.get("end_date")
@@ -83,8 +82,13 @@ def app(filters=None):
         if df.empty:
             st.warning("Nenhuma não conformidade encontrada com os filtros aplicados.")
         else:
-            # Aplica filtros adicionais
-            df = apply_filters_to_df(df, filters)
+            # Aplica filtros adicionais, mas ignora os filtros de sites e usuários
+            # (a tabela nonconformities não tem campo site_id e pode ter diferentes criadores)
+            filters_copy = filters.copy() if filters else {}
+            # Remove filtros que não se aplicam à tabela de não conformidades
+            filters_to_remove = ['sites', 'users']
+            filters_copy = {k: v for k, v in filters_copy.items() if k not in filters_to_remove}
+            df = apply_filters_to_df(df, filters_copy)
             
             # Métricas principais
             total_nc = len(df)
@@ -201,7 +205,7 @@ def app(filters=None):
         st.subheader("Registros de Não Conformidades")
         
         if not df.empty:
-            # Filtros adicionais para a tabela
+            # Filtros locais para a tabela (não afetam o dataframe principal)
             col1, col2, col3 = st.columns(3)
             
             with col1:
@@ -221,7 +225,7 @@ def app(filters=None):
             with col3:
                 search_term = st.text_input("Buscar na descrição", key="nc_search")
             
-            # Aplica filtros
+            # Aplica filtros locais
             filtered_df = df.copy()
             
             if status_filter != "Todos" and 'status' in filtered_df.columns:
@@ -270,7 +274,10 @@ def app(filters=None):
                 nc_id = nc_options[selected_nc]
                 
                 # Busca evidências
-                attachments = get_attachments("nonconformity", str(nc_id))
+                try:
+                    attachments = get_attachments("nonconformity", str(nc_id))
+                except:
+                    attachments = []
                 
                 if attachments:
                     st.write(f"**Evidências para a não conformidade selecionada:**")
@@ -285,20 +292,26 @@ def app(filters=None):
                         
                         with col2:
                             if st.button("📥 Download", key=f"download_{attachment['id']}"):
-                                file_data = download_attachment(attachment['bucket'], attachment['path'])
-                                if file_data:
-                                    st.download_button(
-                                        "💾 Baixar Arquivo",
-                                        file_data,
-                                        attachment['filename'],
-                                        key=f"download_btn_{attachment['id']}"
-                                    )
+                                try:
+                                    file_data = download_attachment(attachment['bucket'], attachment['path'])
+                                    if file_data:
+                                        st.download_button(
+                                            "💾 Baixar Arquivo",
+                                            file_data,
+                                            attachment['filename'],
+                                            key=f"download_btn_{attachment['id']}"
+                                        )
+                                except:
+                                    st.error("Erro ao baixar arquivo")
                         
                         with col3:
                             if st.button("🗑️ Remover", key=f"remove_{attachment['id']}"):
-                                if delete_attachment(attachment['id']):
-                                    st.success("Evidência removida!")
-                                    st.rerun()
+                                try:
+                                    if delete_attachment(attachment['id']):
+                                        st.success("Evidência removida!")
+                                        st.rerun()
+                                except:
+                                    st.error("Erro ao remover evidência")
                 else:
                     st.info("Nenhuma evidência encontrada para esta não conformidade.")
         else:
@@ -378,7 +391,7 @@ def app(filters=None):
                     try:
                         supabase = get_supabase_client()
                         
-                        # Insere não conformidade nos campos reais
+                        # Insere não conformidade nos campos que existem na tabela
                         nc_data = {
                             "opened_at": date_input.isoformat(),
                             "occurred_at": date_input.isoformat(),
@@ -389,15 +402,17 @@ def app(filters=None):
                             "corrective_actions": corrective_actions
                         }
                         
-                        # Adiciona site_id apenas se o campo existir na tabela
-                        if site_id:
-                            nc_data["site_id"] = site_id
-                            
+                        # Apenas adiciona campos se tivermos valores para eles
                         if employee_id:
                             nc_data["employee_id"] = employee_id
                         
                         if resolution_date:
                             nc_data["resolution_date"] = resolution_date.isoformat()
+                        
+                        # Tenta adicionar site_id apenas se a tabela tiver essa coluna
+                        # (pode ser adicionado se a estrutura da tabela for atualizada)
+                        if site_id:
+                            nc_data["site_id"] = site_id
                         
                         result = supabase.table("nonconformities").insert(nc_data).execute()
                         
