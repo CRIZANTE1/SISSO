@@ -14,10 +14,7 @@ def fetch_nonconformities(site_codes=None, start_date=None, end_date=None):
         supabase = get_supabase_client()
         query = supabase.table("nonconformities").select("*")
         
-        if site_codes:
-            sites_response = supabase.table("sites").select("id, code").in_("code", site_codes).execute()
-            site_ids = [site['id'] for site in sites_response.data]
-            query = query.in_("site_id", site_ids)
+        # NOTA: A tabela não tem campo site_id como mostrado no INSERT, então não aplicamos filtro por site
         
         if start_date:
             query = query.gte("occurred_at", start_date.isoformat())
@@ -77,8 +74,8 @@ def app(filters=None):
         
         # Busca dados
         with st.spinner("Carregando dados de não conformidades..."):
+            # Ignora filtro de sites pois a tabela não tem campo site_id
             df = fetch_nonconformities(
-                site_codes=filters.get("sites"),
                 start_date=filters.get("start_date"),
                 end_date=filters.get("end_date")
             )
@@ -383,7 +380,6 @@ def app(filters=None):
                         
                         # Insere não conformidade nos campos reais
                         nc_data = {
-                            "site_id": site_id,
                             "opened_at": date_input.isoformat(),
                             "occurred_at": date_input.isoformat(),
                             "standard_ref": norm_reference,
@@ -392,6 +388,11 @@ def app(filters=None):
                             "description": description,
                             "corrective_actions": corrective_actions
                         }
+                        
+                        # Adiciona site_id apenas se o campo existir na tabela
+                        if site_id:
+                            nc_data["site_id"] = site_id
+                            
                         if employee_id:
                             nc_data["employee_id"] = employee_id
                         
