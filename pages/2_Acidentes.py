@@ -13,39 +13,34 @@ from managers.supabase_config import get_supabase_client
 def calculate_work_days_until_accident(accident_date, employee_email=None):
     """
     Calcula quantos dias o funcionário trabalhou até o acidente acontecer.
-    Baseado na data de criação do perfil (admissão) e horas trabalhadas mensais.
+    Prioriza horas trabalhadas mensais; só limita por admissão quando conhecida.
     """
     try:
         from managers.supabase_config import get_service_role_client
         supabase = get_service_role_client()
-        
-        # Busca data de admissão do funcionário (created_at do perfil)
+
+        admission_date = None
+
+        # Busca data de admissão do funcionário (created_at do perfil) se tivermos o e-mail
         if employee_email:
             profile_response = supabase.table("profiles").select("created_at").eq("email", employee_email).execute()
             if profile_response and hasattr(profile_response, 'data') and profile_response.data:
                 admission_date = pd.to_datetime(profile_response.data[0]['created_at']).date()
-            else:
-                # Se não encontrar o funcionário, usa a data do acidente como referência
-                admission_date = accident_date
-        else:
-            # Se não especificar funcionário, usa a data do acidente como referência
-            admission_date = accident_date
-        
-        # Calcula dias corridos entre admissão e acidente
-        days_since_admission = (accident_date - admission_date).days
-        
-        # Se a data de admissão for posterior ao acidente, retorna 0
-        if days_since_admission < 0:
-            return 0
-        
+
+        # Calcula dias corridos entre admissão e acidente (se conhecido)
+        days_since_admission = None
+        if admission_date is not None:
+            days_since_admission = (accident_date - admission_date).days
+            if days_since_admission < 0:
+                days_since_admission = 0
+
         # Busca horas trabalhadas mensais para calcular dias úteis
+        total_hours = 0.0
         if employee_email:
             hours_response = supabase.table("hours_worked_monthly").select("*").eq("created_by", employee_email).execute()
             if hours_response and hasattr(hours_response, 'data') and hours_response.data:
-                # Calcula dias úteis baseado nas horas trabalhadas até a data do acidente
-                total_hours = 0
+                # Soma horas até o mês do acidente (inclusive)
                 for row in hours_response.data:
-                    # Verifica se as horas são anteriores ao acidente
                     if 'year' in row and 'month' in row:
                         try:
                             month_date = pd.to_datetime(f"{row['year']}-{row['month']:02d}-01").date()
@@ -53,14 +48,19 @@ def calculate_work_days_until_accident(accident_date, employee_email=None):
                                 total_hours += float(row.get('hours', 0))
                         except:
                             continue
-                
-                # Horas gravadas em centenas: converter para horas reais e assumir 8h/dia útil
-                work_days = (total_hours * 100) / 8
-                return min(work_days, days_since_admission)
-        
-        # Se não encontrar dados de horas, retorna dias corridos
-        return days_since_admission
-        
+
+        # Se temos horas, converte para dias úteis (assume 8h/dia) e não capa por admissão desconhecida
+        if total_hours > 0:
+            work_days = (total_hours * 100) / 8
+            return min(work_days, days_since_admission) if days_since_admission is not None else work_days
+
+        # Fallback: se não há horas, mas conhecemos admissão, use dias corridos
+        if days_since_admission is not None:
+            return days_since_admission
+
+        # Último fallback: sem perfil e sem horas, retorne 0
+        return 0
+
     except Exception as e:
         st.error(f"Erro ao calcular dias trabalhados: {str(e)}")
         return 0
