@@ -10,22 +10,44 @@ from components.filters import apply_filters_to_df
 from managers.supabase_config import get_supabase_client
 # Imports da NBR 14280 removidos
 
-def calculate_work_days_until_accident(accident_date, employee_email=None):
+def calculate_work_days_until_accident(accident_date, employee_identifier=None):
     """
     Calcula quantos dias o funcionário trabalhou até o acidente acontecer.
-    Prioriza horas trabalhadas mensais; só limita por admissão quando conhecida.
+    Aceita identificador de usuário (e-mail ou UUID). Tenta obter data de admissão
+    e somatório de horas trabalhadas até o mês do acidente. Converte horas em dias (8h/dia).
     """
     try:
         from managers.supabase_config import get_service_role_client
         supabase = get_service_role_client()
 
         admission_date = None
+        user_email = None
+        user_id = None
 
-        # Busca data de admissão do funcionário (created_at do perfil) se tivermos o e-mail
-        if employee_email:
-            profile_response = supabase.table("profiles").select("created_at").eq("email", employee_email).execute()
-            if profile_response and hasattr(profile_response, 'data') and profile_response.data:
-                admission_date = pd.to_datetime(profile_response.data[0]['created_at']).date()
+        # Resolve identificador do funcionário: pode ser e-mail (contém '@') ou UUID
+        if employee_identifier:
+            if isinstance(employee_identifier, str) and '@' in employee_identifier:
+                user_email = employee_identifier
+            else:
+                user_id = employee_identifier
+
+        # Busca perfil para obter email e uma possível data de admissão
+        profile_response = None
+        if user_email:
+            profile_response = supabase.table("profiles").select("id, email, created_at, admission_date").eq("email", user_email).limit(1).execute()
+        elif user_id:
+            profile_response = supabase.table("profiles").select("id, email, created_at, admission_date").eq("id", user_id).limit(1).execute()
+
+        if profile_response and hasattr(profile_response, 'data') and profile_response.data:
+            profile = profile_response.data[0]
+            user_id = profile.get('id', user_id)
+            user_email = profile.get('email', user_email)
+
+            # Preferir campo admission_date se existir; senão usar created_at
+            if profile.get('admission_date'):
+                admission_date = pd.to_datetime(profile['admission_date']).date()
+            elif profile.get('created_at'):
+                admission_date = pd.to_datetime(profile['created_at']).date()
 
         # Calcula dias corridos entre admissão e acidente (se conhecido)
         days_since_admission = None
@@ -36,27 +58,55 @@ def calculate_work_days_until_accident(accident_date, employee_email=None):
 
         # Busca horas trabalhadas mensais para calcular dias úteis
         total_hours = 0.0
-        if employee_email:
-            hours_response = supabase.table("hours_worked_monthly").select("*").eq("created_by", employee_email).execute()
-            if hours_response and hasattr(hours_response, 'data') and hours_response.data:
-                # Soma horas até o mês do acidente (inclusive)
-                for row in hours_response.data:
-                    if 'year' in row and 'month' in row:
-                        try:
-                            month_date = pd.to_datetime(f"{row['year']}-{row['month']:02d}-01").date()
-                            if month_date <= accident_date:
-                                total_hours += float(row.get('hours', 0))
-                        except:
-                            continue
+        hours_response = None
+        # Tenta por e-mail
+        if user_email:
+            hours_response = supabase.table("hours_worked_monthly").select("year, month, hours, created_by, user_id").eq("created_by", user_email).execute()
+        # Se não achou por e-mail, tenta por user_id em created_by
+        if (not hours_response or not getattr(hours_response, 'data', None)) and user_id:
+            hours_response = supabase.table("hours_worked_monthly").select("year, month, hours, created_by, user_id").eq("created_by", user_id).execute()
+        # Se a tabela tiver coluna user_id, tenta também por ela
+        if (not hours_response or not getattr(hours_response, 'data', None)) and user_id:
+            try:
+                hours_response = supabase.table("hours_worked_monthly").select("year, month, hours, user_id").eq("user_id", user_id).execute()
+            except Exception:
+                pass
 
-        # Se temos horas, converte para dias úteis (assume 8h/dia) e não capa por admissão desconhecida
+        if hours_response and hasattr(hours_response, 'data') and hours_response.data:
+            # Soma horas até o mês do acidente (inclusive)
+            for row in hours_response.data:
+                if 'year' in row and 'month' in row:
+                    try:
+                        month_date = pd.to_datetime(f"{row['year']}-{int(row['month']):02d}-01").date()
+                        if month_date <= accident_date:
+                            total_hours += float(row.get('hours', 0) or 0)
+                    except Exception:
+                        continue
+
+        # Converte horas para dias úteis (8h/dia). Aplicar escala *100 conforme convenção dos dados.
         if total_hours > 0:
-            work_days = (total_hours * 100) / 8
+            work_days = (total_hours * 100.0) / 8.0
             return min(work_days, days_since_admission) if days_since_admission is not None else work_days
 
         # Fallback: se não há horas, mas conhecemos admissão, use dias corridos
         if days_since_admission is not None:
             return days_since_admission
+
+        # Fallback adicional: se não há perfil e existe histórico de acidentes do mesmo criador,
+        # usar dias desde o primeiro registro desse criador como aproximação.
+        if employee_identifier:
+            try:
+                # Determina filtro mais provável
+                identifier_field = "created_by"
+                identifier_value = employee_identifier
+                # Busca acidentes mais antigos do mesmo criador
+                first_acc = supabase.table("accidents").select("occurred_at").eq(identifier_field, identifier_value).order("occurred_at").limit(1).execute()
+                if first_acc and hasattr(first_acc, 'data') and first_acc.data:
+                    first_date = pd.to_datetime(first_acc.data[0]['occurred_at']).date()
+                    approx_days = (accident_date - first_date).days
+                    return max(0, approx_days)
+            except Exception:
+                pass
 
         # Último fallback: sem perfil e sem horas, retorne 0
         return 0
