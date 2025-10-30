@@ -167,34 +167,6 @@ def create_filter_sidebar() -> Dict[str, Any]:
     """Cria sidebar com todos os filtros"""
     with st.sidebar:
         st.header("🔍 Filtros")
-        # Ajuda dos filtros via popover
-        cols_help = st.columns([1, 1])
-        with cols_help[0]:
-            with st.popover("❓ Ajuda"):
-                st.markdown(
-                    "**Como os filtros funcionam**\n\n"
-                    "- Os filtros aplicam-se às páginas de análise, registros e métricas.\n"
-                    "- '📊 Período' limita pelos últimos N meses com base no dado mais recente.\n"
-                    "- 'Filtrar por data' substitui o período com um intervalo específico.\n"
-                    "- '👥 Usuários' filtra por quem criou o registro (created_by).\n"
-                    "- Nem todas as páginas usam todos os filtros (ex.: causa raiz).\n\n"
-                    "**Dicas**\n\n"
-                    "- Se não retornar dados, experimente reduzir os filtros.\n"
-                    "- Verifique se as colunas existem na sua base (ex.: root_cause)."
-                )
-        with st.expander("Como usar os filtros", expanded=False):
-            st.markdown(
-                "- Use os filtros para refinar a análise em todas as páginas.\n"
-                "- O período relativo (📊 Período) limita por meses a partir do dado mais recente.\n"
-                "- O intervalo de datas (📅) substitui o período quando ativado.\n"
-                "- Os filtros aplicam-se aos gráficos, tabelas e métricas."
-            )
-        with st.popover("❓ Dúvidas sobre filtros"):
-            st.markdown(
-                "- Se nada aparece, reduza os filtros.\n"
-                "- 'Usuários' filtra por quem criou o registro.\n"
-                "- Nem todas as páginas usam todos os filtros (ex.: causa raiz só onde existe)."
-            )
         
         # Usuários
         selected_users = user_filter()
