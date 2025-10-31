@@ -12,7 +12,7 @@ SELECT
     SUM(hours) as total_horas_em_centenas,
     SUM(hours) * 100 as total_horas_reais,
     -- Taxa acumulada correta
-    -- ✅ CORRIGIDO: hours na tabela está dividido por 100 (1.75 = 175 horas reais), multiplica por 100 uma vez
+    -- ✅ CORRIGIDO: hours na tabela está em centenas (176.0 = 17.600 horas reais)
     (SUM(accidents_total)::numeric / (SUM(hours) * 100)) * 1000000 as tf_correta,
     ((SUM(lost_days_total) + SUM(debited_days))::numeric / (SUM(hours) * 100)) * 1000000 as tg_correta,
     -- Média das taxas (ERRADA quando horas variam)
@@ -33,8 +33,8 @@ SELECT
     frequency_rate as tf_periodo,
     severity_rate as tg_periodo,
     -- Taxa correta para este período
-    -- ✅ CORRIGIDO: hours na tabela está dividido por 100 (1.75 = 175 horas reais)
-    -- Precisa multiplicar por 100 uma vez para converter para horas reais
+    -- ✅ CORRIGIDO: hours na tabela está em centenas (176.0 = 176 centenas = 17.600 horas reais)
+    -- Precisa multiplicar por 100 para converter para horas reais
     CASE 
         WHEN hours > 0 THEN (accidents_total::numeric / (hours * 100)) * 1000000
         ELSE 0

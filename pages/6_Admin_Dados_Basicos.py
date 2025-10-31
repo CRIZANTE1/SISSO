@@ -383,10 +383,10 @@ def app(filters=None):
                             # Calcular dias debitados para acidentes fatais (NBR 14280)
                             debited_days = acc_data['fatalities'] * 6000  # 6.000 dias por morte
                             
-                            # ✅ CORRIGIDO: hours vem em horas reais (176.0 = 176 horas)
-                            # Mas a função espera em centenas e multiplica por 100
-                            # Então divide por 100 para converter para centenas antes de calcular
-                            hours_in_hundreds = hours / 100  # Converte 176.0 para 1.76 (centenas)
+                            # ✅ CORRIGIDO: hours vem da tabela hours_worked_monthly em HORAS REAIS (182.0 = 182 horas reais)
+                            # A função espera receber em centenas e multiplica por 100 internamente
+                            # Então dividimos por 100 para converter para centenas antes de calcular
+                            hours_in_hundreds = hours / 100  # Converte 182.0 horas reais para 1.82 centenas
                             freq_rate = calculate_frequency_rate(acc_data['count'], hours_in_hundreds)
                             sev_rate = calculate_severity_rate(acc_data['lost_days'], hours_in_hundreds, debited_days)
                             
@@ -399,7 +399,7 @@ def app(filters=None):
                                 "accidents_total": acc_data['count'],
                                 "fatalities": acc_data['fatalities'],
                                 "lost_days_total": acc_data['lost_days'],
-                                "hours": hours / 100,  # ✅ Armazena dividido por 100 (176.0 → 1.76 na tabela)
+                                "hours": hours_in_hundreds,  # ✅ Armazena em centenas (182.0 → 1.82 na tabela)
                                 "frequency_rate": freq_rate,
                                 "severity_rate": sev_rate,
                                 "debited_days": debited_days
@@ -427,7 +427,7 @@ def app(filters=None):
                                     "accidents_total": 0,
                                     "fatalities": 0,
                                     "lost_days_total": 0,
-                                    "hours": hours / 100,
+                                    "hours": hours,  # Armazena em centenas (176.0 = 17.600 horas reais)
                                     "frequency_rate": 0,
                                     "severity_rate": 0,
                                     "debited_days": 0

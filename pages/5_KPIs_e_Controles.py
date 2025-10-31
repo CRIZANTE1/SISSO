@@ -1395,12 +1395,11 @@ def app(filters=None):
                             # Calcular dias debitados para acidentes fatais (NBR 14280)
                             debited_days = acc_data['fatalities'] * 6000  # 6.000 dias por morte
                             
-                            # ✅ CORRIGIDO: hours vem em horas reais (176.0 = 176 horas)
-                            # Mas a função espera em centenas e multiplica por 100
-                            # Então divide por 100 para converter para centenas antes de calcular
-                            hours_in_hundreds = hours / 100  # Converte 176.0 para 1.76 (centenas)
-                            freq_rate = calculate_frequency_rate(acc_data['count'], hours_in_hundreds)
-                            sev_rate = calculate_severity_rate(acc_data['lost_days'], hours_in_hundreds, debited_days)
+                            # ✅ CORRIGIDO: hours vem da tabela hours_worked_monthly (176.0 = 176 centenas = 17.600 horas reais)
+                            # A função espera receber em centenas e multiplica por 100 internamente
+                            # Então passamos hours diretamente (já está em centenas)
+                            freq_rate = calculate_frequency_rate(acc_data['count'], hours)
+                            sev_rate = calculate_severity_rate(acc_data['lost_days'], hours, debited_days)
                             
                             # Verifica se já existe KPI para este período e usuário
                             existing_kpi = supabase.table("kpi_monthly").select("id").eq("period", f"{period}-01").eq("created_by", user_id).execute()
@@ -1411,7 +1410,7 @@ def app(filters=None):
                                 "accidents_total": acc_data['count'],
                                 "fatalities": acc_data['fatalities'],
                                 "lost_days_total": acc_data['lost_days'],
-                                "hours": hours / 100,  # Armazena como centenas (176 representa 17.600 horas)
+                                "hours": hours,  # ✅ Armazena em centenas (176.0 = 17.600 horas reais)
                                 "frequency_rate": freq_rate,
                                 "severity_rate": sev_rate,
                                 "debited_days": debited_days
