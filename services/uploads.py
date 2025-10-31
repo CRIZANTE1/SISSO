@@ -185,7 +185,7 @@ def import_accidents_csv(df: pd.DataFrame, site_mapping: Dict[str, str]) -> bool
             }
             accident_type = type_map.get(severity, 'lesao')
             
-            accident_rows.append({
+            accident_row = {
                 "occurred_at": row['occurred_at'] if 'occurred_at' in row else row.get('date', ''),
                 "type": accident_type,  # severity -> type (enum)
                 "classification": row.get('classification', 'leve'),
@@ -195,9 +195,13 @@ def import_accidents_csv(df: pd.DataFrame, site_mapping: Dict[str, str]) -> bool
                 "root_cause": row.get('root_cause', ''),
                 "status": row.get('status', 'fechado'),  # default 'fechado'
                 "created_by": user_id
-            })
-            # Campos removidos: site_id, date, severity, corrective_actions (não existem na tabela)
-            # employee_id pode ser adicionado se houver mapeamento no CSV
+            }
+            
+            # Adiciona employee_id se presente no CSV
+            if 'employee_id' in row and row.get('employee_id'):
+                accident_row["employee_id"] = row['employee_id']
+            
+            accident_rows.append(accident_row)
         
         if not accident_rows:
             st.error("Nenhum dado válido para importar")

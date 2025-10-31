@@ -1018,8 +1018,10 @@ def app(filters=None):
                             "status": status,
                             "created_by": user_id
                         }
-                        # employee_id removido - a tabela accidents não possui esta coluna
-                        # A relação funcionário-acidente não está implementada na estrutura atual
+                        
+                        # Adiciona employee_id se um funcionário foi selecionado
+                        if employee_id:
+                            accident_data["employee_id"] = employee_id
                         
                         result = supabase.table("accidents").insert(accident_data).execute()
                         
