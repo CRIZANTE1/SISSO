@@ -131,28 +131,28 @@ def app(filters=None):
         # ✅ NOVO: Popover FAQ com explicações dos indicadores (ao lado do título)
         with faq_col:
             with st.popover("❓ FAQ Indicadores", help="Clique para ver explicações resumidas dos indicadores"):
-                st.markdown("### 📊 Explicação dos Indicadores")
+                st.markdown("### 📊 Explicação dos Indicadores (NBR 14280)")
                 
                 st.markdown("""
-                **🔴 Acidentes por Milhão de Horas (TF)**
-                - Mostra quantos acidentes acontecem a cada 1 milhão de horas trabalhadas
+                **📈 Taxa de Frequência (TF)**
+                - Quantos acidentes acontecem a cada 1 milhão de horas trabalhadas
                 - **Padrão**: ≤ 20 = 🟢 Muito bom | > 60 = 🔴 Péssimo
                 
-                **🔴 Dias Perdidos por Milhão de Horas (TG)**
-                - Mostra quantos dias são perdidos a cada 1 milhão de horas
+                **⚠️ Taxa de Gravidade (TG)**
+                - Quantos dias são perdidos a cada 1 milhão de horas
                 - Inclui dias debitados (fatal = 6.000 dias)
                 - **Padrão**: ≤ 50 = 🟢 Excelente | > 200 = 🔴 Crítico
                 
-                **🟠 Total de Acidentes**
+                **🚨 Total de Acidentes**
                 - Número total de acidentes no período
                 - Não conta incidentes sem lesão
                 
-                **🟠 Dias de Trabalho Perdidos**
+                **📅 Dias de Trabalho Perdidos**
                 - Total de dias que funcionários ficaram afastados
-                - Mostra o impacto dos acidentes
+                - Mostra o impacto econômico dos acidentes
                 """)
                 
-                st.caption("📚 Conforme NBR 14280")
+                st.caption("📚 Fonte: NBR 14280 - Cadastro de Acidente do Trabalho")
         
         col1, col2, col3, col4 = st.columns(4)
         
@@ -176,11 +176,12 @@ def app(filters=None):
             freq_delta = f"{freq_change:+.1f}%" if freq_change is not None else None
             
             st.metric(
-                f"{freq_icon} Acidentes por Milhão de Horas",
+                f"{freq_icon} Taxa de Frequência (TF)",
                 f"{freq_value:.0f}",
                 delta=freq_delta,
-                help=f"Quantos acidentes acontecem a cada 1 milhão de horas trabalhadas\nClassificação: {freq_class}\n{rate_label}"
+                help=f"Taxa de Frequência (TF)\nTambém conhecida como: Acidentes por Milhão de Horas\nQuantos acidentes acontecem a cada 1 milhão de horas trabalhadas\nClassificação: {freq_class}\n{rate_label}\n📚 Conforme NBR 14280"
             )
+            st.caption("Acidentes por Milhão de Horas")
         
         with col2:
             sev_data = kpi_summary.get('severity_interpretation', {})
@@ -202,11 +203,12 @@ def app(filters=None):
             sev_delta = f"{sev_change:+.1f}%" if sev_change is not None else None
             
             st.metric(
-                f"{sev_icon} Dias Perdidos por Milhão de Horas",
+                f"{sev_icon} Taxa de Gravidade (TG)",
                 f"{sev_value:.0f}",
                 delta=sev_delta,
-                help=f"Quantos dias de trabalho são perdidos a cada 1 milhão de horas trabalhadas\nClassificação: {sev_class}\n{rate_label}"
+                help=f"Taxa de Gravidade (TG)\nTambém conhecida como: Dias Perdidos por Milhão de Horas\nQuantos dias de trabalho são perdidos a cada 1 milhão de horas trabalhadas\nClassificação: {sev_class}\n{rate_label}\n📚 Conforme NBR 14280"
             )
+            st.caption("Dias Perdidos por Milhão de Horas")
         
         with col3:
             total_acc = kpi_summary.get('total_accidents', 0)
@@ -225,7 +227,7 @@ def app(filters=None):
             st.metric(
                 f"{acc_icon} Total de Acidentes",
                 f"{total_acc}",
-                help=f"Quantos acidentes aconteceram no período\nFatais: {fatalities}"
+                help=f"Total de Acidentes\nNúmero total de acidentes registrados no período\nFatais: {fatalities}\nNão inclui incidentes sem lesão\n📚 Conforme NBR 14280"
             )
         
         with col4:
@@ -247,7 +249,7 @@ def app(filters=None):
                 f"{days_icon} Dias de Trabalho Perdidos",
                 f"{lost_days}",
                 delta=f"+{automatic_debited} debitados" if automatic_debited > 0 else None,
-                help=f"Dias perdidos reais: {lost_days}\nDias debitados (fatais): {automatic_debited}\nTotal de impacto: {total_impact}"
+                help=f"Dias de Trabalho Perdidos\nDias perdidos reais: {lost_days}\nDias debitados (fatais): {automatic_debited}\nTotal de impacto: {total_impact} dias\nMostra o impacto econômico dos acidentes\n📚 Conforme NBR 14280"
             )
         
         # Resumo em linguagem simples

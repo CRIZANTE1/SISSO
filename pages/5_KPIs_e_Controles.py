@@ -88,26 +88,28 @@ def app(filters=None):
                 st.subheader("📊 Indicadores de Segurança")
             with faq_col:
                 with st.popover("❓ FAQ", help="Clique para ver explicações dos indicadores"):
-                    st.markdown("### 📊 O que cada indicador significa:")
+                    st.markdown("### 📊 Explicação dos Indicadores (NBR 14280)")
                     
                     st.markdown("""
                     **📈 Taxa de Frequência (TF)**
-                    - Quantos acidentes a cada 1 milhão de horas trabalhadas
-                    - **Padrão NBR 14280**: ≤ 20 = 🟢 Muito bom | > 60 = 🔴 Péssimo
+                    - Quantos acidentes acontecem a cada 1 milhão de horas trabalhadas
+                    - **Padrão**: ≤ 20 = 🟢 Muito bom | > 60 = 🔴 Péssimo
                     
                     **⚠️ Taxa de Gravidade (TG)**
-                    - Quantos dias perdidos a cada 1 milhão de horas
+                    - Quantos dias são perdidos a cada 1 milhão de horas
                     - Inclui dias debitados (fatal = 6.000 dias)
                     - **Padrão**: ≤ 50 = 🟢 Excelente | > 200 = 🔴 Crítico
                     
                     **🚨 Total de Acidentes**
                     - Número total de acidentes no período
+                    - Não conta incidentes sem lesão
                     
-                    **📅 Dias Perdidos**
-                    - Total de dias de afastamento por acidentes
+                    **📅 Dias de Trabalho Perdidos**
+                    - Total de dias que funcionários ficaram afastados
+                    - Mostra o impacto econômico dos acidentes
                     """)
                     
-                    st.caption("📚 Fonte: NBR 14280")
+                    st.caption("📚 Fonte: NBR 14280 - Cadastro de Acidente do Trabalho")
             
             metrics = [
                 {
@@ -117,7 +119,7 @@ def app(filters=None):
                     "change_label": "vs período anterior",
                     "icon": freq_interpretation.get('icon', '📈'),
                     "color": freq_interpretation.get('color', 'normal'),
-                    "subtitle": freq_interpretation.get('classification', 'N/A')
+                    "subtitle": f"{freq_interpretation.get('classification', 'N/A')} | Acidentes por Milhão de Horas"
                 },
                 {
                     "title": "Taxa de Gravidade (TG)",
@@ -126,19 +128,21 @@ def app(filters=None):
                     "change_label": "vs período anterior",
                     "icon": sev_interpretation.get('icon', '⚠️'),
                     "color": sev_interpretation.get('color', 'normal'),
-                    "subtitle": sev_interpretation.get('classification', 'N/A')
+                    "subtitle": f"{sev_interpretation.get('classification', 'N/A')} | Dias Perdidos por Milhão de Horas"
                 },
                 {
                     "title": "Total de Acidentes",
                     "value": kpi_summary.get('total_accidents', 0),
                     "icon": "🚨",
-                    "color": "normal"
+                    "color": "normal",
+                    "subtitle": "Total de acidentes no período"
                 },
                 {
-                    "title": "Dias Perdidos",
+                    "title": "Dias de Trabalho Perdidos",
                     "value": kpi_summary.get('total_lost_days', 0),
                     "icon": "📅",
-                    "color": "warning"
+                    "color": "warning",
+                    "subtitle": "Total de dias de afastamento"
                 }
             ]
             
