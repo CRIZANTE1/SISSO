@@ -28,7 +28,9 @@ def app(filters=None):
                 "- Recalcule KPIs e veja estatísticas.\n\n"
                 "**Dicas**\n\n"
                 "- Confira o preview antes de importar.\n"
-                "- Usuário existente tem perfil atualizado."
+                "- Usuário existente tem perfil atualizado.\n\n"
+                "**📝 Feedback**\n"
+                "- Encontrou um erro ou tem uma sugestão? Acesse **Conta → Feedbacks** para reportar!"
             )
     
     # Tabs para diferentes funcionalidades administrativas

@@ -29,7 +29,9 @@ def app(filters=None):
                 "- Logs Recentes: filtre níveis e atualize.\n"
                 "- Status do Sistema: teste conexão e veja sessão.\n\n"
                 "**Dicas**\n\n"
-                "- Baixe logs em JSON para auditoria."
+                "- Baixe logs em JSON para auditoria.\n\n"
+                "**📝 Feedback**\n"
+                "- Encontrou um erro ou tem uma sugestão? Acesse **Conta → Feedbacks** para reportar!"
             )
     
     # Inicializa logger

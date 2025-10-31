@@ -82,7 +82,9 @@ def app():
                 "- Gerencie funcionários vinculados.\n"
                 "- Atualize investigações sob sua responsabilidade.\n\n"
                 "**Dicas**\n\n"
-                "- E-mail de contato é obrigatório para salvar."
+                "- E-mail de contato é obrigatório para salvar.\n\n"
+                "**📝 Feedback**\n"
+                "- Encontrou um erro ou tem uma sugestão? Acesse **Feedbacks** no menu para reportar!"
             )
 
     # Perfil

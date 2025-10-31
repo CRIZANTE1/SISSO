@@ -27,7 +27,9 @@ def app(filters=None):
                 "**Como usar a Visão Geral**\n\n"
                 "- Ajuste filtros na barra lateral.\n"
                 "- Leia os cartões de status e indicadores principais.\n"
-                "- Use as abas para metodologia e instruções detalhadas."
+                "- Use as abas para metodologia e instruções detalhadas.\n\n"
+                "**📝 Feedback**\n"
+                "- Encontrou um erro ou tem uma sugestão? Acesse **Conta → Feedbacks** para reportar!"
             )
     
     # Busca filtros do session state se não foram passados como parâmetro

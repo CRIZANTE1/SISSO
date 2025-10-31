@@ -152,7 +152,9 @@ def app(filters=None):
                     "- Campos podem variar (ex.: site_id).\n\n"
                     "**Definições**\n\n"
                     "- 'opened_at': data em que a N/C foi aberta/registrada no sistema.\n"
-                    "- 'occurred_at': data em que a N/C (ou fato gerador) aconteceu em campo."
+                    "- 'occurred_at': data em que a N/C (ou fato gerador) aconteceu em campo.\n\n"
+                    "**📝 Feedback**\n"
+                    "- Encontrou um erro? Acesse **Conta → Feedbacks** para reportar!"
                 )
         with st.expander("Guia rápido de análise", expanded=False):
             st.markdown(
@@ -164,7 +166,9 @@ def app(filters=None):
         with st.popover("❓ Dicas"):
             st.markdown(
                 "- Alguns campos podem variar entre ambientes (ex.: site).\n"
-                "- Se não houver 'opened_at', os gráficos usam 'occurred_at' como fallback."
+                "- Se não houver 'opened_at', os gráficos usam 'occurred_at' como fallback.\n\n"
+                "**📝 Encontrou um erro ou tem uma sugestão?**\n"
+                "- Acesse **Conta → Feedbacks** no menu para reportar ou sugerir melhorias!"
             )
         
         # Busca dados de forma independente - FORÇANDO a busca de TODOS os registros

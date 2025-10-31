@@ -457,7 +457,9 @@ def app(filters=None):
             st.markdown(
                 "- Os filtros afetam todas as seções desta página.\n"
                 "- Sem dados? Tente desmarcar 'Filtrar por data' ou ampliar o período.\n"
-                "- Para análise de 'Dias Trabalhados', cadastre funcionários e horas."
+                "- Para análise de 'Dias Trabalhados', cadastre funcionários e horas.\n\n"
+                "**📝 Encontrou um erro ou tem uma sugestão?**\n"
+                "- Acesse **Conta → Feedbacks** no menu para reportar ou sugerir melhorias!"
             )
         
         if not df.empty:

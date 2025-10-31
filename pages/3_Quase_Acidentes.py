@@ -111,7 +111,9 @@ def app(filters=None):
                     "3) Explore gráficos por severidade e mês.\n\n"
                     "**Dicas**\n\n"
                     "- Severidade potencial é normalizada em Baixo/Médio/Alto.\n"
-                    "- Sem resultados? Amplie o período ou limpe filtros."
+                    "- Sem resultados? Amplie o período ou limpe filtros.\n\n"
+                    "**📝 Feedback**\n"
+                    "- Encontrou um erro? Acesse **Conta → Feedbacks** para reportar!"
                 )
         with st.expander("Guia rápido de análise", expanded=False):
             st.markdown(
@@ -123,7 +125,9 @@ def app(filters=None):
         with st.popover("❓ Dicas"):
             st.markdown(
                 "- A severidade potencial é normalizada em Baixo/Médio/Alto.\n"
-                "- Sem resultados? Amplie o período ou limpe filtros."
+                "- Sem resultados? Amplie o período ou limpe filtros.\n\n"
+                "**📝 Encontrou um erro ou tem uma sugestão?**\n"
+                "- Acesse **Conta → Feedbacks** no menu para reportar ou sugerir melhorias!"
             )
         
         # Busca dados

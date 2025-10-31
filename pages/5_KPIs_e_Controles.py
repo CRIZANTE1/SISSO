@@ -33,7 +33,9 @@ def app(filters=None):
                 "1) KPIs Básicos: visão geral e interpretações.\n"
                 "2) Controles Estatísticos: limites e padrões.\n"
                 "3) Tendências (EWMA) e Previsões.\n"
-                "4) Relatórios e Exportação."
+                "4) Relatórios e Exportação.\n\n"
+                "**📝 Feedback**\n"
+                "- Encontrou um erro ou tem uma sugestão? Acesse **Conta → Feedbacks** para reportar!"
             )
     
     # Busca filtros do session state se não foram passados como parâmetro

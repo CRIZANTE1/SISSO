@@ -43,7 +43,11 @@ def main():
                 "**Dicas rápidas**\n\n"
                 "- Se não aparecerem dados, reduza filtros ou amplie o período.\n"
                 "- Evidências: acesse a aba '📎 Evidências' em cada módulo.\n"
-                "- Para registrar, use as abas '➕ Novo ...' das páginas."
+                "- Para registrar, use as abas '➕ Novo ...' das páginas.\n\n"
+                "**📝 Feedback e Sugestões**\n\n"
+                "- Encontrou um erro ou tem uma sugestão? Acesse **Conta → Feedbacks** no menu.\n"
+                "- Lá você pode reportar bugs, sugerir melhorias ou compartilhar ideias.\n"
+                "- Seu feedback é muito importante para melhorarmos o sistema!"
             )
     
     # Armazena filtros no session state para as páginas acessarem
