@@ -310,31 +310,38 @@ def app(filters=None):
                     from collections import defaultdict
                     import pandas as pd
                     
-                    accidents_by_period = defaultdict(lambda: {'count': 0, 'fatalities': 0, 'lost_days': 0})
+                    accidents_by_period_user = defaultdict(lambda: {'count': 0, 'fatalities': 0, 'lost_days': 0})
                     
                     for accident in accidents_data:
                         period = pd.to_datetime(accident['occurred_at']).strftime('%Y-%m')
-                        accidents_by_period[period]['count'] += 1
-                        # is_fatal removido - usa type para identificar fatais
-                        if accident.get('type') == 'fatal':
-                            accidents_by_period[period]['fatalities'] += 1
-                        accidents_by_period[period]['lost_days'] += int(accident.get('lost_days', 0))
+                        user_id = accident.get('created_by')
+                        if user_id:
+                            key = f"{period}_{user_id}"
+                            accidents_by_period_user[key]['count'] += 1
+                            # is_fatal removido - usa type para identificar fatais
+                            if accident.get('type') == 'fatal':
+                                accidents_by_period_user[key]['fatalities'] += 1
+                            accidents_by_period_user[key]['lost_days'] += int(accident.get('lost_days', 0))
                     
                     # Agrupa horas por mês/criador
-                    hours_by_period = defaultdict(lambda: 0)
+                    hours_by_period_user = defaultdict(lambda: 0)
                     
                     for hour_entry in hours_data:
                         period = f"{hour_entry['year']}-{str(hour_entry['month']).zfill(2)}"
-                        hours_by_period[period] += float(hour_entry.get('hours', 0))
+                        user_id = hour_entry.get('created_by')
+                        if user_id:
+                            key = f"{period}_{user_id}"
+                            hours_by_period_user[key] += float(hour_entry.get('hours', 0))
                     
                     # Limpa tabela de KPIs existentes (opcional - pode ser substituído por atualização incremental)
                     # supabase.table("kpi_monthly").delete().neq("id", 0).execute()
                     
-                    # Calcula KPIs mensais
+                    # Calcula KPIs mensais por usuário
                     kpi_updates = []
-                    for period, acc_data in accidents_by_period.items():
-                        if period in hours_by_period:
-                            hours = hours_by_period[period]
+                    for key, acc_data in accidents_by_period_user.items():
+                        if key in hours_by_period_user:
+                            period, user_id = key.split('_', 1)
+                            hours = hours_by_period_user[key]
                             
                             # Calcular dias debitados para acidentes fatais (NBR 14280)
                             debited_days = acc_data['fatalities'] * 6000  # 6.000 dias por morte
@@ -343,11 +350,12 @@ def app(filters=None):
                             freq_rate = calculate_frequency_rate(acc_data['count'], hours)
                             sev_rate = calculate_severity_rate(acc_data['lost_days'], hours, debited_days)
                             
-                            # Verifica se já existe KPI para este período
-                            existing_kpi = supabase.table("kpi_monthly").select("id").eq("period", f"{period}-01").execute()
+                            # Verifica se já existe KPI para este período e usuário
+                            existing_kpi = supabase.table("kpi_monthly").select("id").eq("period", f"{period}-01").eq("created_by", user_id).execute()
                             
                             kpi_data = {
                                 "period": f"{period}-01",
+                                "created_by": user_id,  # UUID do usuário
                                 "accidents_total": acc_data['count'],
                                 "fatalities": acc_data['fatalities'],
                                 "lost_days_total": acc_data['lost_days'],
@@ -359,12 +367,34 @@ def app(filters=None):
                             
                             if existing_kpi.data:
                                 # Atualiza existente
-                                supabase.table("kpi_monthly").update(kpi_data).eq("period", f"{period}-01").execute()
+                                supabase.table("kpi_monthly").update(kpi_data).eq("period", f"{period}-01").eq("created_by", user_id).execute()
                             else:
                                 # Insere novo
                                 supabase.table("kpi_monthly").insert(kpi_data).execute()
                     
-                    st.success(f"✅ KPIs recalculados com sucesso para {len(accidents_by_period)} períodos!")
+                    # Processa horas sem acidentes (cria KPIs com zero acidentes)
+                    for key, hours in hours_by_period_user.items():
+                        if key not in accidents_by_period_user:
+                            period, user_id = key.split('_', 1)
+                            
+                            # Verifica se já existe KPI para este período e usuário
+                            existing_kpi = supabase.table("kpi_monthly").select("id").eq("period", f"{period}-01").eq("created_by", user_id).execute()
+                            
+                            if not existing_kpi.data:
+                                kpi_data = {
+                                    "period": f"{period}-01",
+                                    "created_by": user_id,
+                                    "accidents_total": 0,
+                                    "fatalities": 0,
+                                    "lost_days_total": 0,
+                                    "hours": hours / 100,
+                                    "frequency_rate": 0,
+                                    "severity_rate": 0,
+                                    "debited_days": 0
+                                }
+                                supabase.table("kpi_monthly").insert(kpi_data).execute()
+                    
+                    st.success(f"✅ KPIs recalculados com sucesso para {len(accidents_by_period_user)} períodos!")
                     
                 except Exception as e:
                     st.error(f"Erro ao recalcular KPIs: {str(e)}")
