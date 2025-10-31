@@ -21,28 +21,39 @@ def fetch_kpi_data(user_email: Optional[str] = None,
     """Busca dados de KPI do Supabase"""
     try:
         from auth.auth_utils import get_user_id, is_admin
-        from managers.supabase_config import get_supabase_client, get_service_role_client
+        from managers.supabase_config import get_service_role_client
         
         user_id = get_user_id()
         if not user_id:
             return pd.DataFrame()
         
-        # Admin usa service_role para contornar RLS e ver todos os dados
-        if is_admin():
-            supabase = get_service_role_client()
-            query = supabase.table("kpi_monthly").select("*")
-            # Admin vê todos os dados sem filtro de created_by
-        else:
-            supabase = get_supabase_client()
-            query = supabase.table("kpi_monthly").select("*").eq("created_by", user_id)
+        # Usa service_role para contornar RLS e aplicar filtro de segurança no código
+        supabase = get_service_role_client()
+        
+        query = supabase.table("kpi_monthly").select("*")
+        
+        # Admin vê todos os dados sem filtro de created_by
+        if not is_admin():
+            # Usuário comum vê apenas seus próprios KPIs
+            query = query.eq("created_by", user_id)
         
         if start_date:
             query = query.gte("period", start_date)
         if end_date:
             query = query.lte("period", end_date)
             
-        data = query.order("period").execute().data
-        return pd.DataFrame(data) if data else pd.DataFrame()
+        response = query.order("period").execute()
+        
+        if response and hasattr(response, 'data'):
+            df = pd.DataFrame(response.data) if response.data else pd.DataFrame()
+            
+            # Validação adicional de segurança para usuários não-admin
+            if not is_admin() and not df.empty:
+                # Filtra novamente para garantir (segurança em camadas)
+                df = df[df['created_by'] == user_id]
+            
+            return df
+        return pd.DataFrame()
     except Exception as e:
         st.error(f"Erro ao buscar dados de KPI: {str(e)}")
         import traceback

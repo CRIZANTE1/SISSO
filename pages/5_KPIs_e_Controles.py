@@ -61,7 +61,7 @@ def app(filters=None):
     df = apply_filters_to_df(df, filters)
     
     # Tabs para diferentes análises
-    tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs(["📊 KPIs Básicos", "📈 Controles Estatísticos", "📊 Monitoramento de Tendências", "🔮 Previsões", "📋 Relatórios", "📚 Metodologia", "🔧 Configurações", "📖 Instruções"])
+    tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9 = st.tabs(["📊 KPIs Básicos", "📈 Controles Estatísticos", "📊 Monitoramento de Tendências", "🔮 Previsões", "📋 Relatórios", "📚 Metodologia", "🔧 Configurações", "🔄 Calcular KPIs", "📖 Instruções"])
     
     with tab1:
         st.subheader("KPIs Básicos de Segurança")
@@ -1283,6 +1283,169 @@ def app(filters=None):
             st.info("ℹ️ As configurações serão aplicadas na próxima análise.")
     
     with tab8:
+        st.subheader("🔄 Calcular KPIs")
+        
+        st.info("💡 **Importante**: Os KPIs precisam ser calculados manualmente através do botão abaixo.\n\n"
+                "📋 **Requisitos para calcular KPIs:**\n"
+                "1. Ter acidentes cadastrados na tabela `accidents`\n"
+                "2. Ter horas trabalhadas cadastradas na tabela `hours_worked_monthly`\n"
+                "3. Os dados devem estar no mesmo período (mês/ano) e vinculados ao seu usuário\n\n"
+                "**Como funciona:** O sistema agrupa acidentes e horas por período (mês) para seu usuário, "
+                "calcula as taxas de frequência e gravidade, e salva na tabela `kpi_monthly`.")
+        
+        # Verifica se há dados antes de permitir recalcular
+        try:
+            from managers.supabase_config import get_service_role_client
+            from auth.auth_utils import get_user_id
+            
+            supabase = get_service_role_client()
+            user_id = get_user_id()
+            
+            if not user_id:
+                st.error("❌ **Erro**: Usuário não autenticado. Faça login novamente.")
+            else:
+                # Filtra apenas dados do usuário logado
+                accidents_count = supabase.table("accidents").select("id", count="exact").eq("created_by", user_id).execute().count or 0
+                hours_count = supabase.table("hours_worked_monthly").select("id", count="exact").eq("created_by", user_id).execute().count or 0
+                kpis_count = supabase.table("kpi_monthly").select("id", count="exact").eq("created_by", user_id).execute().count or 0
+                
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    st.metric("Meus Acidentes", accidents_count)
+                with col2:
+                    st.metric("Meus Registros de Horas", hours_count)
+                with col3:
+                    st.metric("Meus KPIs Calculados", kpis_count)
+                
+                if accidents_count == 0 and hours_count == 0:
+                    st.warning("⚠️ **Nenhum dado encontrado**: Cadastre acidentes e/ou horas trabalhadas primeiro!")
+                elif accidents_count == 0:
+                    st.warning("⚠️ **Sem acidentes**: Cadastre acidentes para calcular KPIs!")
+                elif hours_count == 0:
+                    st.warning("⚠️ **Sem horas trabalhadas**: Cadastre horas trabalhadas para calcular KPIs!")
+                elif kpis_count == 0:
+                    st.info("ℹ️ **KPIs não calculados**: Clique no botão abaixo para calcular os KPIs baseados nos seus dados existentes.")
+                else:
+                    st.success(f"✅ **KPIs já calculados**: Existem {kpis_count} registros de KPI calculados para seus dados.")
+        except Exception as e:
+            st.error(f"Erro ao verificar dados: {str(e)}")
+        
+        if st.button("🔄 Calcular Meus KPIs", type="primary", key="btn_calculate_my_kpis"):
+            with st.spinner("Calculando seus KPIs..."):
+                try:
+                    from services.kpi import calculate_frequency_rate, calculate_severity_rate
+                    from managers.supabase_config import get_service_role_client
+                    from auth.auth_utils import get_user_id
+                    from collections import defaultdict
+                    
+                    supabase = get_service_role_client()
+                    user_id = get_user_id()
+                    
+                    if not user_id:
+                        st.error("❌ Usuário não autenticado.")
+                        return
+                    
+                    # Busca apenas dados do usuário logado
+                    accidents_response = supabase.table("accidents").select(
+                        "id, occurred_at, created_by, lost_days, type"
+                    ).eq("created_by", user_id).execute()
+                    
+                    hours_response = supabase.table("hours_worked_monthly").select(
+                        "id, year, month, hours, created_by"
+                    ).eq("created_by", user_id).execute()
+                    
+                    accidents_data = accidents_response.data if accidents_response and hasattr(accidents_response, 'data') else []
+                    hours_data = hours_response.data if hours_response and hasattr(hours_response, 'data') else []
+                    
+                    # Agrupa acidentes por mês
+                    accidents_by_period = defaultdict(lambda: {'count': 0, 'fatalities': 0, 'lost_days': 0})
+                    
+                    for accident in accidents_data:
+                        period = pd.to_datetime(accident['occurred_at']).strftime('%Y-%m')
+                        accidents_by_period[period]['count'] += 1
+                        if accident.get('type') == 'fatal':
+                            accidents_by_period[period]['fatalities'] += 1
+                        accidents_by_period[period]['lost_days'] += int(accident.get('lost_days', 0))
+                    
+                    # Agrupa horas por mês
+                    hours_by_period = defaultdict(lambda: 0)
+                    
+                    for hour_entry in hours_data:
+                        period = f"{hour_entry['year']}-{str(hour_entry['month']).zfill(2)}"
+                        hours_by_period[period] += float(hour_entry.get('hours', 0))
+                    
+                    # Calcula KPIs mensais do usuário
+                    kpi_count = 0
+                    for period, acc_data in accidents_by_period.items():
+                        if period in hours_by_period:
+                            hours = hours_by_period[period]
+                            
+                            # Calcular dias debitados para acidentes fatais (NBR 14280)
+                            debited_days = acc_data['fatalities'] * 6000  # 6.000 dias por morte
+                            
+                            # Calcula taxas
+                            freq_rate = calculate_frequency_rate(acc_data['count'], hours)
+                            sev_rate = calculate_severity_rate(acc_data['lost_days'], hours, debited_days)
+                            
+                            # Verifica se já existe KPI para este período e usuário
+                            existing_kpi = supabase.table("kpi_monthly").select("id").eq("period", f"{period}-01").eq("created_by", user_id).execute()
+                            
+                            kpi_data = {
+                                "period": f"{period}-01",
+                                "created_by": user_id,  # UUID do usuário
+                                "accidents_total": acc_data['count'],
+                                "fatalities": acc_data['fatalities'],
+                                "lost_days_total": acc_data['lost_days'],
+                                "hours": hours / 100,  # Armazena como centenas (176 representa 17.600 horas)
+                                "frequency_rate": freq_rate,
+                                "severity_rate": sev_rate,
+                                "debited_days": debited_days
+                            }
+                            
+                            if existing_kpi.data:
+                                # Atualiza existente
+                                supabase.table("kpi_monthly").update(kpi_data).eq("period", f"{period}-01").eq("created_by", user_id).execute()
+                                kpi_count += 1
+                            else:
+                                # Insere novo
+                                supabase.table("kpi_monthly").insert(kpi_data).execute()
+                                kpi_count += 1
+                    
+                    # Processa horas sem acidentes (cria KPIs com zero acidentes)
+                    for period, hours in hours_by_period.items():
+                        if period not in accidents_by_period:
+                            # Verifica se já existe KPI para este período e usuário
+                            existing_kpi = supabase.table("kpi_monthly").select("id").eq("period", f"{period}-01").eq("created_by", user_id).execute()
+                            
+                            if not existing_kpi.data:
+                                kpi_data = {
+                                    "period": f"{period}-01",
+                                    "created_by": user_id,
+                                    "accidents_total": 0,
+                                    "fatalities": 0,
+                                    "lost_days_total": 0,
+                                    "hours": hours / 100,
+                                    "frequency_rate": 0,
+                                    "severity_rate": 0,
+                                    "debited_days": 0
+                                }
+                                supabase.table("kpi_monthly").insert(kpi_data).execute()
+                                kpi_count += 1
+                    
+                    st.success(f"✅ Seus KPIs foram calculados com sucesso!\n\n"
+                              f"📊 **Resumo:**\n"
+                              f"- Períodos com acidentes processados: {len(accidents_by_period)}\n"
+                              f"- Períodos com horas (sem acidentes) processados: {len([p for p in hours_by_period.keys() if p not in accidents_by_period])}\n"
+                              f"- **Total de KPIs calculados/atualizados: {kpi_count}**\n\n"
+                              f"💡 **Dica**: Atualize os KPIs sempre que cadastrar novos acidentes ou horas trabalhadas.")
+                    st.rerun()
+                    
+                except Exception as e:
+                    st.error(f"Erro ao calcular KPIs: {str(e)}")
+                    import traceback
+                    st.code(traceback.format_exc())
+    
+    with tab9:
         # Importa e exibe instruções
         from components.instructions import create_instructions_page, get_kpis_instructions
         
