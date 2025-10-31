@@ -4,6 +4,7 @@ Permite que usuários registrem feedbacks sobre o sistema
 """
 import streamlit as st
 from datetime import datetime
+from typing import Optional
 from auth.auth_utils import require_login, is_admin, get_user_id, get_user_email
 from services.feedbacks import (
     get_user_feedbacks, 
