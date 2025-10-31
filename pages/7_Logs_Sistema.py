@@ -38,8 +38,9 @@ def app(filters=None):
     logger = get_logger()
     
     # Tabs para diferentes funcionalidades
-    tab1, tab2, tab3, tab4 = st.tabs([
+    tab1, tab2, tab3, tab4, tab5 = st.tabs([
         "📊 Logs Recentes",
+        "👥 Logs de Ações",
         "🔍 Filtros de Log",
         "🔧 Status do Sistema", 
         "📋 Informações Técnicas"
@@ -99,6 +100,160 @@ def app(filters=None):
             st.info("Nenhum log disponível no momento.")
     
     with tab2:
+        st.subheader("Logs de Ações dos Usuários")
+        st.info("📋 Esta seção exibe logs temporários de ações realizadas pelos usuários no sistema")
+        
+        from services.user_logs import get_all_logs, cleanup_expired_logs, get_log_statistics
+        from datetime import datetime, timedelta
+        import pandas as pd
+        
+        col1, col2, col3, col4 = st.columns(4)
+        
+        with col1:
+            days_back = st.selectbox("Últimos dias", [7, 15, 30, 60, 90], index=2)
+        
+        with col2:
+            action_filter = st.selectbox(
+                "Tipo de ação",
+                ["Todos", "create", "update", "delete", "view", "export", "import", "other"],
+                index=0
+            )
+        
+        with col3:
+            entity_filter = st.selectbox(
+                "Tipo de entidade",
+                ["Todos", "accident", "near_miss", "nonconformity", "action", "feedback", "profile"],
+                index=0
+            )
+        
+        with col4:
+            limit = st.selectbox("Limite", [50, 100, 200, 500], index=1)
+        
+        # Botões de ação
+        col_btn1, col_btn2 = st.columns(2)
+        
+        with col_btn1:
+            if st.button("🔄 Atualizar", type="primary"):
+                st.rerun()
+        
+        with col_btn2:
+            if st.button("🧹 Limpar Logs Expirados"):
+                with st.spinner("Limpando logs expirados..."):
+                    deleted = cleanup_expired_logs()
+                    if deleted > 0:
+                        st.success(f"✅ {deleted} logs expirados foram removidos!")
+                        st.rerun()
+                    else:
+                        st.info("Nenhum log expirado encontrado.")
+        
+        # Busca logs
+        start_date = datetime.now() - timedelta(days=days_back)
+        end_date = datetime.now()
+        
+        action_type = None if action_filter == "Todos" else action_filter
+        entity_type = None if entity_filter == "Todos" else entity_filter
+        
+        with st.spinner("Carregando logs de ações..."):
+            logs = get_all_logs(
+                start_date=start_date,
+                end_date=end_date,
+                action_type=action_type,
+                entity_type=entity_type,
+                limit=limit
+            )
+        
+        if logs:
+            st.success(f"✅ {len(logs)} logs encontrados")
+            
+            # Estatísticas
+            st.subheader("📊 Estatísticas")
+            stats = get_log_statistics()
+            
+            if stats:
+                col_stat1, col_stat2, col_stat3 = st.columns(3)
+                
+                with col_stat1:
+                    st.metric("Total de Logs", stats.get("total", 0))
+                
+                with col_stat2:
+                    if stats.get("por_action_type"):
+                        most_common_action = max(stats["por_action_type"].items(), key=lambda x: x[1])
+                        st.metric("Ação Mais Comum", f"{most_common_action[0]} ({most_common_action[1]})")
+                
+                with col_stat3:
+                    if stats.get("por_entity_type"):
+                        most_common_entity = max(stats["por_entity_type"].items(), key=lambda x: x[1])
+                        st.metric("Entidade Mais Comum", f"{most_common_entity[0]} ({most_common_entity[1]})")
+            
+            # Tabela de logs
+            st.subheader("📋 Lista de Logs")
+            
+            # Prepara dados para exibição
+            logs_data = []
+            for log in logs:
+                logs_data.append({
+                    "Data/Hora": pd.to_datetime(log.get("created_at", "")).strftime("%d/%m/%Y %H:%M:%S") if log.get("created_at") else "N/A",
+                    "Ação": log.get("action_type", "N/A"),
+                    "Entidade": log.get("entity_type", "N/A"),
+                    "Descrição": log.get("description", "")[:100] + "..." if len(log.get("description", "")) > 100 else log.get("description", "N/A"),
+                    "Usuário": log.get("user_id", "N/A")[:8] + "..." if log.get("user_id") else "N/A",
+                    "ID Entidade": log.get("entity_id", "N/A")[:8] + "..." if log.get("entity_id") else "N/A"
+                })
+            
+            if logs_data:
+                df_logs = pd.DataFrame(logs_data)
+                st.dataframe(df_logs, use_container_width=True, hide_index=True)
+            
+            # Detalhes de cada log
+            st.subheader("🔍 Detalhes dos Logs")
+            
+            for log in logs[:20]:  # Mostra apenas os últimos 20 para performance
+                action_icon = {
+                    "create": "➕",
+                    "update": "✏️",
+                    "delete": "🗑️",
+                    "view": "👁️",
+                    "export": "📥",
+                    "import": "📤",
+                    "login": "🔐",
+                    "logout": "🚪",
+                    "other": "📝"
+                }.get(log.get("action_type", "other"), "📝")
+                
+                with st.expander(
+                    f"{action_icon} {log.get('action_type', 'N/A').upper()} - {log.get('entity_type', 'N/A')} - "
+                    f"{pd.to_datetime(log.get('created_at', '')).strftime('%d/%m/%Y %H:%M') if log.get('created_at') else 'N/A'}"
+                ):
+                    col_detail1, col_detail2 = st.columns(2)
+                    
+                    with col_detail1:
+                        st.markdown(f"**Data/Hora:** {pd.to_datetime(log.get('created_at', '')).strftime('%d/%m/%Y %H:%M:%S') if log.get('created_at') else 'N/A'}")
+                        st.markdown(f"**Tipo de Ação:** {log.get('action_type', 'N/A')}")
+                        st.markdown(f"**Tipo de Entidade:** {log.get('entity_type', 'N/A')}")
+                        st.markdown(f"**ID da Entidade:** {log.get('entity_id', 'N/A')}")
+                        st.markdown(f"**Usuário (ID):** {log.get('user_id', 'N/A')}")
+                    
+                    with col_detail2:
+                        if log.get("ip_address"):
+                            st.markdown(f"**IP Address:** {log.get('ip_address')}")
+                        if log.get("user_agent"):
+                            st.markdown(f"**User Agent:** {log.get('user_agent')[:100]}...")
+                        if log.get("expires_at"):
+                            expires = pd.to_datetime(log.get("expires_at", ""))
+                            if expires < datetime.now():
+                                st.warning(f"**Expira em:** {expires.strftime('%d/%m/%Y %H:%M')} (EXPIRADO)")
+                            else:
+                                st.info(f"**Expira em:** {expires.strftime('%d/%m/%Y %H:%M')}")
+                    
+                    st.markdown(f"**Descrição:** {log.get('description', 'N/A')}")
+                    
+                    if log.get("metadata"):
+                        st.markdown("**Metadata:**")
+                        st.json(log.get("metadata"))
+        else:
+            st.info("📭 Nenhum log de ação encontrado com os filtros selecionados.")
+    
+    with tab3:
         st.subheader("Filtros de Log")
         
         col1, col2 = st.columns(2)

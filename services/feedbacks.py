@@ -68,6 +68,20 @@ def create_feedback(feedback_data: Dict) -> bool:
         
         if result.data:
             st.success("✅ Feedback registrado com sucesso! Obrigado pela sua contribuição.")
+            
+            # Registra log da ação
+            try:
+                from services.user_logs import log_action
+                log_action(
+                    action_type="create",
+                    entity_type="feedback",
+                    description=f"Feedback criado: {feedback_data.get('title', '')[:100]}...",
+                    entity_id=result.data[0].get('id'),
+                    metadata={"type": feedback_data.get('type'), "priority": feedback_data.get('priority')}
+                )
+            except:
+                pass  # Não interrompe o fluxo se houver erro no log
+            
             return True
         else:
             st.error("Erro ao criar feedback")

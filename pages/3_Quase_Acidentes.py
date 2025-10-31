@@ -463,6 +463,19 @@ def app(filters=None):
                             near_miss_id = result.data[0]['id']
                             st.success("✅ Quase-acidente registrado com sucesso!")
                             
+                            # Registra log da ação
+                            try:
+                                from services.user_logs import log_action
+                                log_action(
+                                    action_type="create",
+                                    entity_type="near_miss",
+                                    description=f"Quase-acidente criado: {description[:100]}...",
+                                    entity_id=near_miss_id,
+                                    metadata={"potential_severity": potential_severity, "status": status}
+                                )
+                            except:
+                                pass  # Não interrompe o fluxo se houver erro no log
+                            
                             # Upload de evidências
                             if uploaded_files:
                                 for uploaded_file in uploaded_files:

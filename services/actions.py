@@ -44,6 +44,19 @@ def create_action(action_data: Dict) -> bool:
         result = supabase.table("actions").insert(action_data).execute()
         
         if result.data:
+            # Registra log da ação
+            try:
+                from services.user_logs import log_action
+                log_action(
+                    action_type="create",
+                    entity_type="action",
+                    description=f"Ação corretiva criada: {action_data.get('what', '')[:100]}...",
+                    entity_id=result.data[0].get('id'),
+                    metadata={"entity_type": action_data.get('entity_type'), "status": action_data.get('status')}
+                )
+            except:
+                pass  # Não interrompe o fluxo se houver erro no log
+            
             return True
         else:
             st.error("Erro ao criar ação corretiva")

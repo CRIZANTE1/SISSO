@@ -1010,6 +1010,19 @@ def app(filters=None):
                             accident_id = result.data[0]['id']
                             st.success("✅ Acidente registrado com sucesso!")
                             
+                            # Registra log da ação
+                            try:
+                                from services.user_logs import log_action
+                                log_action(
+                                    action_type="create",
+                                    entity_type="accident",
+                                    description=f"Acidente criado: {description[:100]}...",
+                                    entity_id=accident_id,
+                                    metadata={"type": accident_type, "status": status, "lost_days": lost_days}
+                                )
+                            except:
+                                pass  # Não interrompe o fluxo se houver erro no log
+                            
                             # Upload de evidências
                             if uploaded_files:
                                 for uploaded_file in uploaded_files:

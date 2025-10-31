@@ -583,6 +583,19 @@ def app(filters=None):
                             nc_id = result.data[0]['id']
                             st.success("✅ Não conformidade registrada com sucesso!")
                             
+                            # Registra log da ação
+                            try:
+                                from services.user_logs import log_action
+                                log_action(
+                                    action_type="create",
+                                    entity_type="nonconformity",
+                                    description=f"Não conformidade criada: {description[:100]}...",
+                                    entity_id=nc_id,
+                                    metadata={"severity": severity, "status": status}
+                                )
+                            except:
+                                pass  # Não interrompe o fluxo se houver erro no log
+                            
                             # Upload de evidências
                             if uploaded_files:
                                 for uploaded_file in uploaded_files:
