@@ -11,11 +11,16 @@ from managers.supabase_config import get_supabase_client
 def fetch_nonconformities(start_date=None, end_date=None):
     """Busca dados de não conformidades - filtra por usuário logado"""
     try:
-        from auth.auth_utils import get_user_id, is_admin
+        from managers.supabase_config import get_service_role_client
+        from auth.auth_utils import get_user_id, is_admin, get_user_email
         supabase = get_supabase_client()
         
         user_id = get_user_id()
+        user_email = get_user_email()
+        
+        # Debug: mostra informações do usuário
         if not user_id:
+            st.warning("⚠️ Usuário não autenticado ou UUID não encontrado na sessão.")
             return pd.DataFrame()
         
         query = supabase.table("nonconformities").select("*")
@@ -23,9 +28,39 @@ def fetch_nonconformities(start_date=None, end_date=None):
         # Filtra por usuário logado, exceto se for admin
         if not is_admin():
             query = query.eq("created_by", user_id)
+        # Se for admin, mostra todas as não conformidades
         
-        data = query.order("occurred_at", desc=True).execute().data
-        df = pd.DataFrame(data)
+        if start_date:
+            query = query.gte("occurred_at", start_date.isoformat())
+        if end_date:
+            query = query.lte("occurred_at", end_date.isoformat())
+        
+        response = query.order("occurred_at", desc=True).execute()
+        
+        # Debug: verifica se encontrou dados
+        if response and hasattr(response, 'data'):
+            df = pd.DataFrame(response.data) if response.data else pd.DataFrame()
+            
+            # Se não encontrou dados, mostra informação de debug
+            if df.empty:
+                # Verifica se há não conformidades no banco (usando service_role para debug)
+                try:
+                    debug_supabase = get_service_role_client()
+                    debug_count = debug_supabase.table("nonconformities").select("id", count="exact").eq("created_by", user_id).execute()
+                    total_count = debug_supabase.table("nonconformities").select("id", count="exact").execute()
+                    
+                    if hasattr(debug_count, 'count') and debug_count.count == 0:
+                        st.info(f"ℹ️ **Debug**: Nenhuma não conformidade encontrada para o usuário UUID `{user_id}` (email: {user_email}).\n"
+                               f"Os dados fictícios foram criados para o perfil UUID `d88fd010-c11f-4e0a-9491-7a13f5577e8f`.\n"
+                               f"Verifique se você está logado com o email correto (`bboycrysforever@gmail.com`).")
+                    elif hasattr(total_count, 'count'):
+                        st.info(f"ℹ️ **Debug**: Total de não conformidades no banco: {total_count.count}, "
+                               f"mas nenhuma encontrada para seu UUID `{user_id}`.\n"
+                               f"Verifique se você está logado com o email correto.")
+                except:
+                    pass  # Ignora erros de debug
+        else:
+            df = pd.DataFrame()
 
         # Normalizações para UI
         if not df.empty:
@@ -162,12 +197,18 @@ def app(filters=None):
                     df = pd.DataFrame()
         
         if df.empty:
-            st.warning("Nenhuma não conformidade encontrada.")
-            # Mostra informações para debug
-            st.info("ℹ️ **Dica de debug:**")
-            st.write("- Verifique se a tabela 'nonconformities' existe no banco de dados")
-            st.write("- Verifique se há registros na tabela")
-            st.write("- Confirme que o Supabase está configurado corretamente")
+            # Verifica se é problema de autenticação ou realmente não há dados
+            from auth.auth_utils import get_user_id, get_user_email
+            user_id = get_user_id()
+            user_email = get_user_email()
+            
+            if not user_id:
+                st.error("❌ **Erro**: Usuário não autenticado. Faça login novamente.")
+            else:
+                st.warning("Nenhuma não conformidade encontrada.")
+                st.info(f"ℹ️ **Dica**: Você está logado como `{user_email}` (UUID: `{user_id}`).\n"
+                       f"Os dados fictícios foram criados para o perfil com email `bboycrysforever@gmail.com` (UUID: `d88fd010-c11f-4e0a-9491-7a13f5577e8f`).\n"
+                       f"Certifique-se de estar logado com o email correto para ver os dados fictícios.")
         else:
             # Mostra informações sobre os dados encontrados
             st.success(f"📊 **{len(df)} não conformidade(s) encontrada(s)**")

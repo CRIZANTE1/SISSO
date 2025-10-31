@@ -11,12 +11,16 @@ from managers.supabase_config import get_supabase_client
 def fetch_near_misses(start_date=None, end_date=None):
     """Busca dados de quase-acidentes - filtra por usuário logado"""
     try:
-        from managers.supabase_config import get_supabase_client
-        from auth.auth_utils import get_user_id, is_admin
+        from managers.supabase_config import get_supabase_client, get_service_role_client
+        from auth.auth_utils import get_user_id, is_admin, get_user_email
         supabase = get_supabase_client()
         
         user_id = get_user_id()
+        user_email = get_user_email()
+        
+        # Debug: mostra informações do usuário
         if not user_id:
+            st.warning("⚠️ Usuário não autenticado ou UUID não encontrado na sessão.")
             return pd.DataFrame()
         
         query = supabase.table("near_misses").select("*")
@@ -24,16 +28,44 @@ def fetch_near_misses(start_date=None, end_date=None):
         # Filtra por usuário logado, exceto se for admin
         if not is_admin():
             query = query.eq("created_by", user_id)
+        # Se for admin, mostra todos os quase-acidentes
         
         if start_date:
             query = query.gte("occurred_at", start_date.isoformat())
         if end_date:
             query = query.lte("occurred_at", end_date.isoformat())
             
-        data = query.order("occurred_at", desc=True).execute().data
-        return pd.DataFrame(data)
+        response = query.order("occurred_at", desc=True).execute()
+        
+        # Debug: verifica se encontrou dados
+        if response and hasattr(response, 'data'):
+            df = pd.DataFrame(response.data) if response.data else pd.DataFrame()
+            
+            # Se não encontrou dados, mostra informação de debug
+            if df.empty:
+                # Verifica se há quase-acidentes no banco (usando service_role para debug)
+                try:
+                    debug_supabase = get_service_role_client()
+                    debug_count = debug_supabase.table("near_misses").select("id", count="exact").eq("created_by", user_id).execute()
+                    total_count = debug_supabase.table("near_misses").select("id", count="exact").execute()
+                    
+                    if hasattr(debug_count, 'count') and debug_count.count == 0:
+                        st.info(f"ℹ️ **Debug**: Nenhum quase-acidente encontrado para o usuário UUID `{user_id}` (email: {user_email}).\n"
+                               f"Os dados fictícios foram criados para o perfil UUID `d88fd010-c11f-4e0a-9491-7a13f5577e8f`.\n"
+                               f"Verifique se você está logado com o email correto (`bboycrysforever@gmail.com`).")
+                    elif hasattr(total_count, 'count'):
+                        st.info(f"ℹ️ **Debug**: Total de quase-acidentes no banco: {total_count.count}, "
+                               f"mas nenhum encontrado para seu UUID `{user_id}`.\n"
+                               f"Verifique se você está logado com o email correto.")
+                except:
+                    pass  # Ignora erros de debug
+            
+            return df
+        return pd.DataFrame()
     except Exception as e:
         st.error(f"Erro ao buscar quase-acidentes: {str(e)}")
+        import traceback
+        st.code(traceback.format_exc())
         return pd.DataFrame()
 
 def app(filters=None):
@@ -86,7 +118,18 @@ def app(filters=None):
             )
         
         if df.empty:
-            st.warning("Nenhum quase-acidente encontrado com os filtros aplicados.")
+            # Verifica se é problema de autenticação ou realmente não há dados
+            from auth.auth_utils import get_user_id, get_user_email
+            user_id = get_user_id()
+            user_email = get_user_email()
+            
+            if not user_id:
+                st.error("❌ **Erro**: Usuário não autenticado. Faça login novamente.")
+            else:
+                st.warning("Nenhum quase-acidente encontrado com os filtros aplicados.")
+                st.info(f"ℹ️ **Dica**: Você está logado como `{user_email}` (UUID: `{user_id}`).\n"
+                       f"Os dados fictícios foram criados para o perfil com email `bboycrysforever@gmail.com` (UUID: `d88fd010-c11f-4e0a-9491-7a13f5577e8f`).\n"
+                       f"Certifique-se de estar logado com o email correto para ver os dados fictícios.")
         else:
             # Aplica filtros adicionais
             df = apply_filters_to_df(df, filters)
