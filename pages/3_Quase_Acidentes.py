@@ -16,9 +16,7 @@ def fetch_near_misses(start_date=None, end_date=None):
         user_id = get_user_id()
         user_email = get_user_email()
         
-        # Debug: mostra informações do usuário
         if not user_id:
-            st.warning("⚠️ Usuário não autenticado ou UUID não encontrado na sessão.")
             return pd.DataFrame()
         
         # Admin usa service_role para contornar RLS e ver todos os dados
@@ -43,39 +41,8 @@ def fetch_near_misses(start_date=None, end_date=None):
             
         response = query.order("occurred_at", desc=True).execute()
         
-        # Debug: verifica se encontrou dados
         if response and hasattr(response, 'data'):
             df = pd.DataFrame(response.data) if response.data else pd.DataFrame()
-            
-            # Se não encontrou dados, mostra informação de debug
-            if df.empty:
-                # Verifica se há quase-acidentes no banco (usando service_role para debug)
-                try:
-                    debug_supabase = get_service_role_client()
-                    total_count = debug_supabase.table("near_misses").select("id", count="exact").execute()
-                    
-                    if is_admin():
-                        # Admin deveria ver todos os dados
-                        if hasattr(total_count, 'count') and total_count.count > 0:
-                            st.warning(f"⚠️ **Admin**: Existem {total_count.count} quase-acidente(s) no banco, mas nenhum foi retornado.\n"
-                                      f"Isso pode indicar um problema com RLS (Row Level Security) ou com a query.\n"
-                                      f"Tente usar Service Role para visualizar todos os dados.")
-                        else:
-                            st.info(f"ℹ️ **Admin**: Não há quase-acidentes no banco de dados.")
-                    else:
-                        # Usuário comum
-                        debug_count = debug_supabase.table("near_misses").select("id", count="exact").eq("created_by", user_id).execute()
-                        if hasattr(debug_count, 'count') and debug_count.count == 0:
-                            st.info(f"ℹ️ **Debug**: Nenhum quase-acidente encontrado para o usuário UUID `{user_id}` (email: {user_email}).\n"
-                                   f"Os dados fictícios foram criados para o perfil UUID `d88fd010-c11f-4e0a-9491-7a13f5577e8f`.\n"
-                                   f"Verifique se você está logado com o email correto (`bboycrysforever@gmail.com`).")
-                        elif hasattr(total_count, 'count'):
-                            st.info(f"ℹ️ **Debug**: Total de quase-acidentes no banco: {total_count.count}, "
-                                   f"mas nenhum encontrado para seu UUID `{user_id}`.\n"
-                                   f"Verifique se você está logado com o email correto.")
-                except Exception as debug_error:
-                    st.error(f"Erro no debug: {debug_error}")
-            
             return df
         return pd.DataFrame()
     except Exception as e:
@@ -147,9 +114,6 @@ def app(filters=None):
                 st.error("❌ **Erro**: Usuário não autenticado. Faça login novamente.")
             else:
                 st.warning("Nenhum quase-acidente encontrado com os filtros aplicados.")
-                st.info(f"ℹ️ **Dica**: Você está logado como `{user_email}` (UUID: `{user_id}`).\n"
-                       f"Os dados fictícios foram criados para o perfil com email `bboycrysforever@gmail.com` (UUID: `d88fd010-c11f-4e0a-9491-7a13f5577e8f`).\n"
-                       f"Certifique-se de estar logado com o email correto para ver os dados fictícios.")
         else:
             # Aplica filtros adicionais
             df = apply_filters_to_df(df, filters)
