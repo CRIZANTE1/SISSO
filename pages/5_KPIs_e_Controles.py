@@ -121,27 +121,27 @@ def app(filters=None):
             iso_metrics = kpi_summary.get('iso_compliance_metrics', {})
             if iso_metrics:
                 with st.expander("📊 Conformidade ISO 45001:2018", expanded=False):
-                col1, col2 = st.columns(2)
-                
-                with col1:
-                    cont_improve = iso_metrics.get('continuous_improvement', {})
-                    if cont_improve:
-                        is_improving = cont_improve.get('is_improving', False)
-                        st.metric(
-                            "Melhoria Contínua",
-                            "✅ Em Progresso" if is_improving else "⚠️ Necessária",
-                            delta="Tendência de KPIs" if is_improving else "Ações requeridas"
-                        )
-                
-                with col2:
-                    monitoring = iso_metrics.get('monitoring_compliance', {})
-                    if monitoring:
-                        quality_score = monitoring.get('data_quality_score', 0)
-                        st.metric(
-                            "Qualidade dos Dados",
-                            f"{quality_score:.0f}%",
-                            delta="Conformidade com cláusula 9.1"
-                        )
+                    col1, col2 = st.columns(2)
+                    
+                    with col1:
+                        cont_improve = iso_metrics.get('continuous_improvement', {})
+                        if cont_improve:
+                            is_improving = cont_improve.get('is_improving', False)
+                            st.metric(
+                                "Melhoria Contínua",
+                                "✅ Em Progresso" if is_improving else "⚠️ Necessária",
+                                delta="Tendência de KPIs" if is_improving else "Ações requeridas"
+                            )
+                    
+                    with col2:
+                        monitoring = iso_metrics.get('monitoring_compliance', {})
+                        if monitoring:
+                            quality_score = monitoring.get('data_quality_score', 0)
+                            st.metric(
+                                "Qualidade dos Dados",
+                                f"{quality_score:.0f}%",
+                                delta="Conformidade com cláusula 9.1"
+                            )
             
             # ✅ NOVO: Mostrar análise de tendências NBR 14280
             trend_analysis = kpi_summary.get('accident_trend_analysis', {})
