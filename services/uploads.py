@@ -155,7 +155,9 @@ def import_accidents_csv(df: pd.DataFrame, site_mapping: Dict[str, str]) -> bool
     """Importa dados de acidentes de CSV"""
     try:
         from auth.auth_utils import get_user_id
-        supabase = get_supabase_client()
+        from managers.supabase_config import get_service_role_client
+        # Usa service_role para contornar RLS ao importar acidentes
+        supabase = get_service_role_client()
         
         # Valida colunas necessárias (alinhado com estrutura real)
         required_cols = ['occurred_at', 'type', 'description']

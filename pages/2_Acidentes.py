@@ -996,9 +996,10 @@ def app(filters=None):
                     st.error("Descrição é obrigatória.")
                 else:
                     try:
-                        from managers.supabase_config import get_supabase_client
+                        from managers.supabase_config import get_service_role_client
                         from auth.auth_utils import get_user_id
-                        supabase = get_supabase_client()
+                        # Usa service_role para contornar RLS ao inserir acidente
+                        supabase = get_service_role_client()
                         
                         user_id = get_user_id()
                         if not user_id:
