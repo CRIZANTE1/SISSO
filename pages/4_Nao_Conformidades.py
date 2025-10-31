@@ -139,50 +139,12 @@ def app(filters=None):
                 "- Acesse **Conta → Feedbacks** no menu para reportar ou sugerir melhorias!"
             )
         
-        # Busca dados de forma independente - FORÇANDO a busca de TODOS os registros
+        # Busca dados usando a função que respeita isolamento por usuário
         with st.spinner("Carregando dados de não conformidades..."):
-            # Usamos o service role client para garantir acesso a todos os dados
-            from managers.supabase_config import get_service_role_client
-            try:
-                supabase = get_service_role_client()
-                
-                # Busca todos os registros sem filtros
-                response = supabase.table("nonconformities").select("*").order("occurred_at", desc=True).execute()
-                
-                if response and hasattr(response, 'data') and response.data:
-                    df = pd.DataFrame(response.data)
-                    st.info(f"✅ Dados carregados: {len(response.data)} registros encontrados")
-                else:
-                    df = pd.DataFrame()
-                    st.warning("⚠️ Nenhum registro encontrado na tabela")
-                
-                # Aplica filtros de data apenas se necessário
-                if not df.empty:
-                    if filters and filters.get("start_date"):
-                        df['occurred_at'] = pd.to_datetime(df['occurred_at'], errors='coerce')
-                        df = df[df['occurred_at'] >= pd.to_datetime(filters["start_date"])]
-                    
-                    if filters and filters.get("end_date"):
-                        df['occurred_at'] = pd.to_datetime(df['occurred_at'], errors='coerce')
-                        df = df[df['occurred_at'] <= pd.to_datetime(filters["end_date"])]
-                
-            except Exception as e:
-                st.error(f"Erro ao buscar dados: {str(e)}")
-                st.error("Tentando com cliente anônimo...")
-                try:
-                    # Tenta com cliente anônimo como fallback
-                    supabase = get_supabase_client()
-                    response = supabase.table("nonconformities").select("*").order("occurred_at", desc=True).execute()
-                    
-                    if response and hasattr(response, 'data') and response.data:
-                        df = pd.DataFrame(response.data)
-                        st.info(f"✅ Dados carregados com cliente anônimo: {len(response.data)} registros encontrados")
-                    else:
-                        df = pd.DataFrame()
-                        
-                except Exception as e2:
-                    st.error(f"Erro com cliente anônimo também: {str(e2)}")
-                    df = pd.DataFrame()
+            df = fetch_nonconformities(
+                start_date=filters.get("start_date") if filters else None,
+                end_date=filters.get("end_date") if filters else None
+            )
         
         if df.empty:
             # Verifica se é problema de autenticação ou realmente não há dados
@@ -398,11 +360,6 @@ def app(filters=None):
                 st.dataframe(filtered_df, width='stretch', hide_index=True)
         else:
             st.info("Nenhuma não conformidade encontrada.")
-            # Mostra informações para debug
-            st.info("ℹ️ **Dica de debug:**")
-            st.write("- Verifique se a tabela 'nonconformities' existe no banco de dados")
-            st.write("- Verifique as configurações de acesso ao Supabase")
-            st.write("- Confirme que os dados foram inseridos corretamente")
     
     with tab3:
         st.subheader("Evidências das Não Conformidades")
