@@ -107,39 +107,38 @@ def delete_attachment(attachment_id: str) -> bool:
 def import_hours_csv(df: pd.DataFrame, site_mapping: Dict[str, str]) -> bool:
     """Importa dados de horas trabalhadas de CSV"""
     try:
+        from auth.auth_utils import get_user_id
         supabase = get_supabase_client()
         
-        # Valida colunas necessárias
-        required_cols = ['site_code', 'year', 'month', 'hours']
+        # Valida colunas necessárias (site_id removido da tabela)
+        required_cols = ['year', 'month', 'hours']
         missing_cols = [col for col in required_cols if col not in df.columns]
         if missing_cols:
             st.error(f"Colunas obrigatórias ausentes: {missing_cols}")
             return False
         
-        # Prepara dados para inserção
+        user_id = get_user_id()
+        if not user_id:
+            st.error("Usuário não autenticado")
+            return False
+        
+        # Prepara dados para inserção (alinhado com estrutura real)
         hours_rows = []
         for _, row in df.iterrows():
-            site_code = row['site_code']
-            if site_code not in site_mapping:
-                st.warning(f"Site {site_code} não encontrado no mapeamento")
-                continue
-                
             hours_rows.append({
-                "site_id": site_mapping[site_code],
                 "year": int(row['year']),
                 "month": int(row['month']),
                 "hours": float(row['hours']),
+                "created_by": user_id
             })
+            # site_id removido - não existe na tabela hours_worked_monthly
         
         if not hours_rows:
             st.error("Nenhum dado válido para importar")
             return False
         
-        # Upsert no banco
-        result = supabase.table("hours_worked_monthly").upsert(
-            hours_rows, 
-            on_conflict="site_id,year,month"
-        ).execute()
+        # Insere no banco (não há unique constraint para upsert)
+        result = supabase.table("hours_worked_monthly").insert(hours_rows).execute()
         
         if result.data:
             st.success(f"✅ {len(hours_rows)} registros de horas importados com sucesso!")
@@ -155,32 +154,48 @@ def import_hours_csv(df: pd.DataFrame, site_mapping: Dict[str, str]) -> bool:
 def import_accidents_csv(df: pd.DataFrame, site_mapping: Dict[str, str]) -> bool:
     """Importa dados de acidentes de CSV"""
     try:
+        from auth.auth_utils import get_user_id
         supabase = get_supabase_client()
         
-        # Valida colunas necessárias
-        required_cols = ['site_code', 'date', 'severity', 'description']
+        # Valida colunas necessárias (alinhado com estrutura real)
+        required_cols = ['occurred_at', 'type', 'description']
         missing_cols = [col for col in required_cols if col not in df.columns]
         if missing_cols:
             st.error(f"Colunas obrigatórias ausentes: {missing_cols}")
             return False
         
-        # Prepara dados para inserção
+        user_id = get_user_id()
+        if not user_id:
+            st.error("Usuário não autenticado")
+            return False
+        
+        # Prepara dados para inserção (alinhado com estrutura real da tabela accidents)
         accident_rows = []
         for _, row in df.iterrows():
-            site_code = row['site_code']
-            if site_code not in site_mapping:
-                st.warning(f"Site {site_code} não encontrado no mapeamento")
-                continue
-                
+            # Mapeia 'severity' do CSV para 'type' enum (fatal, lesao, sem_lesao)
+            severity = str(row.get('severity', 'lesao')).lower()
+            type_map = {
+                'fatal': 'fatal',
+                'lesao': 'lesao',
+                'sem_lesao': 'sem_lesao',
+                'com lesão': 'lesao',
+                'sem lesão': 'sem_lesao'
+            }
+            accident_type = type_map.get(severity, 'lesao')
+            
             accident_rows.append({
-                "site_id": site_mapping[site_code],
-                "date": row['date'],
-                "severity": row['severity'],
+                "occurred_at": row['occurred_at'] if 'occurred_at' in row else row.get('date', ''),
+                "type": accident_type,  # severity -> type (enum)
+                "classification": row.get('classification', 'leve'),
+                "body_part": row.get('body_part'),
                 "description": row['description'],
                 "lost_days": int(row.get('lost_days', 0)),
                 "root_cause": row.get('root_cause', ''),
-                "corrective_actions": row.get('corrective_actions', ''),
+                "status": row.get('status', 'fechado'),  # default 'fechado'
+                "created_by": user_id
             })
+            # Campos removidos: site_id, date, severity, corrective_actions (não existem na tabela)
+            # employee_id pode ser adicionado se houver mapeamento no CSV
         
         if not accident_rows:
             st.error("Nenhum dado válido para importar")

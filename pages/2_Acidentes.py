@@ -69,18 +69,29 @@ def calculate_work_days_until_accident(accident_date, employee_identifier=None, 
             if days_since_admission < 0:
                 days_since_admission = 0
 
-        # 5) Busca horas trabalhadas mensais (prioriza employee_id)
+        # 5) Busca horas trabalhadas mensais (alinhado com estrutura real)
         total_hours = 0.0
         hours_response = None
-        # 5.1) Por employee_id
-        if employee_id:
+        # employee_id e site_id removidos da tabela hours_worked_monthly
+        # Busca apenas por created_by (UUID do usuário)
+        if user_profile_id:
             try:
-                hours_response = supabase.table("hours_worked_monthly").select("year, month, hours, employee_id").eq("employee_id", employee_id).execute()
+                from auth.auth_utils import get_user_id
+                # Usa UUID do usuário para buscar horas
+                hours_response = supabase.table("hours_worked_monthly").select("year, month, hours, created_by").eq("created_by", user_profile_id).execute()
             except Exception:
                 hours_response = None
-        # 5.2) Por email (apenas se NÃO houver employee_id)
-        if (not employee_id) and (not hours_response or not getattr(hours_response, 'data', None)) and user_email:
-            hours_response = supabase.table("hours_worked_monthly").select("year, month, hours, created_by").eq("created_by", user_email).execute()
+        elif user_email:
+            # Se não tiver UUID, tenta buscar pelo email (mas created_by agora é UUID, não email)
+            # Isso pode não funcionar - melhor usar UUID sempre
+            try:
+                # Tenta buscar pelo perfil do email primeiro
+                profile_resp = supabase.table("profiles").select("id").eq("email", user_email).limit(1).execute()
+                if profile_resp and profile_resp.data:
+                    profile_id = profile_resp.data[0].get('id')
+                    hours_response = supabase.table("hours_worked_monthly").select("year, month, hours, created_by").eq("created_by", profile_id).execute()
+            except Exception:
+                hours_response = None
 
         if hours_response and hasattr(hours_response, 'data') and hours_response.data:
             for row in hours_response.data:
@@ -161,22 +172,16 @@ def get_work_days_analysis(df):
         # Carregar todas as horas trabalhadas de uma vez
         all_hours = {}
         try:
-            hours_response = supabase.table("hours_worked_monthly").select("year, month, hours, employee_id, created_by").execute()
+            # Alinhado com estrutura real: employee_id removido, apenas created_by (UUID)
+            hours_response = supabase.table("hours_worked_monthly").select("year, month, hours, created_by").execute()
             if hours_response and hasattr(hours_response, 'data'):
                 for hour_row in hours_response.data:
-                    # Agrupa por employee_id
-                    emp_id = hour_row.get('employee_id')
-                    if emp_id:
-                        if emp_id not in all_hours:
-                            all_hours[emp_id] = []
-                        all_hours[emp_id].append(hour_row)
-                    else:
-                        # Agrupa por created_by (email)
-                        created_by = hour_row.get('created_by')
-                        if created_by:
-                            if created_by not in all_hours:
-                                all_hours[created_by] = []
-                            all_hours[created_by].append(hour_row)
+                    # Agrupa por created_by (UUID do usuário)
+                    created_by = hour_row.get('created_by')
+                    if created_by:
+                        if created_by not in all_hours:
+                            all_hours[created_by] = []
+                        all_hours[created_by].append(hour_row)
         except Exception:
             pass
         
@@ -917,18 +922,21 @@ def app(filters=None):
                                 from managers.supabase_config import get_service_role_client
                                 supabase = get_service_role_client()
                                 
+                                # Alinhado com estrutura real da tabela employees
+                                from auth.auth_utils import get_user_id
+                                user_id = get_user_id()
+                                
                                 employee_data = {
                                     "full_name": full_name,
-                                    "cpf": cpf,
+                                    "document_id": cpf if cpf else None,  # cpf -> document_id
                                     "email": email,
-                                    "phone": phone,
-                                    "employee_id": employee_id_input,
+                                    "job_title": position if position else None,  # position -> job_title
                                     "department": department,
-                                    "position": position,
                                     "admission_date": admission_date.isoformat(),
-                                    "is_active": is_active,
-                                    "site_id": site_id
+                                    "status": "active" if is_active else "inactive",  # is_active -> status
+                                    "user_id": user_id
                                 }
+                                # Campos removidos: phone, employee_id, site_id (não existem na tabela)
                                 
                                 result = supabase.table("employees").insert(employee_data).execute()
                                 

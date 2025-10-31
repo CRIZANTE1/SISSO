@@ -23,7 +23,7 @@ def app(filters=None):
         with st.popover("❓ Ajuda"):
             st.markdown(
                 "**Guia rápido**\n\n"
-                "- Gerencie Sites, Contratadas e Usuários.\n"
+                "- Gerencie Sites e Usuários.\n"
                 "- Importe Horas e Acidentes via CSV.\n"
                 "- Recalcule KPIs e veja estatísticas.\n\n"
                 "**Dicas**\n\n"
@@ -34,7 +34,6 @@ def app(filters=None):
     # Tabs para diferentes funcionalidades administrativas
     tab1, tab2, tab3, tab4, tab5 = st.tabs([
         "🏢 Sites", 
-        "🏗️ Contratadas", 
         "👥 Usuários", 
         "📊 Importar Dados", 
         "📈 Atualizar KPIs"
@@ -101,63 +100,6 @@ def app(filters=None):
                         st.error(f"Erro: {str(e)}")
     
     with tab2:
-        st.subheader("Gerenciar Contratadas")
-        
-        # Lista contratadas existentes
-        contractors = get_contractors()
-        
-        if contractors:
-            st.write("**Contratadas Cadastradas:**")
-            contractors_df = pd.DataFrame(contractors)
-            st.dataframe(contractors_df, width='stretch', hide_index=True)
-        else:
-            st.info("Nenhuma contratada cadastrada.")
-        
-        # Formulário para nova contratada
-        st.subheader("Adicionar Nova Contratada")
-        
-        with st.form("new_contractor_form"):
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                contractor_name = st.text_input("Nome da Contratada")
-                cnpj = st.text_input("CNPJ", placeholder="00.000.000/0000-00")
-            
-            with col2:
-                contact_email = st.text_input("E-mail de Contato")
-                contact_phone = st.text_input("Telefone de Contato")
-            
-            description = st.text_area("Descrição dos Serviços", height=100)
-            
-            submitted = st.form_submit_button("💾 Salvar Contratada", type="primary")
-            
-            if submitted:
-                if not contractor_name:
-                    st.error("Nome é obrigatório.")
-                else:
-                    try:
-                        supabase = get_supabase_client()
-                        
-                        contractor_data = {
-                            "name": contractor_name,
-                            "cnpj": cnpj,
-                            "contact_email": contact_email,
-                            "contact_phone": contact_phone,
-                            "description": description
-                        }
-                        
-                        result = supabase.table("contractors").insert(contractor_data).execute()
-                        
-                        if result.data:
-                            st.success("✅ Contratada cadastrada com sucesso!")
-                            st.rerun()
-                        else:
-                            st.error("Erro ao cadastrar contratada.")
-                            
-                    except Exception as e:
-                        st.error(f"Erro: {str(e)}")
-    
-    with tab3:
         st.subheader("Gerenciar Usuários")
         
         # Lista usuários existentes
@@ -189,15 +131,8 @@ def app(filters=None):
                 )
             
             with col2:
-                # Busca sites para seleção
-                sites = get_sites()
-                site_options = {f"{site['code']} - {site['name']}": site['id'] for site in sites}
-                selected_sites = st.multiselect(
-                    "Sites de Acesso",
-                    options=list(site_options.keys()),
-                    help="Selecione os sites que o usuário pode acessar"
-                )
-                site_ids = [site_options[site] for site in selected_sites]
+                # site_ids removido - campo não existe na tabela profiles
+                # A tabela profiles não tem relação direta com sites
             
             is_active = st.checkbox("Usuário Ativo", value=True)
             
@@ -284,7 +219,7 @@ def app(filters=None):
                         else:
                             st.error(f"Erro: {str(e)}")
     
-    with tab4:
+    with tab3:
         st.subheader("Importar Dados")
         
         # Importação de horas trabalhadas
@@ -294,7 +229,7 @@ def app(filters=None):
             "Arquivo CSV de Horas Trabalhadas",
             type=['csv'],
             key="hours_upload",
-            help="Formato esperado: site_code, year, month, hours"
+            help="Formato esperado: year, month, hours (site_id removido da tabela)"
         )
         
         if uploaded_hours:
@@ -322,7 +257,7 @@ def app(filters=None):
             "Arquivo CSV de Acidentes",
             type=['csv'],
             key="accidents_upload",
-            help="Formato esperado: site_code, date, severity, description, lost_days, root_cause, corrective_actions"
+            help="Formato esperado: occurred_at (ou date), type (fatal/lesao/sem_lesao), description, classification (opcional), body_part (opcional), lost_days (opcional), root_cause (opcional), status (opcional, default: fechado)"
         )
         
         if uploaded_accidents:
@@ -343,7 +278,7 @@ def app(filters=None):
             except Exception as e:
                 st.error(f"Erro ao processar arquivo: {str(e)}")
     
-    with tab5:
+    with tab4:
         st.subheader("Atualizar KPIs")
         
         st.info("💡 Os KPIs são calculados automaticamente baseados nos dados de acidentes e horas trabalhadas.")
@@ -441,7 +376,7 @@ def app(filters=None):
             # Conta registros em cada tabela
             stats = {}
             
-            tables = ['sites', 'contractors', 'accidents', 'near_misses', 'nonconformities', 'hours_worked_monthly']
+            tables = ['sites', 'accidents', 'near_misses', 'nonconformities', 'hours_worked_monthly']
             
             for table in tables:
                 try:
@@ -454,7 +389,7 @@ def app(filters=None):
             
             with col1:
                 st.metric("Sites", stats.get('sites', 0))
-                st.metric("Contratadas", stats.get('contractors', 0))
+                # contractors removido - tabela não existe
             
             with col2:
                 st.metric("Acidentes", stats.get('accidents', 0))
@@ -476,14 +411,7 @@ def get_sites():
     except:
         return []
 
-def get_contractors():
-    """Busca contratadas disponíveis"""
-    try:
-        supabase = get_supabase_client()
-        response = supabase.table("contractors").select("*").execute()
-        return response.data
-    except:
-        return []
+# get_contractors removido - tabela contractors não existe no banco
 
 def get_users():
     """Busca usuários disponíveis"""
