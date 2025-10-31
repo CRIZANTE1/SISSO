@@ -99,8 +99,14 @@ def create_new_trial_user(email: str) -> Dict[str, Any]:
         
         # Cria perfil com trial (14 dias a partir de agora)
         now = datetime.now(pytz.UTC)
+        
+        # Extrai o nome do email para usar como full_name
+        from auth.auth_utils import extract_name_from_email
+        full_name = extract_name_from_email(email)
+        
         profile_data = {
             "email": email.lower().strip(),
+            "full_name": full_name,
             "role": "viewer",  # Inicialmente viewer
             "status": "ativo",  # Mantém compatibilidade com o campo existente
             "created_at": now.isoformat(),

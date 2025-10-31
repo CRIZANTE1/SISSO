@@ -239,8 +239,13 @@ def app(filters=None):
                             
                             if auth_response.user:
                                 # Cria perfil do usuário
+                                # Extrai o nome do email para usar como full_name
+                                from auth.auth_utils import extract_name_from_email
+                                full_name = extract_name_from_email(email)
+                                
                                 profile_data = {
                                     "email": email,
+                                    "full_name": full_name,
                                     "role": role,
                                     "status": "ativo" if is_active else "inativo"
                                 }

@@ -1,4 +1,5 @@
 import streamlit as st
+import re
 from managers.supabase_config import get_supabase_client
 from typing import Optional, Dict, Any
 from utils.simple_logger import get_logger
@@ -22,6 +23,25 @@ def get_user_display_name() -> str:
     if is_user_logged_in() and hasattr(st.user, 'name'):
         return st.user.name
     return get_user_email() or "Usuário Desconhecido"
+
+def extract_name_from_email(email: str) -> str:
+    """
+    Extrai e formata o nome a partir do email.
+    Exemplo: 'joao.silva@gmail.com' -> 'Joao Silva'
+    """
+    if not email:
+        return ""
+    
+    # Pega a parte antes do @
+    username = email.split('@')[0].strip()
+    
+    # Substitui pontos, underscores, traços e números por espaços
+    name_parts = re.sub(r'[._\-0-9]+', ' ', username).split()
+    
+    # Capitaliza cada palavra e junta com espaços
+    formatted_name = ' '.join([part.capitalize() for part in name_parts if part])
+    
+    return formatted_name if formatted_name else username.capitalize()
 
 def authenticate_user() -> bool:
     """Verifica o usuário na base de dados."""
