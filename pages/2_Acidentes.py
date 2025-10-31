@@ -1120,8 +1120,9 @@ def delete_attachment(attachment_id):
         return False
 
 def get_employees():
-    """Busca funcionários (employees)"""
+    """Busca funcionários (employees) - filtra por usuário logado"""
     try:
+        from services.employees import get_all_employees
         return get_all_employees()
     except:
         return []

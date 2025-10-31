@@ -554,11 +554,12 @@ def delete_attachment(attachment_id):
         return False
 
 def get_employees():
-    """Busca funcionários (employees)"""
+    """Busca funcionários (employees) - filtra por usuário logado"""
     try:
-        supabase = get_supabase_client()
-        response = supabase.table("employees").select("id, full_name, department").order("full_name").execute()
-        return response.data
+        from services.employees import get_all_employees
+        employees = get_all_employees()
+        # Retorna apenas os campos necessários para compatibilidade
+        return [{"id": e.get("id"), "full_name": e.get("full_name"), "department": e.get("department")} for e in employees]
     except:
         return []
 

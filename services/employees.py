@@ -7,20 +7,47 @@ from typing import List, Dict, Optional
 import pandas as pd
 
 def get_all_employees() -> List[Dict]:
-    """Busca todos os funcionários"""
+    """Busca funcionários - filtra por usuário logado (exceto admin)"""
     try:
-        supabase = get_supabase_client()
-        response = supabase.table("employees").select("*").order("full_name").execute()
-        return response.data
+        from auth.auth_utils import get_user_id, is_admin
+        
+        user_id = get_user_id()
+        if not user_id:
+            return []
+        
+        # Admin usa service_role para ver todos os funcionários
+        if is_admin():
+            supabase = get_service_role_client()
+            query = supabase.table("employees").select("*")
+        else:
+            supabase = get_supabase_client()
+            # Usuário comum vê apenas seus próprios funcionários
+            query = supabase.table("employees").select("*").eq("user_id", user_id)
+        
+        response = query.order("full_name").execute()
+        return response.data if response.data else []
     except Exception as e:
         st.error(f"Erro ao buscar funcionários: {str(e)}")
         return []
 
 def get_employee_by_id(employee_id: str) -> Optional[Dict]:
-    """Busca funcionário por ID"""
+    """Busca funcionário por ID - verifica se pertence ao usuário logado (exceto admin)"""
     try:
-        supabase = get_supabase_client()
-        response = supabase.table("employees").select("*").eq("id", employee_id).execute()
+        from auth.auth_utils import get_user_id, is_admin
+        
+        user_id = get_user_id()
+        if not user_id:
+            return None
+        
+        # Admin pode ver qualquer funcionário
+        if is_admin():
+            supabase = get_service_role_client()
+            response = supabase.table("employees").select("*").eq("id", employee_id).execute()
+        else:
+            # Usuário comum só pode ver seus próprios funcionários
+            supabase = get_supabase_client()
+            response = supabase.table("employees").select("*").eq("id", employee_id).eq("user_id", user_id).execute()
+        
         if response.data:
             return response.data[0]
         return None
