@@ -104,9 +104,8 @@ def create_new_trial_user(email: str) -> Dict[str, Any]:
             "role": "viewer",  # Inicialmente viewer
             "status": "ativo",  # Mantém compatibilidade com o campo existente
             "created_at": now.isoformat(),
-            "updated_at": now.isoformat(),
-            "is_active": True
-            # Não inclui campos que não existem na tabela
+            "updated_at": now.isoformat()
+            # Não inclui campos que não existem na tabela (como is_active)
         }
         
         response = supabase.table("profiles").insert(profile_data).execute()

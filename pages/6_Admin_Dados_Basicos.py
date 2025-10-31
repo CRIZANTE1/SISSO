@@ -219,8 +219,7 @@ def app(filters=None):
                             # Atualiza perfil existente
                             profile_data = {
                                 "role": role,
-                                "site_ids": site_ids,
-                                "is_active": is_active
+                                "status": "ativo" if is_active else "inativo"
                             }
                             
                             result = supabase.table("profiles").update(profile_data).eq("email", email).execute()
@@ -241,11 +240,9 @@ def app(filters=None):
                             if auth_response.user:
                                 # Cria perfil do usuário
                                 profile_data = {
-                                    "user_id": auth_response.user.id,
                                     "email": email,
                                     "role": role,
-                                    "site_ids": site_ids,
-                                    "is_active": is_active
+                                    "status": "ativo" if is_active else "inativo"
                                 }
                                 
                                 result = supabase.table("profiles").insert(profile_data).execute()
@@ -267,8 +264,7 @@ def app(filters=None):
                                 
                                 profile_data = {
                                     "role": role,
-                                    "site_ids": site_ids,
-                                    "is_active": is_active
+                                    "status": "ativo" if is_active else "inativo"
                                 }
                                 
                                 result = supabase.table("profiles").update(profile_data).eq("email", email).execute()
