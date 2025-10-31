@@ -1395,9 +1395,12 @@ def app(filters=None):
                             # Calcular dias debitados para acidentes fatais (NBR 14280)
                             debited_days = acc_data['fatalities'] * 6000  # 6.000 dias por morte
                             
-                            # Calcula taxas
-                            freq_rate = calculate_frequency_rate(acc_data['count'], hours)
-                            sev_rate = calculate_severity_rate(acc_data['lost_days'], hours, debited_days)
+                            # ✅ CORRIGIDO: hours vem em horas reais (176.0 = 176 horas)
+                            # Mas a função espera em centenas e multiplica por 100
+                            # Então divide por 100 para converter para centenas antes de calcular
+                            hours_in_hundreds = hours / 100  # Converte 176.0 para 1.76 (centenas)
+                            freq_rate = calculate_frequency_rate(acc_data['count'], hours_in_hundreds)
+                            sev_rate = calculate_severity_rate(acc_data['lost_days'], hours_in_hundreds, debited_days)
                             
                             # Verifica se já existe KPI para este período e usuário
                             existing_kpi = supabase.table("kpi_monthly").select("id").eq("period", f"{period}-01").eq("created_by", user_id).execute()

@@ -257,12 +257,19 @@ def generate_kpi_summary(df: pd.DataFrame) -> Dict[str, Any]:
         return {}
     
     # Calcula totais acumulados para todo o período
-    total_accidents = df['accidents_total'].sum()
-    total_lost_days = df['lost_days_total'].sum()
-    total_hours = df['hours'].sum()
-    total_hours_corrected = total_hours * HOURS_SCALE
-    total_fatalities = df.get('fatalities', pd.Series([0] * len(df))).sum()
-    total_debited_days = df.get('debited_days', pd.Series([0] * len(df))).sum()
+    # ✅ VALIDAÇÃO: Garante que horas são numéricas
+    df['hours'] = pd.to_numeric(df['hours'], errors='coerce').fillna(0)
+    df['accidents_total'] = pd.to_numeric(df['accidents_total'], errors='coerce').fillna(0)
+    df['lost_days_total'] = pd.to_numeric(df['lost_days_total'], errors='coerce').fillna(0)
+    
+    total_accidents = float(df['accidents_total'].sum())
+    total_lost_days = float(df['lost_days_total'].sum())
+    # ✅ CORRIGIDO: A tabela armazena horas divididas por 100 (1.75 = 175 horas reais)
+    # Precisa multiplicar por 100 apenas uma vez para voltar às horas reais
+    total_hours = float(df['hours'].sum())  # Soma dos valores da tabela (ex: 40.79)
+    total_hours_corrected = total_hours * HOURS_SCALE  # Multiplica por 100 uma vez: 40.79 × 100 = 4.079 horas reais
+    total_fatalities = float(df.get('fatalities', pd.Series([0] * len(df))).sum())
+    total_debited_days = float(df.get('debited_days', pd.Series([0] * len(df))).sum())
     
     # Calcula automaticamente os dias debitados para acidentes fatais conforme NBR 14280
     # Morte = 6.000 dias debitados
@@ -283,15 +290,29 @@ def generate_kpi_summary(df: pd.DataFrame) -> Dict[str, Any]:
         }
     
     # ✅ Cálculos ACUMULADOS para todo o período (correto para visão geral)
-    freq_rate = calculate_frequency_rate(total_accidents, total_hours)
-    sev_rate = calculate_severity_rate(total_lost_days, total_hours, total_debited_days)
+    # total_hours na tabela está dividido por 100 (1.75 = 175 horas reais)
+    # A função espera receber em centenas e multiplica por 100 internamente
+    # Então passamos total_hours diretamente (já está em centenas após a divisão)
+    freq_rate = calculate_frequency_rate(int(total_accidents), total_hours)
+    sev_rate = calculate_severity_rate(int(total_lost_days), total_hours, int(total_debited_days))
+    
+    # ✅ VALIDAÇÃO: Verifica se o cálculo está correto
+    if total_hours_corrected > 0:
+        expected_freq = (total_accidents / total_hours_corrected) * 1_000_000
+        expected_sev = ((total_lost_days + total_debited_days) / total_hours_corrected) * 1_000_000
+        # Se houver diferença significativa, algo está errado
+        if abs(freq_rate - expected_freq) > 0.01:
+            import warnings
+            warnings.warn(f"TF calculada ({freq_rate:.2f}) diferente da esperada ({expected_freq:.2f})")
     
     # ✅ NOVO: Calcula também taxas POR PERÍODO para análise mais precisa
     df_with_rates = df.copy()
+    # ✅ CORRIGIDO: Horas na tabela estão divididas por 100 (1.75 = 175 horas reais)
+    # A função espera em centenas, então passamos diretamente (já está no formato correto)
     df_with_rates['freq_rate_period'] = df_with_rates.apply(
         lambda row: calculate_frequency_rate(
             row['accidents_total'], 
-            row['hours']
+            row['hours']  # Já está dividido por 100 (1.75), que é o formato esperado pela função
         ) if row['hours'] > 0 else 0, 
         axis=1
     )
@@ -305,7 +326,7 @@ def generate_kpi_summary(df: pd.DataFrame) -> Dict[str, Any]:
     df_with_rates['sev_rate_period'] = df_with_rates.apply(
         lambda row: calculate_severity_rate(
             row['lost_days_total'], 
-            row['hours'],
+            row['hours'],  # Já está dividido por 100 (1.75), que é o formato esperado pela função
             row['period_debited_days']
         ) if row['hours'] > 0 else 0, 
         axis=1
