@@ -286,7 +286,6 @@ def show_user_info():
         with st.sidebar:
             st.markdown("---")
             st.markdown(f"**Usuário:** {user_info.get('full_name', 'N/A')}")
-            st.markdown(f"**E-mail:** {user_info.get('email', 'N/A')}")
             st.markdown(f"**Papel:** {user_info.get('role', 'viewer').title()}")
             
             if st.button("🚪 Logout"):
