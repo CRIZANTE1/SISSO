@@ -22,12 +22,23 @@ def get_all_employees() -> List[Dict]:
         else:
             supabase = get_supabase_client()
             # Usuário comum vê apenas seus próprios funcionários
+            # Usa filtro explícito por user_id (UUID)
             query = supabase.table("employees").select("*").eq("user_id", user_id)
         
         response = query.order("full_name").execute()
-        return response.data if response.data else []
+        employees = response.data if response.data else []
+        
+        # Garante que todos os funcionários retornados têm user_id correto
+        # (validação adicional de segurança)
+        if not is_admin() and employees:
+            # Filtra novamente para garantir (mesmo que RLS já faça isso)
+            employees = [e for e in employees if e.get('user_id') == user_id]
+        
+        return employees
     except Exception as e:
         st.error(f"Erro ao buscar funcionários: {str(e)}")
+        import traceback
+        st.code(traceback.format_exc())
         return []
 
 def get_employee_by_id(employee_id: str) -> Optional[Dict]:

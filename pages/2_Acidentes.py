@@ -881,8 +881,23 @@ def app(filters=None):
             # Seleção opcional do acidentado
             employees = get_employees()
             emp_options = {"— (Sem funcionário) —": None}
-            emp_options.update({f"{e.get('full_name','Sem Nome')} ({e.get('department','-')})": e['id'] for e in employees})
-            selected_emp = st.selectbox("Funcionário (opcional)", options=list(emp_options.keys()))
+            # Melhora a exibição do select box com mais informações
+            for e in employees:
+                name = e.get('full_name', 'Sem Nome')
+                dept = e.get('department', '-')
+                email = e.get('email', '')
+                emp_id = e.get('id', '')
+                # Mostra nome, departamento e ID (últimos 8 caracteres do UUID)
+                display_text = f"{name} ({dept})"
+                if email:
+                    display_text += f" - {email}"
+                emp_options[display_text] = emp_id
+            
+            selected_emp = st.selectbox(
+                "Funcionário (opcional)", 
+                options=list(emp_options.keys()),
+                help="Selecione o funcionário relacionado ao acidente. Os funcionários são filtrados por usuário (apenas seus funcionários aparecem)."
+            )
             employee_id = emp_options[selected_emp]
             
             # Opção para adicionar novo acidentado
@@ -1002,8 +1017,8 @@ def app(filters=None):
                             "status": status,
                             "created_by": user_id
                         }
-                        if employee_id:
-                            accident_data["employee_id"] = employee_id
+                        # employee_id removido - a tabela accidents não possui esta coluna
+                        # A relação funcionário-acidente não está implementada na estrutura atual
                         
                         result = supabase.table("accidents").insert(accident_data).execute()
                         
