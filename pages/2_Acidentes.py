@@ -785,6 +785,42 @@ def app(filters=None):
     with tab4:
         st.subheader("Registrar Novo Acidente")
         
+        # Instruções de cadastro
+        with st.expander("📖 Como Cadastrar um Acidente", expanded=True):
+            st.markdown("""
+            **Siga estes passos para registrar um novo acidente:**
+            
+            1. **Data do Acidente**: Selecione a data em que o acidente ocorreu
+            
+            2. **Tipo de Acidente**: Escolha entre:
+               - **Fatal**: Acidente que resultou em óbito
+               - **Com Lesão**: Acidente que causou lesão ao trabalhador
+               - **Sem Lesão**: Acidente que não causou lesão física
+            
+            3. **Dias Perdidos**: Informe quantos dias o funcionário ficou afastado do trabalho (0 se não houve afastamento)
+            
+            4. **Classificação**: Selecione o tipo:
+               - **Típico**: Acidente durante a jornada de trabalho
+               - **Trajeto**: Acidente no caminho para/do trabalho
+               - **Doença do Trabalho**: Relacionada às condições de trabalho
+               - **Outro**: Especifique no campo que aparecer
+            
+            5. **Parte do Corpo Afetada**: Selecione a região do corpo que foi afetada pelo acidente
+            
+            6. **Causa Raiz**: Identifique a causa principal:
+               - Fator Humano, Material, Ambiental, Organizacional, Técnico ou Outros
+            
+            7. **Funcionário**: (Opcional) Selecione o funcionário envolvido, ou deixe "Sem funcionário"
+            
+            8. **Descrição**: Descreva detalhadamente o que aconteceu
+            
+            9. **Status**: Defina se o caso está "Aberto" ou "Fechado"
+            
+            10. **Evidências**: (Opcional) Anexe fotos, documentos ou outros arquivos relacionados
+            
+            **💡 Dica**: Preencha todos os campos obrigatórios (marcados com *) antes de salvar.
+            """)
+        
         with st.form("new_accident_form"):
             col1, col2 = st.columns(2)
             
@@ -852,6 +888,7 @@ def app(filters=None):
             # Opção para adicionar novo acidentado
             if st.checkbox("Adicionar novo acidentado", key="add_new_employee_accident"):
                 st.subheader("Adicionar Novo Funcionário")
+                st.info("💡 **Dica**: Preencha pelo menos Nome Completo, CPF e E-mail. Para cadastrar funcionários completos, use a página **Perfil do Usuário**.")
                 with st.form("new_employee_accident_form"):
                     col1, col2 = st.columns(2)
                     

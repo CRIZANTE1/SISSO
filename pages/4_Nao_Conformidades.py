@@ -429,6 +429,41 @@ def app(filters=None):
     with tab4:
         st.subheader("Registrar Nova Não Conformidade")
         
+        # Instruções de cadastro
+        with st.expander("📖 Como Cadastrar uma Não Conformidade", expanded=True):
+            st.markdown("""
+            **Siga estes passos para registrar uma nova não conformidade:**
+            
+            1. **Data de Ocorrência**: Selecione a data em que a não conformidade foi identificada ou ocorreu
+            
+            2. **Norma de Referência**: Informe qual norma, procedimento ou padrão foi violado ou não atendido
+               - Exemplos: NR-12, ISO 9001, Procedimento de Segurança, etc.
+            
+            3. **Gravidade**: Avalie a gravidade da não conformidade:
+               - **Grave**: Risco significativo, requer ação imediata
+               - **Moderada**: Risco médio, requer atenção
+               - **Leve**: Risco baixo, pode ser tratada normalmente
+            
+            4. **Descrição**: Descreva detalhadamente:
+               - O que foi identificado como não conformidade
+               - Contexto e situação
+               - Impacto potencial
+               - Local onde foi identificado
+            
+            5. **Status**: Defina o status atual:
+               - **Aberta**: Não conformidade identificada, aguardando tratamento
+               - **Encerrada**: Não conformidade já foi tratada e resolvida
+            
+            6. **Evidências**: (Opcional) Anexe fotos, documentos, relatórios ou outros arquivos que comprovem ou documentem a não conformidade
+            
+            **💡 Importante**: 
+            - Não conformidades são situações que não atendem aos requisitos estabelecidos
+            - Podem estar relacionadas a normas, procedimentos, padrões de qualidade ou segurança
+            - O registro adequado permite rastreabilidade e melhoria contínua
+            
+            **📋 Campos Obrigatórios**: Data de Ocorrência, Norma de Referência, Gravidade e Descrição
+            """)
+        
         with st.form("new_nonconformity_form"):
             col1, col2 = st.columns(2)
             
@@ -474,9 +509,7 @@ def app(filters=None):
             submitted = st.form_submit_button("💾 Salvar Não Conformidade", type="primary")
             
             if submitted:
-                if not site_id:
-                    st.error("Selecione um site.")
-                elif not description.strip():
+                if not description.strip():
                     st.error("Descrição é obrigatória.")
                 else:
                     try:

@@ -121,6 +121,36 @@ def app():
 
     # Gerenciamento de Funcionários
     st.subheader("👷 Gerenciar Funcionários")
+    
+    # Instruções de cadastro
+    with st.expander("📖 Como Cadastrar um Funcionário", expanded=False):
+        st.markdown("""
+        **Siga estes passos para cadastrar um novo funcionário:**
+        
+        1. **Nome Completo**: Digite o nome completo do funcionário (*obrigatório*)
+        
+        2. **CPF/Documento**: (Opcional) Informe o CPF ou número de documento
+        
+        3. **E-mail**: Informe o e-mail de contato do funcionário (*obrigatório*)
+        
+        4. **Cargo**: Informe o cargo ou função do funcionário
+        
+        5. **Departamento**: Informe o departamento ao qual o funcionário pertence
+        
+        6. **Data de Admissão**: Selecione a data em que o funcionário foi admitido
+        
+        7. **Data de Demissão**: (Opcional) Se o funcionário já foi demitido, informe a data
+        
+        8. **Funcionário Ativo**: Marque se o funcionário está atualmente ativo na empresa
+        
+        **💡 Importante**: 
+        - O funcionário será vinculado automaticamente à sua conta
+        - Você só verá os funcionários que você cadastrou
+        - Campos obrigatórios: **Nome Completo** e **E-mail**
+        
+        **📋 Dica**: Cadastre seus funcionários antes de registrar acidentes para facilitar a seleção posteriormente nos formulários.
+        """)
+    
     list_employees_table()
     
     st.subheader("Adicionar Novo Funcionário")

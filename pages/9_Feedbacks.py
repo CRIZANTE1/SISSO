@@ -190,6 +190,42 @@ def app(filters=None):
     # TAB 1: Novo Feedback
     with tab1:
         st.subheader("📤 Enviar Novo Feedback")
+        
+        # Instruções de cadastro
+        with st.expander("📖 Como Enviar um Feedback", expanded=True):
+            st.markdown("""
+            **Siga estes passos para enviar seu feedback:**
+            
+            1. **Tipo de Feedback**: Selecione a categoria do seu feedback:
+               - **🐛 Erro/Bug**: Para reportar problemas técnicos, bugs ou falhas do sistema
+               - **💡 Sugestão**: Para propor novas funcionalidades ou ideias
+               - **✨ Melhoria**: Para sugerir aprimoramentos em funcionalidades existentes
+               - **📄 Outro**: Para qualquer outro tipo de comentário ou feedback
+            
+            2. **Prioridade**: Informe o nível de urgência:
+               - **🔴 Alta**: Problema crítico que impede o uso ou sugestão muito importante
+               - **🟡 Média**: Problema ou sugestão importante, mas não urgente
+               - **🟢 Baixa**: Problema menor ou sugestão para consideração futura
+            
+            3. **Título**: Crie um título descritivo e claro
+               - **Para erros**: "Erro ao salvar acidente" ou "Sistema não carrega página X"
+               - **Para sugestões**: "Sugestão: adicionar filtro por período" ou "Ideia: exportar relatório em PDF"
+            
+            4. **Descrição Detalhada**: Seja o mais específico possível:
+               - **Se for um erro**: Descreva o que aconteceu, quando ocorreu, o que você estava fazendo, e o que esperava que acontecesse
+               - **Se for sugestão/melhoria**: Explique a ideia detalhadamente, como funcionaria, qual o benefício e por que seria útil
+            
+            **💡 Dicas para um bom feedback**: 
+            - Quanto mais detalhes, melhor conseguiremos entender e resolver
+            - Se for um erro, inclua passos para reproduzir o problema
+            - Se for uma sugestão, explique o contexto de uso
+            - Seus feedbacks são confidenciais e ajudam a melhorar o sistema para todos
+            
+            **📋 Campos Obrigatórios**: Tipo, Título (mínimo necessário) e Descrição (mínimo 20 caracteres)
+            """)
+        
+        st.info("💡 **Sua opinião é muito importante!** Use este formulário para reportar erros, sugerir melhorias ou compartilhar ideias sobre o sistema.")
+        
         new_feedback = feedback_form()
         
         if new_feedback:

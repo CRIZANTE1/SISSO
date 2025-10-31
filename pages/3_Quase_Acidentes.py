@@ -358,6 +358,38 @@ def app(filters=None):
     with tab4:
         st.subheader("Registrar Novo Quase-Acidente")
         
+        # Instruções de cadastro
+        with st.expander("📖 Como Cadastrar um Quase-Acidente", expanded=True):
+            st.markdown("""
+            **Siga estes passos para registrar um novo quase-acidente:**
+            
+            1. **Data do Quase-Acidente**: Selecione a data em que o incidente ocorreu
+            
+            2. **Severidade Potencial**: Avalie o risco caso o incidente tivesse resultado em acidente:
+               - **Alta**: Poderia ter causado lesões graves ou fatalidade
+               - **Média**: Poderia ter causado lesões moderadas
+               - **Baixa**: Poderia ter causado lesões leves ou sem lesões
+            
+            3. **Descrição**: Descreva detalhadamente o que aconteceu, incluindo:
+               - O que estava acontecendo no momento
+               - Qual foi o quase-acidente (o que quase ocorreu)
+               - Por que não resultou em acidente real
+               - Condições e contexto do ambiente
+            
+            4. **Status**: Defina o status atual:
+               - **Aberto**: Ainda em análise ou pendente de ação
+               - **Fechado**: Já foi analisado e tratado
+            
+            5. **Evidências**: (Opcional) Anexe fotos, documentos ou outros arquivos que ajudem a documentar o incidente
+            
+            **💡 Importante**: 
+            - Quase-acidentes são eventos que não resultaram em lesão, mas que poderiam ter causado danos
+            - Registrar quase-acidentes ajuda a prevenir acidentes reais no futuro
+            - Seja o mais detalhado possível na descrição para facilitar a análise
+            
+            **📋 Campos Obrigatórios**: Data, Severidade Potencial e Descrição
+            """)
+        
         with st.form("new_near_miss_form"):
             col1, col2 = st.columns(2)
             
