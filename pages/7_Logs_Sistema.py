@@ -273,7 +273,7 @@ def app(filters=None):
             st.write("3. Clique em 'Atualizar' para ver os resultados")
             st.write("4. Use 'Limpar Logs' para remover logs antigos")
     
-    with tab3:
+    with tab4:
         st.subheader("Status do Sistema")
         
         col1, col2 = st.columns(2)
@@ -308,7 +308,7 @@ def app(filters=None):
         with st.expander("Ver informações do sistema"):
             st.json(system_info)
     
-    with tab4:
+    with tab5:
         st.subheader("Informações Técnicas")
         
         col1, col2 = st.columns(2)
