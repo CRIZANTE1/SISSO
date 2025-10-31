@@ -143,10 +143,14 @@ def app(filters=None):
             else:
                 freq_icon = "🔴"
             
+            # ✅ CORRIGIDO: Só mostra delta se houver comparação válida
+            freq_change = kpi_summary.get('frequency_change')
+            freq_delta = f"{freq_change:+.1f}%" if freq_change is not None else None
+            
             st.metric(
                 f"{freq_icon} Acidentes por Milhão de Horas",
                 f"{freq_value:.0f}",
-                delta=f"{kpi_summary.get('frequency_change', 0):+.1f}%" if kpi_summary.get('frequency_change') else None,
+                delta=freq_delta,
                 help=f"Quantos acidentes acontecem a cada 1 milhão de horas trabalhadas\nClassificação: {freq_class}\n{rate_label}"
             )
         
@@ -165,10 +169,14 @@ def app(filters=None):
             else:
                 sev_icon = "🔴"
             
+            # ✅ CORRIGIDO: Só mostra delta se houver comparação válida
+            sev_change = kpi_summary.get('severity_change')
+            sev_delta = f"{sev_change:+.1f}%" if sev_change is not None else None
+            
             st.metric(
                 f"{sev_icon} Dias Perdidos por Milhão de Horas",
                 f"{sev_value:.0f}",
-                delta=f"{kpi_summary.get('severity_change', 0):+.1f}%" if kpi_summary.get('severity_change') else None,
+                delta=sev_delta,
                 help=f"Quantos dias de trabalho são perdidos a cada 1 milhão de horas trabalhadas\nClassificação: {sev_class}\n{rate_label}"
             )
         

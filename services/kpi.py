@@ -311,13 +311,27 @@ def generate_kpi_summary(df: pd.DataFrame) -> Dict[str, Any]:
         axis=1
     )
     
-    # Taxa média por período (mais representativa para períodos múltiplos)
-    avg_freq_rate = df_with_rates['freq_rate_period'].mean()
-    avg_sev_rate = df_with_rates['sev_rate_period'].mean()
+    # ✅ CORRIGIDO: Taxa média por período (mais representativa para períodos múltiplos)
+    # Calcula média apenas dos períodos com horas > 0 (válidos)
+    periods_with_hours = df_with_rates[df_with_rates['hours'] > 0]
+    if len(periods_with_hours) > 0:
+        avg_freq_rate = float(periods_with_hours['freq_rate_period'].mean())
+        avg_sev_rate = float(periods_with_hours['sev_rate_period'].mean())
+    else:
+        # Se não houver períodos válidos, usa a taxa acumulada
+        avg_freq_rate = float(freq_rate)
+        avg_sev_rate = float(sev_rate)
     
-    # Interpretações conforme parâmetros de referência
-    freq_interpretation = get_frequency_rate_interpretation(freq_rate)
-    sev_interpretation = get_severity_rate_interpretation(sev_rate)
+    # ✅ CORRIGIDO: Quando há múltiplos períodos, usa a MÉDIA para interpretação
+    # Quando há apenas 1 período, usa a taxa acumulada (que é igual)
+    if len(df) > 1:
+        # Usa a média por período para interpretação (mais representativa)
+        freq_interpretation = get_frequency_rate_interpretation(avg_freq_rate)
+        sev_interpretation = get_severity_rate_interpretation(avg_sev_rate)
+    else:
+        # Apenas 1 período: taxa acumulada e média são iguais
+        freq_interpretation = get_frequency_rate_interpretation(float(freq_rate))
+        sev_interpretation = get_severity_rate_interpretation(float(sev_rate))
     
     # ✅ MELHORADO: Comparação com média dos últimos 3 períodos (mais estável)
     freq_change = None
