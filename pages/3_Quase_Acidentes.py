@@ -11,7 +11,7 @@ from managers.supabase_config import get_supabase_client
 def fetch_near_misses(start_date=None, end_date=None):
     """Busca dados de quase-acidentes - filtra por usuário logado"""
     try:
-        from managers.supabase_config import get_supabase_client, get_service_role_client
+        from managers.supabase_config import get_service_role_client
         from auth.auth_utils import get_user_id, is_admin, get_user_email
         user_id = get_user_id()
         user_email = get_user_email()
@@ -19,11 +19,8 @@ def fetch_near_misses(start_date=None, end_date=None):
         if not user_id:
             return pd.DataFrame()
         
-        # Admin usa service_role para contornar RLS e ver todos os dados
-        if is_admin():
-            supabase = get_service_role_client()
-        else:
-            supabase = get_supabase_client()
+        # Usa service_role para contornar RLS e aplicar filtro de segurança no código
+        supabase = get_service_role_client()
         
         query = supabase.table("near_misses").select("*")
         
@@ -43,6 +40,12 @@ def fetch_near_misses(start_date=None, end_date=None):
         
         if response and hasattr(response, 'data'):
             df = pd.DataFrame(response.data) if response.data else pd.DataFrame()
+            
+            # Validação adicional de segurança para usuários não-admin
+            if not is_admin() and not df.empty:
+                # Filtra novamente para garantir (segurança em camadas)
+                df = df[df['created_by'] == user_id]
+            
             return df
         return pd.DataFrame()
     except Exception as e:
@@ -434,9 +437,10 @@ def app(filters=None):
                     st.error("Descrição é obrigatória.")
                 else:
                     try:
-                        from managers.supabase_config import get_supabase_client
+                        from managers.supabase_config import get_service_role_client
                         from auth.auth_utils import get_user_id
-                        supabase = get_supabase_client()
+                        # Usa service_role para contornar RLS ao inserir quase-acidente
+                        supabase = get_service_role_client()
                         
                         user_id = get_user_id()
                         if not user_id:
