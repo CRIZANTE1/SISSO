@@ -285,7 +285,7 @@ def app(filters=None):
         
         st.info("💡 Os KPIs são calculados automaticamente baseados nos dados de acidentes e horas trabalhadas.")
         
-        if st.button("🔄 Recalcular KPIs", type="primary"):
+        if st.button("🔄 Recalcular KPIs", type="primary", key="btn_recalculate_kpis"):
             with st.spinner("Recalculando KPIs..."):
                 try:
                     from services.kpi import calculate_frequency_rate, calculate_severity_rate

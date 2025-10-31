@@ -100,7 +100,7 @@ def app():
         employees_count = st.number_input("Número de funcionários", min_value=0, step=1, value=int(profile.get("employees_count") or 0))
         status = st.selectbox("Status", options=["ativo", "inativo"], index=0 if profile.get("status", "ativo") == "ativo" else 1)
 
-    if st.button("💾 Salvar Perfil", type="primary"):
+    if st.button("💾 Salvar Perfil", type="primary", key="btn_save_profile"):
         if not contact_email:
             st.error("E-mail de contato é obrigatório.")
         else:

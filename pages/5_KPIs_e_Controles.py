@@ -862,7 +862,7 @@ def app(filters=None):
             )
             
             # Botão para exportar
-            if st.button("📥 Exportar Relatório CSV"):
+            if st.button("📥 Exportar Relatório CSV", key="btn_export_report_csv"):
                 try:
                     # Cria DataFrame para exportação
                     export_data = pd.DataFrame()
@@ -1278,7 +1278,7 @@ def app(filters=None):
             )
         
         # Botão para salvar configurações
-        if st.button("💾 Salvar Configurações"):
+        if st.button("💾 Salvar Configurações", key="btn_save_kpi_config"):
             st.success("✅ Configurações salvas com sucesso!")
             st.info("ℹ️ As configurações serão aplicadas na próxima análise.")
     

@@ -55,11 +55,11 @@ def app(filters=None):
             limit = st.slider("Número de logs", 10, 100, 50)
         
         with col2:
-            if st.button("🔄 Atualizar", type="primary"):
+            if st.button("🔄 Atualizar", type="primary", key="btn_update_memory_logs"):
                 st.rerun()
         
         with col3:
-            if st.button("🗑️ Limpar Logs"):
+            if st.button("🗑️ Limpar Logs", key="btn_clear_memory_logs"):
                 logger.clear_memory_logs()
                 st.success("Logs limpos com sucesso!")
                 st.rerun()
@@ -133,11 +133,11 @@ def app(filters=None):
         col_btn1, col_btn2 = st.columns(2)
         
         with col_btn1:
-            if st.button("🔄 Atualizar", type="primary"):
+            if st.button("🔄 Atualizar", type="primary", key="btn_update_user_logs"):
                 st.rerun()
         
         with col_btn2:
-            if st.button("🧹 Limpar Logs Expirados"):
+            if st.button("🧹 Limpar Logs Expirados", key="btn_cleanup_expired_logs"):
                 with st.spinner("Limpando logs expirados..."):
                     deleted = cleanup_expired_logs()
                     if deleted > 0:
@@ -280,7 +280,7 @@ def app(filters=None):
         
         with col1:
             st.write("**Teste de Conexão**")
-            if st.button("🧪 Testar Conexão Supabase"):
+            if st.button("🧪 Testar Conexão Supabase", key="btn_test_connection"):
                 with st.spinner("Testando conexão..."):
                     if test_connection():
                         st.success("✅ Conexão com Supabase OK")
@@ -330,7 +330,7 @@ def app(filters=None):
         # Exportar logs
         st.subheader("Exportar Logs")
         
-        if st.button("📥 Baixar Logs (JSON)"):
+        if st.button("📥 Baixar Logs (JSON)", key="btn_download_logs_json"):
             logs_data = logger.get_memory_logs()
             logs_json = json.dumps(logs_data, indent=2, ensure_ascii=False)
             
@@ -338,7 +338,8 @@ def app(filters=None):
                 label="💾 Download Logs",
                 data=logs_json,
                 file_name=f"sso_logs_{st.session_state.get('authenticated_user_email', 'unknown')}.json",
-                mime="application/json"
+                mime="application/json",
+                key="btn_download_logs_file"
             )
         
         # Estatísticas de logs
