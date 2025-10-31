@@ -410,7 +410,7 @@ def app(filters=None):
         filters = st.session_state.get('filters', {})
     
     # Tabs para diferentes visualizações
-    tab1, tab2, tab3, tab4, tab5 = st.tabs(["📊 Análise", "📋 Registros", "📎 Evidências", "➕ Novo Acidente", "📚 Instruções"])
+    tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["📊 Análise", "📋 Registros", "📎 Evidências", "➕ Novo Acidente", "✅ Ações Corretivas", "📚 Instruções"])
     
     # Busca dados uma única vez no início
     with st.spinner("Carregando dados de acidentes..."):
@@ -1029,6 +1029,81 @@ def app(filters=None):
                         st.error(f"Erro: {str(e)}")
     
     with tab5:
+        st.subheader("✅ Ações Corretivas")
+        st.info("📋 Registre e gerencie ações corretivas relacionadas aos acidentes usando a metodologia 5W2H")
+        
+        # Busca todos os acidentes para seleção
+        if df.empty:
+            st.warning("Nenhum acidente encontrado. Registre acidentes primeiro para criar ações corretivas.")
+        else:
+            # Seleção de acidente
+            accident_options = {f"ID: {row['id'][:8]}... - {row.get('description', 'Sem descrição')[:50]}": row['id'] 
+                              for _, row in df.iterrows()}
+            
+            selected_accident_id = st.selectbox(
+                "Selecione o Acidente",
+                options=list(accident_options.keys()),
+                help="Selecione o acidente para ver ou criar ações corretivas"
+            )
+            
+            if selected_accident_id:
+                accident_id = accident_options[selected_accident_id]
+                
+                # Busca ações existentes
+                from services.actions import get_actions_by_entity, create_action, update_action_status, delete_action, action_form
+                
+                actions = get_actions_by_entity("accident", accident_id)
+                
+                # Mostra ações existentes
+                if actions:
+                    st.markdown("### Ações Corretivas Existentes")
+                    for action in actions:
+                        with st.expander(f"🔹 {action.get('what', 'Sem descrição')[:60]}... - Status: {action.get('status', 'N/A')}"):
+                            col1, col2 = st.columns([3, 1])
+                            
+                            with col1:
+                                st.markdown(f"**O QUE:** {action.get('what', '-')}")
+                                st.markdown(f"**QUEM:** {action.get('who', '-')}")
+                                st.markdown(f"**QUANDO:** {action.get('when_date', '-')}")
+                                st.markdown(f"**ONDE:** {action.get('where_text', '-')}")
+                                st.markdown(f"**POR QUÊ:** {action.get('why', '-')}")
+                                st.markdown(f"**COMO:** {action.get('how', '-')}")
+                                if action.get('how_much'):
+                                    st.markdown(f"**QUANTO:** R$ {action.get('how_much', 0):,.2f}")
+                            
+                            with col2:
+                                # Atualizar status
+                                new_status = st.selectbox(
+                                    "Alterar Status",
+                                    options=["aberta", "em_andamento", "fechada"],
+                                    index=["aberta", "em_andamento", "fechada"].index(action.get("status", "aberta")),
+                                    key=f"status_{action.get('id')}"
+                                )
+                                
+                                if new_status != action.get("status"):
+                                    if st.button("Atualizar", key=f"update_{action.get('id')}"):
+                                        if update_action_status(action.get('id'), new_status):
+                                            st.success("Status atualizado!")
+                                            st.rerun()
+                                
+                                if st.button("🗑️ Remover", key=f"delete_{action.get('id')}"):
+                                    if delete_action(action.get('id')):
+                                        st.success("Ação removida!")
+                                        st.rerun()
+                else:
+                    st.info("Nenhuma ação corretiva registrada para este acidente.")
+                
+                # Formulário para nova ação
+                st.markdown("---")
+                st.markdown("### ➕ Nova Ação Corretiva")
+                
+                new_action = action_form("accident", accident_id)
+                if new_action:
+                    if create_action(new_action):
+                        st.success("✅ Ação corretiva registrada com sucesso!")
+                        st.rerun()
+    
+    with tab6:
         # Importa e exibe instruções
         from components.instructions import create_instructions_page, get_accidents_instructions
         
