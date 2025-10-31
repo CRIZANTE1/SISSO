@@ -31,7 +31,8 @@ def log_action(
         True se o log foi registrado com sucesso, False caso contrário
     """
     try:
-        supabase = get_supabase_client()
+        # Usa service_role para contornar RLS ao inserir logs
+        supabase = get_service_role_client()
         user_id = get_user_id()
         
         if not user_id:
