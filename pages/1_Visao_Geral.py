@@ -83,14 +83,14 @@ def app(filters=None):
         total_accidents = kpi_summary.get('total_accidents', 0)
         fatalities = kpi_summary.get('total_fatalities', 0)
         
-        # ✅ NOVO: Usa taxa MÉDIA para classificação quando há múltiplos períodos
+        # ✅ CORRIGIDO: Sempre usa TAXA ACUMULADA (padrão NBR 14280)
+        # A taxa acumulada é calculada como: (Total acidentes / Total horas) × 1.000.000
+        # Esta é a forma correta de calcular para múltiplos períodos conforme a norma
+        display_freq_rate = freq_rate
+        display_sev_rate = sev_rate
         if kpi_summary.get('periods_count', 0) > 1:
-            display_freq_rate = kpi_summary.get('avg_frequency_rate', freq_rate)
-            display_sev_rate = kpi_summary.get('avg_severity_rate', sev_rate)
-            rate_label = "Média por Período"
+            rate_label = f"Taxa Acumulada ({kpi_summary['periods_count']} períodos)"
         else:
-            display_freq_rate = freq_rate
-            display_sev_rate = sev_rate
             rate_label = "Taxa do Período"
         
         # Determina status geral
@@ -122,9 +122,9 @@ def app(filters=None):
         # Métricas principais simplificadas
         st.subheader("📈 Indicadores Principais")
         
-        # ✅ Mostra se é acumulado ou média
+        # ✅ Mostra informação sobre o cálculo
         if kpi_summary.get('periods_count', 0) > 1:
-            st.caption(f"**{rate_label}** - Baseado em {kpi_summary['periods_count']} períodos de dados")
+            st.caption(f"**{rate_label}** - Conforme NBR 14280: (Total de acidentes ÷ Total de horas) × 1.000.000")
         
         col1, col2, col3, col4 = st.columns(4)
         
