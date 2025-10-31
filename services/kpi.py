@@ -20,30 +20,33 @@ def fetch_kpi_data(user_email: Optional[str] = None,
                    end_date: Optional[str] = None) -> pd.DataFrame:
     """Busca dados de KPI do Supabase"""
     try:
-        from auth.auth_utils import get_user_id
-        supabase = get_supabase_client()
-        query = supabase.table("kpi_monthly").select("*")
+        from auth.auth_utils import get_user_id, is_admin
+        from managers.supabase_config import get_supabase_client, get_service_role_client
         
-        # Usa UUID do usuário (created_by agora é UUID, não email)
-        from auth.auth_utils import is_admin
         user_id = get_user_id()
+        if not user_id:
+            return pd.DataFrame()
         
-        # Admin vê todos os dados, usuário comum vê apenas seus próprios
+        # Admin usa service_role para contornar RLS e ver todos os dados
         if is_admin():
-            # Admin não aplica filtro de created_by - vê todos os dados
-            pass
-        elif user_id:
-            query = query.eq("created_by", user_id)
-        # O RLS já filtra por usuário, mas adicionamos explicitamente para garantir
+            supabase = get_service_role_client()
+            query = supabase.table("kpi_monthly").select("*")
+            # Admin vê todos os dados sem filtro de created_by
+        else:
+            supabase = get_supabase_client()
+            query = supabase.table("kpi_monthly").select("*").eq("created_by", user_id)
+        
         if start_date:
             query = query.gte("period", start_date)
         if end_date:
             query = query.lte("period", end_date)
             
         data = query.order("period").execute().data
-        return pd.DataFrame(data)
+        return pd.DataFrame(data) if data else pd.DataFrame()
     except Exception as e:
         st.error(f"Erro ao buscar dados de KPI: {str(e)}")
+        import traceback
+        st.code(traceback.format_exc())
         return pd.DataFrame()
 
 def calculate_frequency_rate(accidents: int, hours_worked: float) -> float:
