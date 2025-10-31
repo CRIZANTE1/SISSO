@@ -34,7 +34,7 @@ def app(filters=None):
             )
     
     # Tabs para diferentes funcionalidades administrativas
-    tab1, tab2, tab3, tab4, tab5 = st.tabs([
+    tab1, tab2, tab3, tab4 = st.tabs([
         "🏢 Sites", 
         "👥 Usuários", 
         "📊 Importar Dados", 
