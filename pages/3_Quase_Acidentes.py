@@ -13,8 +13,6 @@ def fetch_near_misses(start_date=None, end_date=None):
     try:
         from managers.supabase_config import get_supabase_client, get_service_role_client
         from auth.auth_utils import get_user_id, is_admin, get_user_email
-        supabase = get_supabase_client()
-        
         user_id = get_user_id()
         user_email = get_user_email()
         
@@ -23,12 +21,20 @@ def fetch_near_misses(start_date=None, end_date=None):
             st.warning("⚠️ Usuário não autenticado ou UUID não encontrado na sessão.")
             return pd.DataFrame()
         
+        # Admin usa service_role para contornar RLS e ver todos os dados
+        if is_admin():
+            supabase = get_service_role_client()
+        else:
+            supabase = get_supabase_client()
+        
         query = supabase.table("near_misses").select("*")
         
         # Filtra por usuário logado, exceto se for admin
+        # Admin vê todos os dados sem filtro de created_by
         if not is_admin():
+            # Usuário comum vê apenas seus próprios quase-acidentes
             query = query.eq("created_by", user_id)
-        # Se for admin, mostra todos os quase-acidentes
+        # Admin vê todos os quase-acidentes - não aplica filtro de created_by
         
         if start_date:
             query = query.gte("occurred_at", start_date.isoformat())
@@ -46,19 +52,29 @@ def fetch_near_misses(start_date=None, end_date=None):
                 # Verifica se há quase-acidentes no banco (usando service_role para debug)
                 try:
                     debug_supabase = get_service_role_client()
-                    debug_count = debug_supabase.table("near_misses").select("id", count="exact").eq("created_by", user_id).execute()
                     total_count = debug_supabase.table("near_misses").select("id", count="exact").execute()
                     
-                    if hasattr(debug_count, 'count') and debug_count.count == 0:
-                        st.info(f"ℹ️ **Debug**: Nenhum quase-acidente encontrado para o usuário UUID `{user_id}` (email: {user_email}).\n"
-                               f"Os dados fictícios foram criados para o perfil UUID `d88fd010-c11f-4e0a-9491-7a13f5577e8f`.\n"
-                               f"Verifique se você está logado com o email correto (`bboycrysforever@gmail.com`).")
-                    elif hasattr(total_count, 'count'):
-                        st.info(f"ℹ️ **Debug**: Total de quase-acidentes no banco: {total_count.count}, "
-                               f"mas nenhum encontrado para seu UUID `{user_id}`.\n"
-                               f"Verifique se você está logado com o email correto.")
-                except:
-                    pass  # Ignora erros de debug
+                    if is_admin():
+                        # Admin deveria ver todos os dados
+                        if hasattr(total_count, 'count') and total_count.count > 0:
+                            st.warning(f"⚠️ **Admin**: Existem {total_count.count} quase-acidente(s) no banco, mas nenhum foi retornado.\n"
+                                      f"Isso pode indicar um problema com RLS (Row Level Security) ou com a query.\n"
+                                      f"Tente usar Service Role para visualizar todos os dados.")
+                        else:
+                            st.info(f"ℹ️ **Admin**: Não há quase-acidentes no banco de dados.")
+                    else:
+                        # Usuário comum
+                        debug_count = debug_supabase.table("near_misses").select("id", count="exact").eq("created_by", user_id).execute()
+                        if hasattr(debug_count, 'count') and debug_count.count == 0:
+                            st.info(f"ℹ️ **Debug**: Nenhum quase-acidente encontrado para o usuário UUID `{user_id}` (email: {user_email}).\n"
+                                   f"Os dados fictícios foram criados para o perfil UUID `d88fd010-c11f-4e0a-9491-7a13f5577e8f`.\n"
+                                   f"Verifique se você está logado com o email correto (`bboycrysforever@gmail.com`).")
+                        elif hasattr(total_count, 'count'):
+                            st.info(f"ℹ️ **Debug**: Total de quase-acidentes no banco: {total_count.count}, "
+                                   f"mas nenhum encontrado para seu UUID `{user_id}`.\n"
+                                   f"Verifique se você está logado com o email correto.")
+                except Exception as debug_error:
+                    st.error(f"Erro no debug: {debug_error}")
             
             return df
         return pd.DataFrame()

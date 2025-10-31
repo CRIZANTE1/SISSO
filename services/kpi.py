@@ -25,8 +25,14 @@ def fetch_kpi_data(user_email: Optional[str] = None,
         query = supabase.table("kpi_monthly").select("*")
         
         # Usa UUID do usuário (created_by agora é UUID, não email)
+        from auth.auth_utils import is_admin
         user_id = get_user_id()
-        if user_id:
+        
+        # Admin vê todos os dados, usuário comum vê apenas seus próprios
+        if is_admin():
+            # Admin não aplica filtro de created_by - vê todos os dados
+            pass
+        elif user_id:
             query = query.eq("created_by", user_id)
         # O RLS já filtra por usuário, mas adicionamos explicitamente para garantir
         if start_date:
@@ -682,14 +688,23 @@ def fetch_detailed_accidents(user_email: str, start_date=None, end_date=None) ->
         supabase = get_supabase_client()
         
         # Busca dados de acidentes usando UUID do usuário (created_by agora é UUID)
+        from managers.supabase_config import get_service_role_client
+        from auth.auth_utils import is_admin
         user_id = get_user_id()
         if not user_id:
             return pd.DataFrame()
         
-        # Usa get_supabase_client() que respeita RLS ao invés de service_role
+        # Admin usa service_role para ver todos os dados, usuário comum usa client normal
+        if is_admin():
+            supabase = get_service_role_client()
+        else:
+            supabase = get_supabase_client()
+        
         query = supabase.table("accidents").select("*")
-        # O RLS já filtra por created_by = user_id, mas podemos adicionar explicitamente
-        query = query.eq("created_by", user_id)
+        
+        # Admin vê todos os dados, usuário comum vê apenas seus próprios
+        if not is_admin():
+            query = query.eq("created_by", user_id)
         
         if start_date:
             query = query.gte("occurred_at", start_date.isoformat())
