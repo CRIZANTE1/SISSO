@@ -62,6 +62,7 @@ def main():
         ],
         "👤 Conta": [
             st.Page("pages/8_Perfil_Usuario.py", title="Perfil do Usuário", icon="👤"),
+            st.Page("pages/9_Feedbacks.py", title="Feedbacks", icon="📝"),
         ],
         "⚙️ Administração": [
             st.Page("pages/6_Admin_Dados_Basicos.py", title="Dados Básicos", icon="⚙️"),
