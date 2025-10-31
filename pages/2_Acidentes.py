@@ -318,11 +318,21 @@ def get_work_days_analysis(df):
         return {}, df
 
 def fetch_accidents(start_date=None, end_date=None):
-    """Busca dados de acidentes"""
+    """Busca dados de acidentes - filtra por usuário logado"""
     try:
-        from managers.supabase_config import get_service_role_client
-        supabase = get_service_role_client()
+        from managers.supabase_config import get_supabase_client
+        from auth.auth_utils import get_user_id, is_admin
+        supabase = get_supabase_client()
+        
+        user_id = get_user_id()
+        if not user_id:
+            return pd.DataFrame()
+        
         query = supabase.table("accidents").select("*")
+        
+        # Filtra por usuário logado, exceto se for admin
+        if not is_admin():
+            query = query.eq("created_by", user_id)
         
         if start_date:
             query = query.gte("occurred_at", start_date.isoformat())
@@ -761,7 +771,7 @@ def app(filters=None):
                     }[x]
                 )
                 lost_days = st.number_input("Dias Perdidos", min_value=0, value=0)
-                is_fatal = st.checkbox("Acidente Fatal", value=False, help="Marque se o acidente resultou em morte")
+                # is_fatal removido - campo não existe na tabela accidents
             
             with col2:
                 classification_options = [
@@ -800,9 +810,8 @@ def app(filters=None):
                             "Fator Organizacional", "Fator Técnico", "Outros"]
                 )
                 
-                # Campos adicionais
-                cat_number = st.text_input("Número da CAT", placeholder="Ex: 2024001234")
-                communication_date = st.date_input("Data de Comunicação", value=date.today())
+                # Campos adicionais removidos - não existem na tabela accidents
+                # cat_number, communication_date, investigation_* campos não existem na tabela
             
             # Seleção opcional do acidentado
             employees = get_employees()
@@ -874,28 +883,17 @@ def app(filters=None):
                             except Exception as e:
                                 st.error(f"Erro: {str(e)}")
             
-            # Campos de investigação
-            st.subheader("🔍 Investigação do Acidente")
-            col3, col4 = st.columns(2)
-            
-            with col3:
-                investigation_completed = st.checkbox("Investigação Concluída", value=False)
-                investigation_date = st.date_input("Data de Conclusão da Investigação", value=date.today()) if investigation_completed else None
-            
-            with col4:
-                investigation_responsible = st.text_input("Responsável pela Investigação") if investigation_completed else None
-                investigation_notes = st.text_area("Observações da Investigação", height=80) if investigation_completed else None
+            # Campos de investigação removidos - não existem na tabela accidents
+            # investigation_completed, investigation_date, investigation_responsible, investigation_notes, corrective_actions não existem na tabela
             
             description = st.text_area("Descrição do Acidente", height=100)
-            corrective_actions = st.text_area("Ações Corretivas", height=100)
 
             # Status padronizado
             status = st.selectbox(
                 "Status",
-                options=["aberto", "em_investigacao", "fechado"],
+                options=["aberto", "fechado"],
                 format_func=lambda x: {
                     "aberto": "Aberto",
-                    "em_investigacao": "Em investigação",
                     "fechado": "Fechado"
                 }[x]
             )
@@ -914,8 +912,14 @@ def app(filters=None):
                     st.error("Descrição é obrigatória.")
                 else:
                     try:
-                        from managers.supabase_config import get_service_role_client
-                        supabase = get_service_role_client()
+                        from managers.supabase_config import get_supabase_client
+                        from auth.auth_utils import get_user_id
+                        supabase = get_supabase_client()
+                        
+                        user_id = get_user_id()
+                        if not user_id:
+                            st.error("Usuário não autenticado.")
+                            return
                         
                         # Insere acidente
                         accident_data = {
@@ -927,14 +931,7 @@ def app(filters=None):
                             "lost_days": lost_days,
                             "root_cause": root_cause,
                             "status": status,
-                            "is_fatal": is_fatal,
-                            "cat_number": cat_number if cat_number else None,
-                            "communication_date": communication_date.isoformat() if communication_date else None,
-                            "investigation_completed": investigation_completed,
-                            "investigation_date": investigation_date.isoformat() if investigation_date else None,
-                            "investigation_responsible": investigation_responsible if investigation_responsible else None,
-                            "investigation_notes": investigation_notes if investigation_notes else None,
-                            "corrective_actions": corrective_actions if corrective_actions else None
+                            "created_by": user_id
                         }
                         if employee_id:
                             accident_data["employee_id"] = employee_id

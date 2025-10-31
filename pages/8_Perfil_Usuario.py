@@ -32,12 +32,11 @@ def fetch_user_accidents(user_email: str, user_name: str) -> pd.DataFrame:
         supabase = get_service_role_client()
         if not supabase:
             return pd.DataFrame()
-        # Tenta filtrar por responsável de investigação OU criador quando disponível
-        # created_by pode não existir em todos os registros
-        query = supabase.table("accidents").select("id, occurred_at, description, status, investigation_completed, investigation_date, investigation_responsible, investigation_notes")
-        # Filtro por responsável igual ao nome do usuário (ou email presente nas notas)
-        # Preferimos responsável por texto exato; fallback mostra abertos
-        response = query.or_(f"investigation_responsible.eq.{user_name},investigation_responsible.eq.{user_email},status.neq.fechado").order("occurred_at", desc=True).execute()
+        # Campos de investigação removidos - não existem na tabela accidents
+        # Filtra apenas por status aberto e criador
+        query = supabase.table("accidents").select("id, occurred_at, description, status, created_by")
+        # Mostra apenas acidentes abertos do usuário
+        response = query.eq("status", "aberto").order("occurred_at", desc=True).execute()
         if response and hasattr(response, 'data') and response.data:
             df = pd.DataFrame(response.data)
             return df
@@ -50,13 +49,9 @@ def update_investigation(accident_id: int, completed: bool, inv_date: date | Non
     supabase = get_service_role_client()
     if not supabase:
         return False
+    # Campos de investigação removidos - apenas atualiza status
     payload = {
-        "investigation_completed": completed,
-        "investigation_date": inv_date.isoformat() if inv_date else None,
-        "investigation_responsible": responsible if responsible else None,
-        "investigation_notes": notes if notes else None,
-        # Ajusta status se marcar concluída
-        "status": "fechado" if completed else "em_investigacao",
+        "status": "fechado" if completed else "aberto",
     }
     res = supabase.table("accidents").update(payload).eq("id", accident_id).execute()
     return bool(res and hasattr(res, 'data'))
@@ -155,14 +150,13 @@ def app():
         sel_row = df_acc[df_acc['id'] == accident_id].iloc[0]
 
         with st.form("investigation_form"):
-            completed = st.checkbox("Investigação Concluída", value=bool(sel_row.get('investigation_completed')))
-            inv_date = st.date_input("Data da conclusão", value=date.today() if completed else date.today()) if completed else None
-            responsible = st.text_input("Responsável pela investigação", value=sel_row.get('investigation_responsible') or user_name or user_email)
-            notes = st.text_area("Observações", value=sel_row.get('investigation_notes') or "", height=100)
+            # Campos de investigação removidos - apenas status
+            completed = st.checkbox("Marcar como Fechado", value=sel_row.get('status') == 'fechado')
+            # inv_date, responsible, notes removidos - campos não existem na tabela
 
             submitted = st.form_submit_button("💾 Atualizar Investigação", type="primary")
             if submitted:
-                ok = update_investigation(accident_id, completed, inv_date, responsible, notes)
+                ok = update_investigation(accident_id, completed, None, None, None)
                 if ok:
                     st.success("Investigação atualizada!")
                     st.rerun()

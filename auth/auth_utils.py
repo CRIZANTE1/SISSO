@@ -115,7 +115,7 @@ def check_user_in_database(email: str) -> Optional[Dict[str, Any]]:
             profile = response.data[0]
             logger.info(f"Perfil encontrado para {email}: role={profile.get('role', 'viewer')}")
             return {
-                "id": profile["email"],  # Usa email como ID
+                "id": profile.get("id"),  # Usa UUID do perfil
                 "email": profile.get("email", email),
                 "full_name": profile.get("full_name", ""),
                 "role": profile.get("role", "viewer")
@@ -133,12 +133,23 @@ def check_user_in_database(email: str) -> Optional[Dict[str, Any]]:
                 logger.info(f"Usuário de trial criado com sucesso: {email}")
                 st.success("Bem-vindo! Você tem 14 dias de acesso gratuito ao sistema.")
                 
-                return {
-                    "id": email,
-                    "email": email,
-                    "full_name": "",
-                    "role": "viewer"
-                }
+                # Busca o perfil recém-criado para obter o UUID
+                response = supabase.table("profiles").select("*").eq("email", email).execute()
+                if response.data and len(response.data) > 0:
+                    profile = response.data[0]
+                    return {
+                        "id": profile.get("id"),
+                        "email": email,
+                        "full_name": profile.get("full_name", ""),
+                        "role": "viewer"
+                    }
+                else:
+                    return {
+                        "id": None,
+                        "email": email,
+                        "full_name": "",
+                        "role": "viewer"
+                    }
             else:
                 logger.warning(f"Falha ao criar usuário de trial para: {email}")
                 # Ainda tenta encontrar o perfil mesmo que tenha falhado a criação
@@ -146,7 +157,7 @@ def check_user_in_database(email: str) -> Optional[Dict[str, Any]]:
                 if response.data and len(response.data) > 0:
                     profile = response.data[0]
                     return {
-                        "id": profile["email"],
+                        "id": profile.get("id"),
                         "email": profile.get("email", email),
                         "full_name": profile.get("full_name", ""),
                         "role": profile.get("role", "viewer")
@@ -182,8 +193,10 @@ def check_user_in_database(email: str) -> Optional[Dict[str, Any]]:
                 
                 if response.data:
                     logger.info(f"Perfil de emergência criado com sucesso para {email}")
+                    # Retorna o UUID do perfil criado
+                    profile = response.data[0]
                     return {
-                        "id": email,
+                        "id": profile.get("id"),
                         "email": email,
                         "full_name": "Cristian Ferreira",
                         "role": "admin"
@@ -201,7 +214,7 @@ def check_user_in_database(email: str) -> Optional[Dict[str, Any]]:
                             profile = existing_profile.data[0]
                             logger.info(f"Perfil encontrado após erro de duplicação: {email}")
                             return {
-                                "id": email,
+                                "id": profile.get("id"),
                                 "email": profile.get("email", email),
                                 "full_name": profile.get("full_name", "Cristian Ferreira"),
                                 "role": profile.get("role", "admin")

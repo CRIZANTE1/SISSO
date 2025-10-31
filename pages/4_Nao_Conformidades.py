@@ -9,13 +9,20 @@ from components.filters import apply_filters_to_df
 from managers.supabase_config import get_supabase_client
 
 def fetch_nonconformities(start_date=None, end_date=None):
-    """Busca dados de não conformidades"""
+    """Busca dados de não conformidades - filtra por usuário logado"""
     try:
+        from auth.auth_utils import get_user_id, is_admin
         supabase = get_supabase_client()
+        
+        user_id = get_user_id()
+        if not user_id:
+            return pd.DataFrame()
+        
         query = supabase.table("nonconformities").select("*")
         
-        # NOTA: A tabela não tem campo site_id como mostrado no INSERT, então não aplicamos filtro por site
-        # Buscamos todos os registros independentemente de quem criou
+        # Filtra por usuário logado, exceto se for admin
+        if not is_admin():
+            query = query.eq("created_by", user_id)
         
         data = query.order("occurred_at", desc=True).execute().data
         df = pd.DataFrame(data)
@@ -352,7 +359,7 @@ def app(filters=None):
                 filtered_df = filtered_df[filtered_df['description'].str.contains(search_term, case=False, na=False)]
             
             # Exibe tabela
-            display_cols = ['occurred_at', 'norm_reference', 'severity', 'status', 'description', 'corrective_actions']
+            display_cols = ['occurred_at', 'norm_reference', 'severity', 'status', 'description']
             available_cols = [col for col in display_cols if col in filtered_df.columns]
             
             if available_cols:
@@ -460,37 +467,19 @@ def app(filters=None):
                 )
             
             with col2:
-                # Busca sites disponíveis
-                sites = get_sites()
-                site_options = {f"{site['code']} - {site['name']}": site['id'] for site in sites}
-                selected_site = st.selectbox("Site", options=list(site_options.keys()))
-                site_id = site_options[selected_site] if selected_site else None
+                # site_id, employee_id, resolution_date removidos - não existem na tabela nonconformities
                 
                 status = st.selectbox(
                     "Status",
-                    options=["aberta", "tratando", "encerrada"],
+                    options=["aberta", "encerrada"],
                     format_func=lambda x: {
                         "aberta": "Aberta",
-                        "tratando": "Em Tratamento", 
                         "encerrada": "Encerrada"
                     }[x]
                 )
 
-            # Seleção opcional do acidentado (quando aplicável)
-            employees = get_employees()
-            emp_options = {"— (Sem funcionário) —": None}
-            emp_options.update({f"{e.get('full_name','Sem Nome')} ({e.get('department','-')})": e['id'] for e in employees})
-            selected_emp = st.selectbox("Funcionário (opcional)", options=list(emp_options.keys()))
-            employee_id = emp_options[selected_emp]
-            
             description = st.text_area("Descrição da Não Conformidade", height=100)
-            corrective_actions = st.text_area("Ações Corretivas", height=100)
-            
-            # Data de resolução se encerrada
-            if status == "encerrada":
-                resolution_date = st.date_input("Data de Resolução", value=date.today())
-            else:
-                resolution_date = None
+            # corrective_actions removido - campo não existe na tabela nonconformities
             
             # Upload de evidências
             uploaded_files = st.file_uploader(
@@ -508,7 +497,13 @@ def app(filters=None):
                     st.error("Descrição é obrigatória.")
                 else:
                     try:
+                        from auth.auth_utils import get_user_id
                         supabase = get_supabase_client()
+                        
+                        user_id = get_user_id()
+                        if not user_id:
+                            st.error("Usuário não autenticado.")
+                            return
                         
                         # Insere não conformidade nos campos que existem na tabela
                         nc_data = {
@@ -518,20 +513,8 @@ def app(filters=None):
                             "severity": severity,
                             "status": status,
                             "description": description,
-                            "corrective_actions": corrective_actions
+                            "created_by": user_id
                         }
-                        
-                        # Apenas adiciona campos se tivermos valores para eles
-                        if employee_id:
-                            nc_data["employee_id"] = employee_id
-                        
-                        if resolution_date:
-                            nc_data["resolution_date"] = resolution_date.isoformat()
-                        
-                        # Tenta adicionar site_id apenas se a tabela tiver essa coluna
-                        # (pode ser adicionado se a estrutura da tabela for atualizada)
-                        if site_id:
-                            nc_data["site_id"] = site_id
                         
                         result = supabase.table("nonconformities").insert(nc_data).execute()
                         

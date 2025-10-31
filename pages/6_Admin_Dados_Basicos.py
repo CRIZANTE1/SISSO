@@ -359,11 +359,11 @@ def app(filters=None):
                     
                     # Busca todos os dados de acidentes e horas trabalhadas
                     accidents_response = supabase.table("accidents").select(
-                        "id, occurred_at, created_by, lost_days, is_fatal"
+                        "id, occurred_at, created_by, lost_days, type"
                     ).execute()
                     
                     hours_response = supabase.table("hours_worked_monthly").select(
-                        "id, year, month, hours, site_id, created_by"
+                        "id, year, month, hours, created_by"
                     ).execute()
                     
                     accidents_data = accidents_response.data if accidents_response and hasattr(accidents_response, 'data') else []
@@ -378,7 +378,8 @@ def app(filters=None):
                     for accident in accidents_data:
                         period = pd.to_datetime(accident['occurred_at']).strftime('%Y-%m')
                         accidents_by_period[period]['count'] += 1
-                        if accident.get('is_fatal', False):
+                        # is_fatal removido - usa type para identificar fatais
+                        if accident.get('type') == 'fatal':
                             accidents_by_period[period]['fatalities'] += 1
                         accidents_by_period[period]['lost_days'] += int(accident.get('lost_days', 0))
                     

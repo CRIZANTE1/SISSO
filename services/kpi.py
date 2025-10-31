@@ -20,11 +20,15 @@ def fetch_kpi_data(user_email: Optional[str] = None,
                    end_date: Optional[str] = None) -> pd.DataFrame:
     """Busca dados de KPI do Supabase"""
     try:
+        from auth.auth_utils import get_user_id
         supabase = get_supabase_client()
         query = supabase.table("kpi_monthly").select("*")
         
-        if user_email:
-            query = query.eq("created_by", user_email)
+        # Usa UUID do usuário (created_by agora é UUID, não email)
+        user_id = get_user_id()
+        if user_id:
+            query = query.eq("created_by", user_id)
+        # O RLS já filtra por usuário, mas adicionamos explicitamente para garantir
         if start_date:
             query = query.gte("period", start_date)
         if end_date:
@@ -673,11 +677,19 @@ def fetch_detailed_accidents(user_email: str, start_date=None, end_date=None) ->
     Busca dados detalhados de acidentes do usuário atual
     """
     try:
-        from managers.supabase_config import get_service_role_client
-        supabase = get_service_role_client()
+        from managers.supabase_config import get_supabase_client
+        from auth.auth_utils import get_user_id
+        supabase = get_supabase_client()
         
-        # Busca dados de acidentes - o RLS já controla o acesso baseado no created_by
-        query = supabase.table("accidents").select("*").eq("created_by", user_email)
+        # Busca dados de acidentes usando UUID do usuário (created_by agora é UUID)
+        user_id = get_user_id()
+        if not user_id:
+            return pd.DataFrame()
+        
+        # Usa get_supabase_client() que respeita RLS ao invés de service_role
+        query = supabase.table("accidents").select("*")
+        # O RLS já filtra por created_by = user_id, mas podemos adicionar explicitamente
+        query = query.eq("created_by", user_id)
         
         if start_date:
             query = query.gte("occurred_at", start_date.isoformat())
@@ -712,10 +724,7 @@ def analyze_accidents_by_category(accidents_df: pd.DataFrame) -> Dict[str, Any]:
         'lost_days': 'sum'
     }
     
-    # Adiciona is_fatal apenas se a coluna existir
-    if 'is_fatal' in accidents_df.columns:
-        agg_dict['is_fatal'] = 'sum'
-    
+    # is_fatal removido - usar type == 'fatal' em vez disso
     type_analysis = accidents_df.groupby('type').agg(agg_dict).rename(columns={'id': 'count'})
     
     # Análise por classificação
@@ -743,16 +752,13 @@ def analyze_accidents_by_category(accidents_df: pd.DataFrame) -> Dict[str, Any]:
             'lost_days': 'sum'
         }
         
-        # Adiciona is_fatal apenas se a coluna existir
-        if 'is_fatal' in accidents_df.columns:
-            temporal_agg_dict['is_fatal'] = 'sum'
-            
+        # is_fatal removido - usar type == 'fatal' em vez disso
         temporal_analysis = accidents_df.groupby('year_month').agg(temporal_agg_dict).rename(columns={'id': 'count'})
     else:
         temporal_analysis = pd.DataFrame()
     
     # Converte para formato mais legível
-    def format_analysis(df, name):
+    def format_analysis(df, analysis_name, group_key=None):
         if df.empty:
             return {}
         
@@ -760,21 +766,46 @@ def analyze_accidents_by_category(accidents_df: pd.DataFrame) -> Dict[str, Any]:
         for idx, row in df.iterrows():
             if pd.isna(idx) or idx == '':
                 continue
+            
+            # Calcula fatalities baseado em type == 'fatal'
+            fatalities_count = 0
+            if analysis_name == 'by_type':
+                # Para análise por tipo, se o índice for 'fatal', todos são fatais
+                fatalities_count = int(row['count']) if str(idx) == 'fatal' else 0
+            elif group_key is not None and 'type' in accidents_df.columns:
+                # Para outras análises, filtra o dataframe original pelo grupo e conta fatais
+                if group_key == 'classification':
+                    group_data = accidents_df[accidents_df['classification'] == idx]
+                elif group_key == 'body_part':
+                    group_data = accidents_df[accidents_df['body_part'] == idx]
+                elif group_key == 'root_cause':
+                    group_data = accidents_df[accidents_df['root_cause'] == idx]
+                elif group_key == 'year_month':
+                    group_data = accidents_df[accidents_df['year_month'] == idx]
+                else:
+                    group_data = pd.DataFrame()
+                
+                if not group_data.empty:
+                    fatalities_count = len(group_data[group_data['type'] == 'fatal'])
+            
             result[str(idx)] = {
                 'count': int(row['count']),
                 'lost_days': int(row.get('lost_days', 0)),
-                'fatalities': int(row.get('is_fatal', 0)) if 'is_fatal' in row else 0
+                'fatalities': fatalities_count
             }
         return result
     
+    # Calcula total de fatais baseado em type == 'fatal'
+    total_fatalities = len(accidents_df[accidents_df['type'] == 'fatal']) if 'type' in accidents_df.columns else 0
+    
     return {
-        'by_type': format_analysis(type_analysis, 'Tipo'),
-        'by_classification': format_analysis(classification_analysis, 'Classificação'),
-        'by_body_part': format_analysis(body_part_analysis, 'Parte do Corpo'),
-        'by_root_cause': format_analysis(root_cause_analysis, 'Causa Raiz'),
-        'temporal': format_analysis(temporal_analysis, 'Temporal'),
+        'by_type': format_analysis(type_analysis, 'by_type'),
+        'by_classification': format_analysis(classification_analysis, 'by_classification', 'classification'),
+        'by_body_part': format_analysis(body_part_analysis, 'by_body_part', 'body_part'),
+        'by_root_cause': format_analysis(root_cause_analysis, 'by_root_cause', 'root_cause'),
+        'temporal': format_analysis(temporal_analysis, 'temporal', 'year_month'),
         'total_accidents': len(accidents_df),
-        'total_fatalities': int(accidents_df['is_fatal'].sum()) if 'is_fatal' in accidents_df.columns else 0,
+        'total_fatalities': total_fatalities,
         'total_lost_days': int(accidents_df['lost_days'].sum()) if 'lost_days' in accidents_df.columns else 0,
         'frequency_by_period': calculate_accident_frequency_by_period(accidents_df)
     }

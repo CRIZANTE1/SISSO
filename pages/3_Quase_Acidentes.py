@@ -9,11 +9,21 @@ from components.filters import apply_filters_to_df
 from managers.supabase_config import get_supabase_client
 
 def fetch_near_misses(start_date=None, end_date=None):
-    """Busca dados de quase-acidentes"""
+    """Busca dados de quase-acidentes - filtra por usuário logado"""
     try:
-        from managers.supabase_config import get_service_role_client
-        supabase = get_service_role_client()
+        from managers.supabase_config import get_supabase_client
+        from auth.auth_utils import get_user_id, is_admin
+        supabase = get_supabase_client()
+        
+        user_id = get_user_id()
+        if not user_id:
+            return pd.DataFrame()
+        
         query = supabase.table("near_misses").select("*")
+        
+        # Filtra por usuário logado, exceto se for admin
+        if not is_admin():
+            query = query.eq("created_by", user_id)
         
         if start_date:
             query = query.gte("occurred_at", start_date.isoformat())
@@ -84,11 +94,11 @@ def app(filters=None):
             # Normaliza severidade potencial para 3 níveis: low/medium/high
             if 'potential_severity' in df.columns:
                 sev_map = {
-                    'leve': 'low',
+                    'baixa': 'low',
+                    'media': 'medium',
+                    'alta': 'high',
                     'low': 'low',
-                    'moderada': 'medium',
                     'medium': 'medium',
-                    'grave': 'high',
                     'high': 'high'
                 }
                 df['_severity_norm'] = (
@@ -328,11 +338,11 @@ def app(filters=None):
                 date_input = st.date_input("Data do Quase-Acidente", value=date.today())
                 potential_severity = st.selectbox(
                     "Severidade Potencial",
-                    options=["low", "medium", "high"],
+                    options=["baixa", "media", "alta"],
                     format_func=lambda x: {
-                        "low": "Baixo",
-                        "medium": "Médio", 
-                        "high": "Alto"
+                        "baixa": "Baixa",
+                        "media": "Média", 
+                        "alta": "Alta"
                     }[x]
                 )
             
@@ -346,15 +356,10 @@ def app(filters=None):
                     }[x]
                 )
             
-            # Seleção opcional de funcionário (acidentado potencial)
-            employees = get_employees()
-            emp_options = {"— (Sem funcionário) —": None}
-            emp_options.update({f"{e.get('full_name','Sem Nome')} ({e.get('department','-')})": e['id'] for e in employees})
-            selected_emp = st.selectbox("Funcionário (opcional)", options=list(emp_options.keys()))
-            employee_id = emp_options[selected_emp]
+            # employee_id removido - campo não existe na tabela near_misses
             
             description = st.text_area("Descrição do Quase-Acidente", height=100)
-            preventive_actions = st.text_area("Ações Preventivas", height=100)
+            # preventive_actions removido - campo não existe na tabela near_misses
             
             # Upload de evidências
             uploaded_files = st.file_uploader(
@@ -370,18 +375,24 @@ def app(filters=None):
                     st.error("Descrição é obrigatória.")
                 else:
                     try:
-                        from managers.supabase_config import get_service_role_client
-                        supabase = get_service_role_client()
+                        from managers.supabase_config import get_supabase_client
+                        from auth.auth_utils import get_user_id
+                        supabase = get_supabase_client()
+                        
+                        user_id = get_user_id()
+                        if not user_id:
+                            st.error("Usuário não autenticado.")
+                            return
                         
                         # Insere quase-acidente
                         near_miss_data = {
                             "occurred_at": date_input.isoformat(),
                             "potential_severity": potential_severity,
                             "description": description,
-                            "status": status
+                            "status": status,
+                            "created_by": user_id
                         }
-                        if employee_id:
-                            near_miss_data["employee_id"] = employee_id
+                        # employee_id removido - campo não existe na tabela near_misses
                         
                         result = supabase.table("near_misses").insert(near_miss_data).execute()
                         
