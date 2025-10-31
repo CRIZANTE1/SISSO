@@ -15,23 +15,24 @@ def get_all_employees() -> List[Dict]:
         if not user_id:
             return []
         
-        # Admin usa service_role para ver todos os funcionários
+        # Usa service_role para contornar RLS e aplicar filtro de segurança no código
+        supabase = get_service_role_client()
+        
+        # Admin vê todos os funcionários
         if is_admin():
-            supabase = get_service_role_client()
             query = supabase.table("employees").select("*")
         else:
-            supabase = get_supabase_client()
             # Usuário comum vê apenas seus próprios funcionários
-            # Usa filtro explícito por user_id (UUID)
+            # Aplica filtro explícito por user_id (UUID)
             query = supabase.table("employees").select("*").eq("user_id", user_id)
         
         response = query.order("full_name").execute()
         employees = response.data if response.data else []
         
         # Garante que todos os funcionários retornados têm user_id correto
-        # (validação adicional de segurança)
+        # (validação adicional de segurança para usuários não-admin)
         if not is_admin() and employees:
-            # Filtra novamente para garantir (mesmo que RLS já faça isso)
+            # Filtra novamente para garantir (segurança em camadas)
             employees = [e for e in employees if e.get('user_id') == user_id]
         
         return employees
@@ -50,17 +51,23 @@ def get_employee_by_id(employee_id: str) -> Optional[Dict]:
         if not user_id:
             return None
         
+        # Usa service_role para contornar RLS e aplicar filtro de segurança no código
+        supabase = get_service_role_client()
+        
         # Admin pode ver qualquer funcionário
         if is_admin():
-            supabase = get_service_role_client()
             response = supabase.table("employees").select("*").eq("id", employee_id).execute()
         else:
             # Usuário comum só pode ver seus próprios funcionários
-            supabase = get_supabase_client()
+            # Aplica filtro explícito por user_id (UUID)
             response = supabase.table("employees").select("*").eq("id", employee_id).eq("user_id", user_id).execute()
         
         if response.data:
-            return response.data[0]
+            employee = response.data[0]
+            # Validação adicional de segurança para usuários não-admin
+            if not is_admin() and employee.get('user_id') != user_id:
+                return None
+            return employee
         return None
     except Exception as e:
         st.error(f"Erro ao buscar funcionário: {str(e)}")

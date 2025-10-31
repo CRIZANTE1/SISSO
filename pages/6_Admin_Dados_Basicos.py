@@ -284,7 +284,43 @@ def app(filters=None):
     with tab4:
         st.subheader("Atualizar KPIs")
         
-        st.info("💡 Os KPIs são calculados automaticamente baseados nos dados de acidentes e horas trabalhadas.")
+        st.info("💡 **Importante**: Os KPIs precisam ser calculados manualmente através do botão abaixo.\n\n"
+                "📋 **Requisitos para calcular KPIs:**\n"
+                "1. Ter acidentes cadastrados na tabela `accidents`\n"
+                "2. Ter horas trabalhadas cadastradas na tabela `hours_worked_monthly`\n"
+                "3. Os dados devem estar no mesmo período (mês/ano) e vinculados ao mesmo usuário\n\n"
+                "**Como funciona:** O sistema agrupa acidentes e horas por período (mês) e usuário, "
+                "calcula as taxas de frequência e gravidade, e salva na tabela `kpi_monthly`.")
+        
+        # Verifica se há dados antes de permitir recalcular
+        try:
+            from managers.supabase_config import get_service_role_client
+            supabase = get_service_role_client()
+            
+            accidents_count = supabase.table("accidents").select("id", count="exact").execute().count or 0
+            hours_count = supabase.table("hours_worked_monthly").select("id", count="exact").execute().count or 0
+            kpis_count = supabase.table("kpi_monthly").select("id", count="exact").execute().count or 0
+            
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric("Acidentes Cadastrados", accidents_count)
+            with col2:
+                st.metric("Registros de Horas", hours_count)
+            with col3:
+                st.metric("KPIs Calculados", kpis_count)
+            
+            if accidents_count == 0 and hours_count == 0:
+                st.warning("⚠️ **Nenhum dado encontrado**: Cadastre acidentes e/ou horas trabalhadas primeiro!")
+            elif accidents_count == 0:
+                st.warning("⚠️ **Sem acidentes**: Cadastre acidentes para calcular KPIs!")
+            elif hours_count == 0:
+                st.warning("⚠️ **Sem horas trabalhadas**: Cadastre horas trabalhadas para calcular KPIs!")
+            elif kpis_count == 0:
+                st.info("ℹ️ **KPIs não calculados**: Clique no botão abaixo para calcular os KPIs baseados nos dados existentes.")
+            else:
+                st.success(f"✅ **KPIs já calculados**: Existem {kpis_count} registros de KPI calculados.")
+        except Exception as e:
+            st.error(f"Erro ao verificar dados: {str(e)}")
         
         if st.button("🔄 Recalcular KPIs", type="primary", key="btn_recalculate_kpis"):
             with st.spinner("Recalculando KPIs..."):
@@ -395,7 +431,13 @@ def app(filters=None):
                                 }
                                 supabase.table("kpi_monthly").insert(kpi_data).execute()
                     
-                    st.success(f"✅ KPIs recalculados com sucesso para {len(accidents_by_period_user)} períodos!")
+                    total_kpis = len(accidents_by_period_user) + len([k for k in hours_by_period_user.keys() if k not in accidents_by_period_user])
+                    st.success(f"✅ KPIs recalculados com sucesso!\n\n"
+                              f"📊 **Resumo:**\n"
+                              f"- Períodos com acidentes processados: {len(accidents_by_period_user)}\n"
+                              f"- Períodos com horas (sem acidentes) processados: {len([k for k in hours_by_period_user.keys() if k not in accidents_by_period_user])}\n"
+                              f"- **Total de KPIs calculados/atualizados: {total_kpis}**\n\n"
+                              f"💡 **Dica**: Atualize os KPIs sempre que cadastrar novos acidentes ou horas trabalhadas.")
                     
                 except Exception as e:
                     st.error(f"Erro ao recalcular KPIs: {str(e)}")
