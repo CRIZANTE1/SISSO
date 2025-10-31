@@ -1395,11 +1395,12 @@ def app(filters=None):
                             # Calcular dias debitados para acidentes fatais (NBR 14280)
                             debited_days = acc_data['fatalities'] * 6000  # 6.000 dias por morte
                             
-                            # ✅ CORRIGIDO: hours vem da tabela hours_worked_monthly (176.0 = 176 centenas = 17.600 horas reais)
+                            # ✅ CORRIGIDO: hours vem da tabela hours_worked_monthly em HORAS REAIS (182.0 = 182 horas reais)
                             # A função espera receber em centenas e multiplica por 100 internamente
-                            # Então passamos hours diretamente (já está em centenas)
-                            freq_rate = calculate_frequency_rate(acc_data['count'], hours)
-                            sev_rate = calculate_severity_rate(acc_data['lost_days'], hours, debited_days)
+                            # Então dividimos por 100 para converter para centenas antes de calcular
+                            hours_in_hundreds = hours / 100  # Converte 182.0 horas reais para 1.82 centenas
+                            freq_rate = calculate_frequency_rate(acc_data['count'], hours_in_hundreds)
+                            sev_rate = calculate_severity_rate(acc_data['lost_days'], hours_in_hundreds, debited_days)
                             
                             # Verifica se já existe KPI para este período e usuário
                             existing_kpi = supabase.table("kpi_monthly").select("id").eq("period", f"{period}-01").eq("created_by", user_id).execute()
@@ -1410,7 +1411,7 @@ def app(filters=None):
                                 "accidents_total": acc_data['count'],
                                 "fatalities": acc_data['fatalities'],
                                 "lost_days_total": acc_data['lost_days'],
-                                "hours": hours,  # ✅ Armazena em centenas (176.0 = 17.600 horas reais)
+                                "hours": hours_in_hundreds,  # ✅ Armazena em centenas (182.0 → 1.82 na tabela)
                                 "frequency_rate": freq_rate,
                                 "severity_rate": sev_rate,
                                 "debited_days": debited_days
@@ -1438,7 +1439,7 @@ def app(filters=None):
                                     "accidents_total": 0,
                                     "fatalities": 0,
                                     "lost_days_total": 0,
-                                    "hours": hours / 100,
+                                    "hours": hours / 100,  # ✅ Converte horas reais para centenas
                                     "frequency_rate": 0,
                                     "severity_rate": 0,
                                     "debited_days": 0

@@ -264,10 +264,10 @@ def generate_kpi_summary(df: pd.DataFrame) -> Dict[str, Any]:
     
     total_accidents = float(df['accidents_total'].sum())
     total_lost_days = float(df['lost_days_total'].sum())
-    # ✅ CORRIGIDO: A tabela armazena horas em centenas (176.0 = 176 centenas = 17.600 horas reais)
+    # ✅ CORRIGIDO: A tabela armazena horas em centenas (1.82 = 182 horas reais)
     # Precisa multiplicar por 100 para converter para horas reais
-    total_hours = float(df['hours'].sum())  # Soma dos valores da tabela (ex: 4079 centenas)
-    total_hours_corrected = total_hours * HOURS_SCALE  # Multiplica por 100: 4079 × 100 = 407.900 horas reais
+    total_hours = float(df['hours'].sum())  # Soma dos valores da tabela em centenas (ex: 40.79 centenas)
+    total_hours_corrected = total_hours * HOURS_SCALE  # Multiplica por 100: 40.79 × 100 = 4.079 horas reais
     total_fatalities = float(df.get('fatalities', pd.Series([0] * len(df))).sum())
     total_debited_days = float(df.get('debited_days', pd.Series([0] * len(df))).sum())
     

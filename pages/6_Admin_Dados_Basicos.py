@@ -427,7 +427,7 @@ def app(filters=None):
                                     "accidents_total": 0,
                                     "fatalities": 0,
                                     "lost_days_total": 0,
-                                    "hours": hours,  # Armazena em centenas (176.0 = 17.600 horas reais)
+                                    "hours": hours / 100,  # ✅ Converte horas reais para centenas (182.0 → 1.82 na tabela)
                                     "frequency_rate": 0,
                                     "severity_rate": 0,
                                     "debited_days": 0
