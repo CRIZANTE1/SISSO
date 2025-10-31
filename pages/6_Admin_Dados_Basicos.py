@@ -135,6 +135,7 @@ def app(filters=None):
             with col2:
                 # site_ids removido - campo não existe na tabela profiles
                 # A tabela profiles não tem relação direta com sites
+                pass  # Coluna vazia - campo removido
             
             is_active = st.checkbox("Usuário Ativo", value=True)
             
