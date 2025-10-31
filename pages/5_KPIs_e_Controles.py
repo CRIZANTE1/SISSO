@@ -82,6 +82,33 @@ def app(filters=None):
             freq_interpretation = kpi_summary.get('frequency_interpretation', {})
             sev_interpretation = kpi_summary.get('severity_interpretation', {})
             
+            # ✅ NOVO: Popover FAQ com explicações dos indicadores
+            title_col, faq_col = st.columns([10, 1])
+            with title_col:
+                st.subheader("📊 Indicadores de Segurança")
+            with faq_col:
+                with st.popover("❓ FAQ", help="Clique para ver explicações dos indicadores"):
+                    st.markdown("### 📊 O que cada indicador significa:")
+                    
+                    st.markdown("""
+                    **📈 Taxa de Frequência (TF)**
+                    - Quantos acidentes a cada 1 milhão de horas trabalhadas
+                    - **Padrão NBR 14280**: ≤ 20 = 🟢 Muito bom | > 60 = 🔴 Péssimo
+                    
+                    **⚠️ Taxa de Gravidade (TG)**
+                    - Quantos dias perdidos a cada 1 milhão de horas
+                    - Inclui dias debitados (fatal = 6.000 dias)
+                    - **Padrão**: ≤ 50 = 🟢 Excelente | > 200 = 🔴 Crítico
+                    
+                    **🚨 Total de Acidentes**
+                    - Número total de acidentes no período
+                    
+                    **📅 Dias Perdidos**
+                    - Total de dias de afastamento por acidentes
+                    """)
+                    
+                    st.caption("📚 Fonte: NBR 14280")
+            
             metrics = [
                 {
                     "title": "Taxa de Frequência (TF)",

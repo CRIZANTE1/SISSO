@@ -123,8 +123,36 @@ def app(filters=None):
         st.subheader("📈 Indicadores Principais")
         
         # ✅ Mostra informação sobre o cálculo
-        if kpi_summary.get('periods_count', 0) > 1:
-            st.caption(f"**{rate_label}** - Conforme NBR 14280: (Total de acidentes ÷ Total de horas) × 1.000.000")
+        calc_info_col, faq_col = st.columns([6, 1])
+        with calc_info_col:
+            if kpi_summary.get('periods_count', 0) > 1:
+                st.caption(f"**{rate_label}** - Conforme NBR 14280: (Total de acidentes ÷ Total de horas) × 1.000.000")
+        
+        # ✅ NOVO: Popover FAQ com explicações dos indicadores (ao lado do título)
+        with faq_col:
+            with st.popover("❓ FAQ Indicadores", help="Clique para ver explicações resumidas dos indicadores"):
+                st.markdown("### 📊 Explicação dos Indicadores")
+                
+                st.markdown("""
+                **🔴 Acidentes por Milhão de Horas (TF)**
+                - Mostra quantos acidentes acontecem a cada 1 milhão de horas trabalhadas
+                - **Padrão**: ≤ 20 = 🟢 Muito bom | > 60 = 🔴 Péssimo
+                
+                **🔴 Dias Perdidos por Milhão de Horas (TG)**
+                - Mostra quantos dias são perdidos a cada 1 milhão de horas
+                - Inclui dias debitados (fatal = 6.000 dias)
+                - **Padrão**: ≤ 50 = 🟢 Excelente | > 200 = 🔴 Crítico
+                
+                **🟠 Total de Acidentes**
+                - Número total de acidentes no período
+                - Não conta incidentes sem lesão
+                
+                **🟠 Dias de Trabalho Perdidos**
+                - Total de dias que funcionários ficaram afastados
+                - Mostra o impacto dos acidentes
+                """)
+                
+                st.caption("📚 Conforme NBR 14280")
         
         col1, col2, col3, col4 = st.columns(4)
         
