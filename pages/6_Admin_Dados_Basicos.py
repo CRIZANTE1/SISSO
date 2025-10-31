@@ -345,7 +345,7 @@ def app(filters=None):
                     
                     # Agrupa acidentes por mês/criador
                     from collections import defaultdict
-                    import pandas as pd
+                    # pd já está importado no topo do arquivo
                     
                     accidents_by_period_user = defaultdict(lambda: {'count': 0, 'fatalities': 0, 'lost_days': 0})
                     
