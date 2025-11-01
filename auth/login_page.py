@@ -3,7 +3,7 @@ from .auth_utils import get_user_display_name, get_user_email
 
 def show_login_page():
     """Página de login inicial."""
-    st.title("🛡️ Sistema SSO - Monitoramento")
+    st.title("🛡️ Sistema SISSO - Monitoramento")
     st.subheader("Sistema de Gestão de Segurança e Saúde Ocupacional")
     
     st.markdown("""
