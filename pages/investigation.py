@@ -107,9 +107,13 @@ def render_fault_tree_html(tree_json: Dict[str, Any]) -> str:
         # Causa básica: fact validado sem filhos
         if node_type == 'fact' and status == 'validated' and not has_children:
             basic_cause_counter += 1
-            return f"CB {basic_cause_counter}"
-        # Hipótese: qualquer hypothesis ou fact com filhos
-        elif node_type == 'hypothesis' or (node_type == 'fact' and has_children):
+            return f"CB{basic_cause_counter}"
+        # Hipótese: qualquer hypothesis (pendente ou descartada) ou fact com filhos
+        elif node_type == 'hypothesis' or (node_type == 'fact' and has_children) or (status in ['pending', 'discarded']):
+            hypothesis_counter += 1
+            return f"H{hypothesis_counter}"
+        # Causa intermediária validada: também pode ter numeração H
+        elif status == 'validated' and has_children:
             hypothesis_counter += 1
             return f"H{hypothesis_counter}"
         # Root não tem numeração
@@ -183,29 +187,13 @@ def render_fault_tree_html(tree_json: Dict[str, Any]) -> str:
             # Retângulo arredondado
             shape_style = f"border-radius: {shape_config['border_radius']}; width: 280px; min-height: 70px;"
         
-        # Estilo do nó
-        node_style = f"""
-            position: relative;
-            {shape_style}
-            background-color: {shape_config['bg_color']};
-            border: 2px solid {shape_config['border_color']};
-            padding: 12px 15px;
-            margin: 10px 5px;
-            display: inline-flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            text-align: center;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.25);
-            font-size: 0.9em;
-            line-height: 1.3;
-            word-wrap: break-word;
-        """
+        # Estilo do nó (compacto)
+        node_style = f"position: relative; {shape_style} background-color: {shape_config['bg_color']}; border: 2px solid {shape_config['border_color']}; padding: 12px 15px; margin: 10px 5px; display: inline-flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; box-shadow: 0 2px 6px rgba(0,0,0,0.25); font-size: 0.9em; line-height: 1.3; word-wrap: break-word;"
         
         # Número do nó (se houver)
         number_html = ""
         if node_number:
-            number_html = f'<div style="position: absolute; top: -12px; left: -12px; background-color: {shape_config["border_color"]}; color: white; width: 35px; height: 35px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 0.85em; box-shadow: 0 2px 6px rgba(0,0,0,0.4); z-index: 10;">{node_number}</div>'
+            number_html = f'<div style="position: absolute; top: -10px; left: -10px; background-color: {shape_config["border_color"]}; color: white; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 0.8em; box-shadow: 0 2px 4px rgba(0,0,0,0.3); z-index: 10;">{node_number}</div>'
         
         # X para descartado
         discard_x = ""
@@ -221,7 +209,6 @@ def render_fault_tree_html(tree_json: Dict[str, Any]) -> str:
         # Renderiza filhos
         children_html = ""
         children_container = ""
-        connector_line = ""
         if children:
             children_items = []
             for child in children:
@@ -229,16 +216,17 @@ def render_fault_tree_html(tree_json: Dict[str, Any]) -> str:
                 children_items.append(child_html)
             children_html = "".join(children_items)
             
-            # Container dos filhos com linhas conectivas (compacto)
-            children_container = f'<div style="position: relative; margin-top: 30px; padding-top: 20px;"><div style="position: absolute; left: 50%; top: 0; width: 3px; height: 20px; background-color: #2196f3; transform: translateX(-50%); z-index: 1;"></div><div style="position: absolute; left: 0; right: 0; top: 20px; height: 3px; background-color: #2196f3; z-index: 1;"></div><div style="display: flex; flex-wrap: wrap; justify-content: center; align-items: flex-start; position: relative; padding-top: 23px;">{children_html}</div></div>'
+            # Container dos filhos com linhas conectivas (ajustado)
+            # Linha vertical do pai + linha horizontal + container dos filhos
+            children_container = f'<div style="position: relative; margin-top: 25px; padding-top: 15px; width: 100%;"><div style="position: absolute; left: 50%; top: 0; width: 2px; height: 15px; background-color: #2196f3; transform: translateX(-50%); z-index: 1;"></div><div style="position: absolute; left: 0; right: 0; top: 15px; height: 2px; background-color: #2196f3; z-index: 1;"></div><div style="display: flex; flex-wrap: wrap; justify-content: center; align-items: flex-start; position: relative; padding-top: 17px; gap: 10px;">{children_html}</div></div>'
         
-        # Linha vertical do nó (se não for raiz e tiver pai)
+        # Linha vertical do nó conectando ao pai (se não for raiz)
         node_connector = ""
         if level > 0:
-            node_connector = f'<div style="position: absolute; left: 50%; top: -23px; width: 3px; height: 23px; background-color: #2196f3; transform: translateX(-50%); z-index: 1;"></div>'
+            node_connector = f'<div style="position: absolute; left: 50%; top: -17px; width: 2px; height: 17px; background-color: #2196f3; transform: translateX(-50%); z-index: 1;"></div>'
         
         # HTML do nó (compacto, sem quebras de linha)
-        node_html = f'<div style="position: relative; display: inline-block; vertical-align: top; margin: 0 15px;">{node_connector}<div style="{node_style}">{number_html}{discard_x}<div style="color: {shape_config["text_color"]}; font-weight: 500; z-index: 2; position: relative;">{label_escaped}</div>{nbr_html}</div>{children_container}</div>'
+        node_html = f'<div style="position: relative; display: inline-block; vertical-align: top; margin: 0 10px;">{node_connector}<div style="{node_style}">{number_html}{discard_x}<div style="color: {shape_config["text_color"]}; font-weight: 500; z-index: 2; position: relative;">{label_escaped}</div>{nbr_html}</div>{children_container}</div>'
         
         return node_html
     
@@ -249,7 +237,7 @@ def render_fault_tree_html(tree_json: Dict[str, Any]) -> str:
     legend_html = '<div style="position: absolute; top: 10px; right: 10px; background: white; border: 2px solid #333; padding: 10px; border-radius: 5px; font-size: 0.8em; z-index: 1000; box-shadow: 0 2px 8px rgba(0,0,0,0.3);"><div style="font-weight: bold; margin-bottom: 8px; border-bottom: 1px solid #ccc; padding-bottom: 5px;">LEGENDA</div><div style="margin-bottom: 5px;"><strong>H:</strong> Numeração de Hipóteses</div><div style="margin-bottom: 5px;"><strong>CB:</strong> Numeração de Causas Básicas</div><div style="margin-bottom: 5px; display: flex; align-items: center; gap: 5px;"><div style="width: 20px; height: 20px; clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%); background: #e0e0e0; border: 2px solid #757575;"></div><span>Hipótese</span></div><div style="margin-bottom: 5px; display: flex; align-items: center; gap: 5px;"><div style="width: 20px; height: 20px; clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%); background: #ffcdd2; border: 2px solid #f44336; position: relative;"><span style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: #d32f2f; font-weight: bold;">✕</span></div><span>Hipótese Descartada</span></div><div style="margin-bottom: 5px; display: flex; align-items: center; gap: 5px;"><div style="width: 20px; height: 20px; background: #fff9c4; border: 2px solid #f9a825; border-radius: 5px;"></div><span>Causa Intermediária</span></div><div style="display: flex; align-items: center; gap: 5px;"><div style="width: 20px; height: 20px; background: #c8e6c9; border: 2px solid #4caf50; border-radius: 50px;"></div><span>Causa Básica</span></div></div>'
     
     # HTML completo (compacto, sem quebras de linha)
-    full_html = f'<div style="position: relative; font-family: Arial, sans-serif; padding: 40px 20px; background: white; min-height: 400px; overflow-x: auto;"><div style="text-align: center; margin-bottom: 30px;"><h2 style="margin: 0; color: #333; font-size: 1.5em;">ÁRVORE DE FALHAS</h2><div style="color: #666; font-size: 0.9em; margin-top: 5px;">{date.today().strftime("%d/%m/%Y")}</div></div>{legend_html}<div style="display: flex; justify-content: center; align-items: flex-start; min-height: 300px; padding: 20px 0;"><div style="text-align: center;">{tree_html}</div></div></div>'
+    full_html = f'<div style="position: relative; font-family: Arial, sans-serif; padding: 40px 20px; background: white; min-height: 400px; overflow-x: auto; overflow-y: auto;"><div style="text-align: center; margin-bottom: 30px;"><h2 style="margin: 0; color: #333; font-size: 1.5em; font-weight: bold;">ÁRVORE DE FALHAS</h2><div style="color: #666; font-size: 0.9em; margin-top: 5px;">{date.today().strftime("%d/%m/%Y")}</div></div>{legend_html}<div style="display: flex; justify-content: center; align-items: flex-start; min-height: 300px; padding: 20px 0; width: 100%;"><div style="text-align: center; width: 100%;">{tree_html}</div></div></div>'
     
     return full_html
 
