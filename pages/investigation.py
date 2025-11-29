@@ -229,88 +229,27 @@ def render_fault_tree_html(tree_json: Dict[str, Any]) -> str:
                 children_items.append(child_html)
             children_html = "".join(children_items)
             
-            # Container dos filhos com linhas conectivas
-            children_container = f'''
-            <div style="position: relative; margin-top: 30px; padding-top: 20px;">
-                <!-- Linha vertical do pai -->
-                <div style="position: absolute; left: 50%; top: 0; width: 3px; height: 20px; background-color: #2196f3; transform: translateX(-50%); z-index: 1;"></div>
-                <!-- Linha horizontal conectando filhos -->
-                <div style="position: absolute; left: 0; right: 0; top: 20px; height: 3px; background-color: #2196f3; z-index: 1;"></div>
-                <!-- Linhas verticais dos filhos -->
-                <div style="display: flex; flex-wrap: wrap; justify-content: center; align-items: flex-start; position: relative; padding-top: 23px;">
-                    {children_html}
-                </div>
-            </div>
-            '''
+            # Container dos filhos com linhas conectivas (compacto)
+            children_container = f'<div style="position: relative; margin-top: 30px; padding-top: 20px;"><div style="position: absolute; left: 50%; top: 0; width: 3px; height: 20px; background-color: #2196f3; transform: translateX(-50%); z-index: 1;"></div><div style="position: absolute; left: 0; right: 0; top: 20px; height: 3px; background-color: #2196f3; z-index: 1;"></div><div style="display: flex; flex-wrap: wrap; justify-content: center; align-items: flex-start; position: relative; padding-top: 23px;">{children_html}</div></div>'
         
         # Linha vertical do nó (se não for raiz e tiver pai)
         node_connector = ""
         if level > 0:
             node_connector = f'<div style="position: absolute; left: 50%; top: -23px; width: 3px; height: 23px; background-color: #2196f3; transform: translateX(-50%); z-index: 1;"></div>'
         
-        # HTML do nó
-        node_html = f'''
-        <div style="position: relative; display: inline-block; vertical-align: top; margin: 0 15px;">
-            {node_connector}
-            <div style="{node_style}">
-                {number_html}
-                {discard_x}
-                <div style="color: {shape_config['text_color']}; font-weight: 500; z-index: 2; position: relative;">
-                    {label_escaped}
-                </div>
-                {nbr_html}
-            </div>
-            {children_container}
-        </div>
-        '''
+        # HTML do nó (compacto, sem quebras de linha)
+        node_html = f'<div style="position: relative; display: inline-block; vertical-align: top; margin: 0 15px;">{node_connector}<div style="{node_style}">{number_html}{discard_x}<div style="color: {shape_config["text_color"]}; font-weight: 500; z-index: 2; position: relative;">{label_escaped}</div>{nbr_html}</div>{children_container}</div>'
         
         return node_html
     
     # Renderiza a árvore completa
     tree_html = render_node(tree_json, level=0)
     
-    # Legenda
-    legend_html = '''
-    <div style="position: absolute; top: 10px; right: 10px; background: white; border: 2px solid #333; padding: 10px; border-radius: 5px; font-size: 0.8em; z-index: 1000; box-shadow: 0 2px 8px rgba(0,0,0,0.3);">
-        <div style="font-weight: bold; margin-bottom: 8px; border-bottom: 1px solid #ccc; padding-bottom: 5px;">LEGENDA</div>
-        <div style="margin-bottom: 5px;"><strong>H:</strong> Numeração de Hipóteses</div>
-        <div style="margin-bottom: 5px;"><strong>CB:</strong> Numeração de Causas Básicas</div>
-        <div style="margin-bottom: 5px; display: flex; align-items: center; gap: 5px;">
-            <div style="width: 20px; height: 20px; clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%); background: #e0e0e0; border: 2px solid #757575;"></div>
-            <span>Hipótese</span>
-        </div>
-        <div style="margin-bottom: 5px; display: flex; align-items: center; gap: 5px;">
-            <div style="width: 20px; height: 20px; clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%); background: #ffcdd2; border: 2px solid #f44336; position: relative;">
-                <span style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: #d32f2f; font-weight: bold;">✕</span>
-            </div>
-            <span>Hipótese Descartada</span>
-        </div>
-        <div style="margin-bottom: 5px; display: flex; align-items: center; gap: 5px;">
-            <div style="width: 20px; height: 20px; background: #fff9c4; border: 2px solid #f9a825; border-radius: 5px;"></div>
-            <span>Causa Intermediária</span>
-        </div>
-        <div style="display: flex; align-items: center; gap: 5px;">
-            <div style="width: 20px; height: 20px; background: #c8e6c9; border: 2px solid #4caf50; border-radius: 50px;"></div>
-            <span>Causa Básica</span>
-        </div>
-    </div>
-    '''
+    # Legenda (compacta)
+    legend_html = '<div style="position: absolute; top: 10px; right: 10px; background: white; border: 2px solid #333; padding: 10px; border-radius: 5px; font-size: 0.8em; z-index: 1000; box-shadow: 0 2px 8px rgba(0,0,0,0.3);"><div style="font-weight: bold; margin-bottom: 8px; border-bottom: 1px solid #ccc; padding-bottom: 5px;">LEGENDA</div><div style="margin-bottom: 5px;"><strong>H:</strong> Numeração de Hipóteses</div><div style="margin-bottom: 5px;"><strong>CB:</strong> Numeração de Causas Básicas</div><div style="margin-bottom: 5px; display: flex; align-items: center; gap: 5px;"><div style="width: 20px; height: 20px; clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%); background: #e0e0e0; border: 2px solid #757575;"></div><span>Hipótese</span></div><div style="margin-bottom: 5px; display: flex; align-items: center; gap: 5px;"><div style="width: 20px; height: 20px; clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%); background: #ffcdd2; border: 2px solid #f44336; position: relative;"><span style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: #d32f2f; font-weight: bold;">✕</span></div><span>Hipótese Descartada</span></div><div style="margin-bottom: 5px; display: flex; align-items: center; gap: 5px;"><div style="width: 20px; height: 20px; background: #fff9c4; border: 2px solid #f9a825; border-radius: 5px;"></div><span>Causa Intermediária</span></div><div style="display: flex; align-items: center; gap: 5px;"><div style="width: 20px; height: 20px; background: #c8e6c9; border: 2px solid #4caf50; border-radius: 50px;"></div><span>Causa Básica</span></div></div>'
     
-    # HTML completo
-    full_html = f'''
-    <div style="position: relative; font-family: Arial, sans-serif; padding: 40px 20px; background: white; min-height: 400px; overflow-x: auto;">
-        <div style="text-align: center; margin-bottom: 30px;">
-            <h2 style="margin: 0; color: #333; font-size: 1.5em;">ÁRVORE DE FALHAS</h2>
-            <div style="color: #666; font-size: 0.9em; margin-top: 5px;">{date.today().strftime('%d/%m/%Y')}</div>
-        </div>
-        {legend_html}
-        <div style="display: flex; justify-content: center; align-items: flex-start; min-height: 300px; padding: 20px 0;">
-            <div style="text-align: center;">
-                {tree_html}
-            </div>
-        </div>
-    </div>
-    '''
+    # HTML completo (compacto, sem quebras de linha)
+    full_html = f'<div style="position: relative; font-family: Arial, sans-serif; padding: 40px 20px; background: white; min-height: 400px; overflow-x: auto;"><div style="text-align: center; margin-bottom: 30px;"><h2 style="margin: 0; color: #333; font-size: 1.5em;">ÁRVORE DE FALHAS</h2><div style="color: #666; font-size: 0.9em; margin-top: 5px;">{date.today().strftime("%d/%m/%Y")}</div></div>{legend_html}<div style="display: flex; justify-content: center; align-items: flex-start; min-height: 300px; padding: 20px 0;"><div style="text-align: center;">{tree_html}</div></div></div>'
     
     return full_html
 
