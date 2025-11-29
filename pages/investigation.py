@@ -89,6 +89,155 @@ def render_progress_bar(current_step: int, total_steps: int = 4):
     st.progress(progress)
 
 
+def render_fault_tree_html(tree_json: Dict[str, Any]) -> str:
+    """Renderiza a árvore de falhas em HTML/CSS bonito e visual"""
+    if not tree_json:
+        return ""
+    
+    # Cores e ícones baseados no status
+    status_config = {
+        'validated': {
+            'bg_color': '#d4edda',
+            'border_color': '#28a745',
+            'text_color': '#155724',
+            'icon': '✅',
+            'badge': 'Confirmado',
+            'badge_bg': '#28a745'
+        },
+        'discarded': {
+            'bg_color': '#f8d7da',
+            'border_color': '#dc3545',
+            'text_color': '#721c24',
+            'icon': '❌',
+            'badge': 'Descartado',
+            'badge_bg': '#dc3545'
+        },
+        'pending': {
+            'bg_color': '#e2e3e5',
+            'border_color': '#6c757d',
+            'text_color': '#383d41',
+            'icon': '⏳',
+            'badge': 'Em Análise',
+            'badge_bg': '#6c757d'
+        }
+    }
+    
+    # Mapeamento de tipos
+    type_labels = {
+        'root': '🎯 Evento Principal',
+        'hypothesis': '💭 Hipótese',
+        'fact': '📌 Fato Confirmado'
+    }
+    
+    def render_node(node: Dict[str, Any], level: int = 0) -> str:
+        """Renderiza um nó recursivamente"""
+        status = node.get('status', 'pending')
+        node_type = node.get('type', 'hypothesis')
+        label = node.get('label', '')
+        nbr_code = node.get('nbr_code')
+        
+        config = status_config.get(status, status_config['pending'])
+        type_label = type_labels.get(node_type, node_type)
+        
+        # Indentação baseada no nível (máximo de 60px por nível)
+        margin_left = min(level * 50, 200)  # Limita a 200px
+        
+        # Estilo do card com melhor espaçamento
+        card_style = f"""
+            margin-left: {margin_left}px;
+            margin-bottom: 20px;
+            margin-top: 10px;
+            padding: 18px 20px;
+            background: linear-gradient(to right, {config['bg_color']} 0%, {config['bg_color']} 4px, #ffffff 4px);
+            border-left: 4px solid {config['border_color']};
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            transition: transform 0.2s, box-shadow 0.2s;
+        """
+        
+        # Badge de status melhorado
+        badge_style = f"""
+            display: inline-block;
+            padding: 5px 10px;
+            background-color: {config['badge_bg']};
+            color: white;
+            border-radius: 12px;
+            font-size: 0.75em;
+            font-weight: 600;
+            margin-right: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        """
+        
+        # Linha conectora vertical (se não for raiz)
+        connector = ""
+        if level > 0:
+            connector = f"""
+            <div style="position: relative; margin-left: {margin_left - 25}px; width: 2px; height: 15px; background: linear-gradient(to bottom, {config['border_color']}, transparent); margin-bottom: -2px;"></div>
+            """
+        
+        # Código NBR (se existir) - melhorado
+        nbr_html = ""
+        if nbr_code:
+            nbr_html = f"""
+            <div style="margin-top: 12px; padding: 10px 12px; background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); border-radius: 6px; border: 1px solid #dee2e6;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <span style="font-size: 1.1em;">📋</span>
+                    <span style="font-weight: 600; color: #495057; margin-right: 8px;">Código NBR:</span>
+                    <code style="background-color: #fff; padding: 4px 10px; border-radius: 4px; font-weight: 600; color: #0066cc; border: 1px solid #cce5ff;">{nbr_code}</code>
+                </div>
+            </div>
+            """
+        
+        # Renderiza filhos
+        children_html = ""
+        children = node.get('children', [])
+        if children:
+            children_html = "".join([render_node(child, level + 1) for child in children])
+        
+        # Texto com melhor formatação
+        label_html = label.replace('\n', '<br>')
+        
+        return f"""
+        {connector}
+        <div style="{card_style}">
+            <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 12px;">
+                <span style="font-size: 1.3em; margin-right: 4px;">{config['icon']}</span>
+                <span style="{badge_style}">{config['badge']}</span>
+                <span style="color: #6c757d; font-size: 0.9em; font-weight: 500;">{type_label}</span>
+            </div>
+            <div style="color: {config['text_color']}; font-weight: 500; font-size: 1.08em; line-height: 1.5; word-wrap: break-word;">
+                {label_html}
+            </div>
+            {nbr_html}
+        </div>
+        {children_html}
+        """
+    
+    # Renderiza a árvore completa
+    tree_html = render_node(tree_json, level=0)
+    
+    # HTML completo com estilos e container
+    full_html = f"""
+    <div style="
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+        padding: 20px;
+        background: linear-gradient(135deg, #f5f7fa 0%, #ffffff 100%);
+        border-radius: 12px;
+        border: 1px solid #e1e8ed;
+        margin: 20px 0;
+    ">
+        <div style="margin-bottom: 15px; padding-bottom: 15px; border-bottom: 2px solid #e1e8ed;">
+            <h3 style="margin: 0; color: #2c3e50; font-size: 1.3em; font-weight: 600;">🌳 Árvore de Causas</h3>
+            <p style="margin: 5px 0 0 0; color: #7f8c8d; font-size: 0.9em;">Estrutura hierárquica das causas identificadas</p>
+        </div>
+        {tree_html}
+    </div>
+    """
+    
+    return full_html
+
+
 def render_fault_tree_graph_from_json(tree_json: Dict[str, Any]):
     """Renderiza a árvore de falhas usando graphviz a partir do JSON hierárquico"""
     if not GRAPHVIZ_AVAILABLE:
@@ -934,27 +1083,45 @@ def main():
         st.markdown("### 🌳 Estrutura da Árvore de Causas")
         
         if tree_json:
-            if GRAPHVIZ_AVAILABLE:
-                try:
-                    tree_graph = render_fault_tree_graph_from_json(tree_json)
-                    if tree_graph:
-                        st.graphviz_chart(tree_graph.source)
-                        
-                        # Legenda de cores
-                        st.markdown("""
-                        <div style="background-color: #f8f9fa; padding: 10px; border-radius: 5px; margin: 10px 0;">
-                            <strong>Legenda:</strong><br>
-                            🟢 <span style="color: #28a745;">Verde</span> = Causa confirmada (Verdadeiro)<br>
-                            🔴 <span style="color: #dc3545;">Vermelho</span> = Causa descartada (Falso)<br>
-                            ⚪ <span style="color: #6c757d;">Cinza</span> = Em análise (Investigando...)
+            # Usa visualização HTML bonita como padrão
+            tree_html = render_fault_tree_html(tree_json)
+            if tree_html:
+                st.markdown(tree_html, unsafe_allow_html=True)
+                
+                # Legenda de cores
+                st.markdown("""
+                <div style="background-color: #f8f9fa; padding: 15px; border-radius: 8px; margin: 20px 0; border: 1px solid #dee2e6;">
+                    <strong style="font-size: 1.1em;">📊 Legenda de Status:</strong><br><br>
+                    <div style="display: flex; gap: 20px; flex-wrap: wrap; margin-top: 10px;">
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <span style="font-size: 1.2em;">✅</span>
+                            <span style="color: #155724; font-weight: 500;">Verde</span> = Causa confirmada (Verdadeiro)
                         </div>
-                        """, unsafe_allow_html=True)
-                except Exception as e:
-                    st.warning(f"Erro ao renderizar árvore: {str(e)}")
-                    st.json(tree_json)
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <span style="font-size: 1.2em;">❌</span>
+                            <span style="color: #721c24; font-weight: 500;">Vermelho</span> = Causa descartada (Falso)
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <span style="font-size: 1.2em;">⏳</span>
+                            <span style="color: #383d41; font-weight: 500;">Cinza</span> = Em análise (Investigando...)
+                        </div>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                # Opção alternativa: Graphviz (se disponível)
+                with st.expander("🔀 Ver visualização alternativa (Graphviz)", expanded=False):
+                    if GRAPHVIZ_AVAILABLE:
+                        try:
+                            tree_graph = render_fault_tree_graph_from_json(tree_json)
+                            if tree_graph:
+                                st.graphviz_chart(tree_graph.source)
+                        except Exception as e:
+                            st.warning(f"Erro ao renderizar com Graphviz: {str(e)}")
+                    else:
+                        st.info("📋 Graphviz não está instalado. Instale com: `pip install graphviz`")
             else:
-                st.info("📋 Graphviz não disponível - Exibindo estrutura:")
-                st.json(tree_json)
+                st.warning("⚠️ Erro ao renderizar árvore")
         else:
             st.info("🌱 A árvore ainda não possui nós. Adicione causas abaixo.")
         
