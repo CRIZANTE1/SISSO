@@ -448,14 +448,28 @@ def main():
                         help="Evento de quase-acidente"
                     )
                 
-                severity_level = st.selectbox(
+                # Mapeamento entre português (interface) e inglês (banco)
+                severity_options_pt = ["", "Baixa", "Média", "Alta", "Catastrófica"]
+                severity_options_en = ["", "Low", "Medium", "High", "Catastrophic"]
+                
+                # Converte valor do banco (inglês) para índice em português
+                current_severity_en = investigation.get('severity_level', '') or ''
+                current_index = 0
+                if current_severity_en and current_severity_en in severity_options_en:
+                    current_index = severity_options_en.index(current_severity_en)
+                
+                severity_level_pt = st.selectbox(
                     "Nível de Gravidade:",
-                    options=["", "Low", "Medium", "High", "Catastrophic"],
-                    index=0 if not investigation.get('severity_level') else 
-                          (["", "Low", "Medium", "High", "Catastrophic"].index(investigation.get('severity_level'))
-                           if investigation.get('severity_level') in ["", "Low", "Medium", "High", "Catastrophic"] else 0),
+                    options=severity_options_pt,
+                    index=current_index,
                     help="Gravidade do acidente: Baixa, Média, Alta ou Catastrófica"
                 )
+                
+                # Converte seleção em português para inglês (para salvar no banco)
+                if severity_level_pt and severity_level_pt in severity_options_pt:
+                    severity_level = severity_options_en[severity_options_pt.index(severity_level_pt)]
+                else:
+                    severity_level = ""
                 
                 estimated_loss_val = investigation.get('estimated_loss_value')
                 estimated_loss_value = st.number_input(

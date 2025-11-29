@@ -302,10 +302,10 @@ HTML_TEMPLATE = """
             </td>
             <td width="50%">
                 <span class="label">Gravidade Real/Potencial</span>
-                <span class="checkbox">{{ '☑' if accident.get('severity_level') == 'Low' else '☐' }}</span> Baixa<br>
-                <span class="checkbox">{{ '☑' if accident.get('severity_level') == 'Medium' else '☐' }}</span> Média<br>
-                <span class="checkbox">{{ '☑' if accident.get('severity_level') == 'High' else '☐' }}</span> Alta<br>
-                <span class="checkbox">{{ '☑' if accident.get('severity_level') == 'Catastrophic' else '☐' }}</span> Catastrófica
+                <span class="checkbox">{{ '☑' if accident.get('severity_level') == 'Low' or accident.get('severity_level') == 'Baixa' else '☐' }}</span> Baixa<br>
+                <span class="checkbox">{{ '☑' if accident.get('severity_level') == 'Medium' or accident.get('severity_level') == 'Média' else '☐' }}</span> Média<br>
+                <span class="checkbox">{{ '☑' if accident.get('severity_level') == 'High' or accident.get('severity_level') == 'Alta' else '☐' }}</span> Alta<br>
+                <span class="checkbox">{{ '☑' if accident.get('severity_level') == 'Catastrophic' or accident.get('severity_level') == 'Catastrófica' else '☐' }}</span> Catastrófica
             </td>
         </tr>
         {% if accident.get('estimated_loss_value') %}
