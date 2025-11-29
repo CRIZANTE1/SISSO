@@ -139,55 +139,29 @@ def render_fault_tree_html(tree_json: Dict[str, Any]) -> str:
         config = status_config.get(status, status_config['pending'])
         type_label = type_labels.get(node_type, node_type)
         
-        # Indentação baseada no nível (máximo de 60px por nível)
-        margin_left = min(level * 50, 200)  # Limita a 200px
+        # Indentação baseada no nível
+        margin_left = min(level * 50, 200)
         
-        # Estilo do card com melhor espaçamento
-        card_style = f"""
-            margin-left: {margin_left}px;
-            margin-bottom: 20px;
-            margin-top: 10px;
-            padding: 18px 20px;
-            background: linear-gradient(to right, {config['bg_color']} 0%, {config['bg_color']} 4px, #ffffff 4px);
-            border-left: 4px solid {config['border_color']};
-            border-radius: 8px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-            transition: transform 0.2s, box-shadow 0.2s;
-        """
+        # Escapa HTML no label para evitar problemas
+        import html
+        label_escaped = html.escape(label).replace('\n', '<br>')
         
-        # Badge de status melhorado
-        badge_style = f"""
-            display: inline-block;
-            padding: 5px 10px;
-            background-color: {config['badge_bg']};
-            color: white;
-            border-radius: 12px;
-            font-size: 0.75em;
-            font-weight: 600;
-            margin-right: 10px;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        """
+        # Estilo do card (compacto, sem quebras de linha)
+        card_style = f"margin-left: {margin_left}px; margin-bottom: 20px; margin-top: 10px; padding: 18px 20px; background: linear-gradient(to right, {config['bg_color']} 0%, {config['bg_color']} 4px, #ffffff 4px); border-left: 4px solid {config['border_color']}; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.08);"
+        
+        # Badge de status
+        badge_style = f"display: inline-block; padding: 5px 10px; background-color: {config['badge_bg']}; color: white; border-radius: 12px; font-size: 0.75em; font-weight: 600; margin-right: 10px; text-transform: uppercase; letter-spacing: 0.5px;"
         
         # Linha conectora vertical (se não for raiz)
         connector = ""
         if level > 0:
-            connector = f"""
-            <div style="position: relative; margin-left: {margin_left - 25}px; width: 2px; height: 15px; background: linear-gradient(to bottom, {config['border_color']}, transparent); margin-bottom: -2px;"></div>
-            """
+            connector = f'<div style="position: relative; margin-left: {margin_left - 25}px; width: 2px; height: 15px; background: linear-gradient(to bottom, {config["border_color"]}, transparent); margin-bottom: -2px;"></div>'
         
-        # Código NBR (se existir) - melhorado
+        # Código NBR (se existir)
         nbr_html = ""
         if nbr_code:
-            nbr_html = f"""
-            <div style="margin-top: 12px; padding: 10px 12px; background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); border-radius: 6px; border: 1px solid #dee2e6;">
-                <div style="display: flex; align-items: center; gap: 8px;">
-                    <span style="font-size: 1.1em;">📋</span>
-                    <span style="font-weight: 600; color: #495057; margin-right: 8px;">Código NBR:</span>
-                    <code style="background-color: #fff; padding: 4px 10px; border-radius: 4px; font-weight: 600; color: #0066cc; border: 1px solid #cce5ff;">{nbr_code}</code>
-                </div>
-            </div>
-            """
+            nbr_code_escaped = html.escape(str(nbr_code))
+            nbr_html = f'<div style="margin-top: 12px; padding: 10px 12px; background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); border-radius: 6px; border: 1px solid #dee2e6;"><div style="display: flex; align-items: center; gap: 8px;"><span style="font-size: 1.1em;">📋</span><span style="font-weight: 600; color: #495057; margin-right: 8px;">Código NBR:</span><code style="background-color: #fff; padding: 4px 10px; border-radius: 4px; font-weight: 600; color: #0066cc; border: 1px solid #cce5ff;">{nbr_code_escaped}</code></div></div>'
         
         # Renderiza filhos
         children_html = ""
@@ -195,45 +169,16 @@ def render_fault_tree_html(tree_json: Dict[str, Any]) -> str:
         if children:
             children_html = "".join([render_node(child, level + 1) for child in children])
         
-        # Texto com melhor formatação
-        label_html = label.replace('\n', '<br>')
+        # HTML do nó (compacto, sem quebras de linha desnecessárias)
+        node_html = f'{connector}<div style="{card_style}"><div style="display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 12px;"><span style="font-size: 1.3em; margin-right: 4px;">{config["icon"]}</span><span style="{badge_style}">{config["badge"]}</span><span style="color: #6c757d; font-size: 0.9em; font-weight: 500;">{type_label}</span></div><div style="color: {config["text_color"]}; font-weight: 500; font-size: 1.08em; line-height: 1.5; word-wrap: break-word;">{label_escaped}</div>{nbr_html}</div>{children_html}'
         
-        return f"""
-        {connector}
-        <div style="{card_style}">
-            <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 12px;">
-                <span style="font-size: 1.3em; margin-right: 4px;">{config['icon']}</span>
-                <span style="{badge_style}">{config['badge']}</span>
-                <span style="color: #6c757d; font-size: 0.9em; font-weight: 500;">{type_label}</span>
-            </div>
-            <div style="color: {config['text_color']}; font-weight: 500; font-size: 1.08em; line-height: 1.5; word-wrap: break-word;">
-                {label_html}
-            </div>
-            {nbr_html}
-        </div>
-        {children_html}
-        """
+        return node_html
     
     # Renderiza a árvore completa
     tree_html = render_node(tree_json, level=0)
     
-    # HTML completo com estilos e container
-    full_html = f"""
-    <div style="
-        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-        padding: 20px;
-        background: linear-gradient(135deg, #f5f7fa 0%, #ffffff 100%);
-        border-radius: 12px;
-        border: 1px solid #e1e8ed;
-        margin: 20px 0;
-    ">
-        <div style="margin-bottom: 15px; padding-bottom: 15px; border-bottom: 2px solid #e1e8ed;">
-            <h3 style="margin: 0; color: #2c3e50; font-size: 1.3em; font-weight: 600;">🌳 Árvore de Causas</h3>
-            <p style="margin: 5px 0 0 0; color: #7f8c8d; font-size: 0.9em;">Estrutura hierárquica das causas identificadas</p>
-        </div>
-        {tree_html}
-    </div>
-    """
+    # HTML completo com estilos e container (compacto)
+    full_html = f'<div style="font-family: -apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, \'Helvetica Neue\', Arial, sans-serif; padding: 20px; background: linear-gradient(135deg, #f5f7fa 0%, #ffffff 100%); border-radius: 12px; border: 1px solid #e1e8ed; margin: 20px 0;"><div style="margin-bottom: 15px; padding-bottom: 15px; border-bottom: 2px solid #e1e8ed;"><h3 style="margin: 0; color: #2c3e50; font-size: 1.3em; font-weight: 600;">🌳 Árvore de Causas</h3><p style="margin: 5px 0 0 0; color: #7f8c8d; font-size: 0.9em;">Estrutura hierárquica das causas identificadas</p></div>{tree_html}</div>'
     
     return full_html
 
@@ -1086,6 +1031,7 @@ def main():
             # Usa visualização HTML bonita como padrão
             tree_html = render_fault_tree_html(tree_json)
             if tree_html:
+                # Renderiza HTML usando st.markdown com unsafe_allow_html
                 st.markdown(tree_html, unsafe_allow_html=True)
                 
                 # Legenda de cores
