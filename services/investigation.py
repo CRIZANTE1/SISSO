@@ -11,6 +11,25 @@ from auth.auth_utils import get_user_id, get_user_email
 import streamlit as st
 
 
+def get_sites() -> List[Dict[str, Any]]:
+    """Busca todos os sites ativos da tabela sites (com bypass RLS)"""
+    try:
+        from managers.supabase_config import get_service_role_client
+        supabase = get_service_role_client()
+        if not supabase:
+            return []
+        
+        # Busca sites ativos, ordenados por nome
+        response = supabase.table("sites").select("id, code, name, type, is_active").eq("is_active", True).order("name").execute()
+        
+        if response and hasattr(response, 'data'):
+            return response.data if response.data else []
+        return []
+    except Exception as e:
+        st.error(f"Erro ao buscar sites: {str(e)}")
+        return []
+
+
 def create_accident(title: str, description: str = "", occurrence_date: Optional[datetime] = None, 
                    **kwargs) -> Optional[str]:
     """Cria uma nova investigação de acidente com campos expandidos do relatório Vibra"""

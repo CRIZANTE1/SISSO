@@ -26,7 +26,8 @@ from services.investigation import (
     update_accident_status,
     build_fault_tree_json,
     get_involved_people,
-    upsert_involved_people
+    upsert_involved_people,
+    get_sites
 )
 from auth.auth_utils import require_login
 
@@ -354,6 +355,25 @@ def main():
         involved_commission = get_involved_people(accident_id, 'Commission_Member')
         involved_witnesses = get_involved_people(accident_id, 'Witness')
         
+        # Campo de quantidade de membros da comissão FORA do form para permitir interação dinâmica
+        form_key = f"num_commission_{accident_id}"
+        if form_key not in st.session_state:
+            st.session_state[form_key] = len(involved_commission) if involved_commission else 0
+        
+        # Campo de quantidade FORA do form (permite interação dinâmica)
+        with st.expander("👔 Configurar Comissão de Investigação", expanded=True):
+            num_commission = st.number_input(
+                "Quantidade de membros:", 
+                min_value=0, 
+                max_value=10, 
+                value=st.session_state[form_key], 
+                key=f"num_commission_input_{accident_id}",
+                help="Defina quantos membros da comissão você deseja cadastrar. Os campos aparecerão no formulário abaixo."
+            )
+            if num_commission != st.session_state[form_key]:
+                st.session_state[form_key] = num_commission
+                st.rerun()
+        
         # Formulário completo com seções
         with st.form("accident_context_form", clear_on_submit=False):
             # ========== SEÇÃO 1: DADOS GERAIS ==========
@@ -387,14 +407,41 @@ def main():
                     )
                     occurrence_datetime = datetime.combine(occurrence_date_input, occurrence_time_input)
                 
-                base_location = st.selectbox(
+                # Campo: Local da Base (input manual)
+                base_location = st.text_input(
                     "Local da Base:",
-                    options=["", "Base de Barueri", "Base de Santos", "Base de Campinas", "Base de São Paulo", "Outro"],
-                    index=0 if not investigation.get('base_location') else 
-                          (["", "Base de Barueri", "Base de Santos", "Base de Campinas", "Base de São Paulo", "Outro"].index(investigation.get('base_location')) 
-                           if investigation.get('base_location') in ["", "Base de Barueri", "Base de Santos", "Base de Campinas", "Base de São Paulo", "Outro"] else 0),
-                    help="Localização da base onde ocorreu o acidente"
+                    value=investigation.get('base_location', ''),
+                    placeholder="Ex: Hangar 3, Pista 2, Área de Manutenção",
+                    help="Digite o local específico dentro da base onde ocorreu o acidente"
                 )
+                
+                # Campo: Base (selectbox da tabela sites)
+                sites_list = get_sites()
+                site_options = [""] + [f"{site['name']} ({site['code']})" for site in sites_list]
+                site_ids = [None] + [site['id'] for site in sites_list]
+                
+                # Encontra o site_id atual do acidente (se existir)
+                current_site_id = investigation.get('site_id')
+                current_site_index = 0
+                if current_site_id:
+                    try:
+                        current_site_index = site_ids.index(current_site_id) if current_site_id in site_ids else 0
+                    except:
+                        current_site_index = 0
+                
+                selected_site_label = st.selectbox(
+                    "Base:",
+                    options=site_options,
+                    index=current_site_index,
+                    help="Selecione a base da tabela de sites cadastrados"
+                )
+                
+                # Obtém o site_id correspondente à seleção
+                selected_site_id = None
+                if selected_site_label and selected_site_label != "":
+                    selected_index = site_options.index(selected_site_label)
+                    if selected_index > 0:  # Não é a opção vazia
+                        selected_site_id = site_ids[selected_index]
                 
                 title = st.text_input(
                     "Título do Acidente:",
@@ -633,7 +680,14 @@ def main():
             with st.expander("👔 Seção 5: Comissão de Investigação", expanded=True):
                 st.markdown("**Membros da Comissão de Investigação**")
                 
-                num_commission = st.number_input("Quantidade de membros:", min_value=0, max_value=10, value=len(involved_commission), key="num_commission")
+                # Usa o valor do session_state (definido fora do form)
+                num_commission = st.session_state[form_key]
+                
+                if num_commission == 0:
+                    st.info("💡 **Configure a quantidade de membros no campo acima (fora do formulário)** para começar a preencher os dados.")
+                else:
+                    st.info(f"📝 **Preencha os dados dos {num_commission} membro(s) da comissão:**")
+                
                 commission = []
                 for i in range(num_commission):
                     with st.container():
@@ -687,6 +741,7 @@ def main():
                     update_data = {
                         'registry_number': registry_number if registry_number else None,
                         'base_location': base_location if base_location else None,
+                        'site_id': selected_site_id,
                         'title': title,
                         'description': description if description else None,
                         'occurrence_date': occurrence_datetime.isoformat() if occurrence_datetime else None,
