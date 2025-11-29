@@ -1,7 +1,3 @@
-# Dependências do sistema para geração de PDF
-# Usado em ambientes de deploy (Streamlit Cloud, Docker, etc.)
-
-# WeasyPrint requer estas bibliotecas do sistema
 libpango-1.0-0
 libpangoft2-1.0-0
 libfontconfig1
@@ -9,8 +5,5 @@ libcairo2
 libgdk-pixbuf2.0-0
 libffi-dev
 shared-mime-info
-
-# Graphviz (para renderização da árvore de falhas)
 graphviz
 libgraphviz-dev
-
