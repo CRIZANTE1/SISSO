@@ -31,11 +31,30 @@ def check_trial_status(email: str) -> Dict[str, Any]:
         
         profile = response.data[0]
         
+        # Verifica se o usuário é admin ou tem plano ilimitado
+        role = profile.get("role", "viewer")
+        plan = profile.get("plan", "trial")
+        status = profile.get("status", "inativo")  # 'ativo' ou 'inativo'
+        
+        # Admin ou plano dev_ilimitado não tem restrições de trial
+        is_admin = role == "admin"
+        is_unlimited_plan = plan == "dev_ilimitado" or plan == "enterprise"
+        
+        if is_admin or is_unlimited_plan:
+            # Usuário tem acesso ilimitado
+            return {
+                "has_trial": False,
+                "is_trial_expired": False,
+                "trial_expires_at": None,
+                "is_active": True,
+                "role": role,
+                "plan": plan,
+                "unlimited_access": True
+            }
+        
         # Verifica se o usuário é novo comparando created_at com a data atual
         # se foi criado há menos de 14 dias, ainda está em trial
         created_at_str = profile.get("created_at")
-        status = profile.get("status", "inativo")  # 'ativo' ou 'inativo'
-        role = profile.get("role", "viewer")
         
         # Converte created_at para datetime
         if created_at_str:
@@ -53,17 +72,31 @@ def check_trial_status(email: str) -> Dict[str, Any]:
             has_trial = not is_trial_expired  # Tem trial se ainda não expirou
             
             # Considera ativo se o status for 'ativo' e o trial não tiver expirado
-            is_active = (status == 'ativo' or status == 'Ativo' or status == 'Ativo') and not is_trial_expired
+            is_active = (status == 'ativo' or status == 'Ativo') and not is_trial_expired
             
             return {
                 "has_trial": has_trial,
                 "is_trial_expired": is_trial_expired,
                 "trial_expires_at": trial_expires_at,
                 "is_active": is_active,
-                "role": role
+                "role": role,
+                "plan": plan,
+                "unlimited_access": False
             }
         else:
             # Usuário existe mas sem data de criação
+            # Se for admin ou plano ilimitado, tem acesso
+            if is_admin or is_unlimited_plan:
+                return {
+                    "has_trial": False,
+                    "is_trial_expired": False,
+                    "trial_expires_at": None,
+                    "is_active": True,
+                    "role": role,
+                    "plan": plan,
+                    "unlimited_access": True
+                }
+            
             # Considera ativo se o status for 'ativo'
             is_active = status in ['ativo', 'Ativo']
             return {
@@ -71,7 +104,9 @@ def check_trial_status(email: str) -> Dict[str, Any]:
                 "is_trial_expired": True,  # Assumimos que expirou pois não tem data de criação
                 "trial_expires_at": None,
                 "is_active": is_active,
-                "role": role
+                "role": role,
+                "plan": plan,
+                "unlimited_access": False
             }
     
     except Exception as e:
@@ -148,6 +183,7 @@ def create_new_trial_user(email: str) -> Dict[str, Any]:
 def show_trial_notification():
     """
     Mostra notificação de trial expirado ou informações sobre o trial
+    Não mostra nada para admins ou usuários com plano ilimitado
     """
     user_email = get_user_email_from_session()
     if not user_email:
@@ -157,6 +193,10 @@ def show_trial_notification():
     
     if trial_info.get("error"):
         st.error("Erro ao verificar status do trial")
+        return
+    
+    # Não mostra notificação para admins ou planos ilimitados
+    if trial_info.get("unlimited_access", False):
         return
     
     if trial_info.get("is_trial_expired"):
@@ -231,6 +271,35 @@ def show_trial_expired_page():
                 if key.startswith('user_') or key in ['authenticated_user_email', 'role', 'user_id', 'user_info']:
                     del st.session_state[key]
             st.rerun()
+
+def update_user_plan(email: str, plan: str) -> bool:
+    """
+    Atualiza o plano do usuário (somente para admin)
+    Planos disponíveis: 'trial', 'basic', 'premium', 'dev_ilimitado', 'enterprise'
+    """
+    try:
+        supabase = get_service_role_client()
+        if not supabase:
+            return False
+        
+        valid_plans = ['trial', 'basic', 'premium', 'dev_ilimitado', 'enterprise']
+        if plan not in valid_plans:
+            st.error(f"Plano inválido. Planos válidos: {', '.join(valid_plans)}")
+            return False
+        
+        now = datetime.now(pytz.UTC)
+        
+        # Atualiza o plano do usuário
+        update_response = supabase.table("profiles").update({
+            "plan": plan,
+            "updated_at": now.isoformat()
+        }).eq("email", email).execute()
+        
+        return bool(update_response.data)
+    
+    except Exception as e:
+        st.error(f"Erro ao atualizar plano: {str(e)}")
+        return False
 
 def extend_trial(email: str, additional_days: int = 14) -> bool:
     """

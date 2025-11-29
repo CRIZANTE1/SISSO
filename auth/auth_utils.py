@@ -51,11 +51,15 @@ def authenticate_user() -> bool:
 
     # Verifica se já está autenticado na sessão
     if st.session_state.get('authenticated_user_email') == user_email:
-        # Verifica o status do trial para sessões existentes
+        # Verifica o status do trial para sessões existentes (não bloqueia admins ou planos ilimitados)
         try:
             from services.trial_manager import check_trial_status
             trial_info = check_trial_status(user_email)
-            if trial_info.get('is_trial_expired', False) and trial_info.get('has_trial', False):
+            
+            # Não bloqueia se tiver acesso ilimitado
+            if trial_info.get('unlimited_access', False):
+                pass  # Continua normalmente
+            elif trial_info.get('is_trial_expired', False) and trial_info.get('has_trial', False):
                 # Se o trial expirou, encerra a sessão
                 st.error("Seu período de trial expirou.")
                 return False
@@ -69,12 +73,15 @@ def authenticate_user() -> bool:
     if not user_info:
         return False
 
-    # Verifica o status do trial
+    # Verifica o status do trial (não bloqueia admins ou planos ilimitados)
     try:
         from services.trial_manager import check_trial_status
         trial_info = check_trial_status(user_email)
         
-        if trial_info.get('is_trial_expired', False) and trial_info.get('has_trial', False):
+        # Não bloqueia se tiver acesso ilimitado
+        if trial_info.get('unlimited_access', False):
+            pass  # Continua normalmente
+        elif trial_info.get('is_trial_expired', False) and trial_info.get('has_trial', False):
             st.error("Seu período de trial expirou.")
             return False
     except:
@@ -299,13 +306,17 @@ def require_login():
         show_access_denied_page()
         st.stop()
     
-    # Verifica status do trial após autenticação
+    # Verifica status do trial após autenticação (não bloqueia admins ou planos ilimitados)
     try:
         from services.trial_manager import check_trial_status
         user_email = get_user_email()
         if user_email:
             trial_info = check_trial_status(user_email)
-            if trial_info.get('is_trial_expired', False) and trial_info.get('has_trial', False):
+            
+            # Não bloqueia se tiver acesso ilimitado
+            if trial_info.get('unlimited_access', False):
+                pass  # Continua normalmente
+            elif trial_info.get('is_trial_expired', False) and trial_info.get('has_trial', False):
                 from services.trial_manager import show_trial_expired_page
                 show_trial_expired_page()
                 st.stop()
