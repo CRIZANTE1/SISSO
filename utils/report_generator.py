@@ -206,7 +206,10 @@ HTML_TEMPLATE = """
     <div class="cover-subtitle">Investigação de Acidente</div>
     <div class="cover-info">
         <strong>Evento:</strong> {{ accident.get('title', accident.get('description', 'N/A')) }}<br>
-        <strong>Local:</strong> {{ accident.get('base_location', 'N/A') }}<br>
+        {% if accident.get('site_name') %}
+        <strong>Base:</strong> {{ accident.get('site_name', 'N/A') }}<br>
+        {% endif %}
+        <strong>Local da Base:</strong> {{ accident.get('base_location', 'N/A') }}<br>
         <strong>Data de Ocorrência:</strong> {{ accident.get('occurrence_date', accident.get('occurred_at', 'N/A')) }}<br>
         <strong>Comissão Constituída em:</strong> {{ accident.get('created_at', 'N/A') }}
     </div>
@@ -230,7 +233,11 @@ HTML_TEMPLATE = """
             </td>
         </tr>
         <tr>
-            <td class="vibra-green">Local</td>
+            <td class="vibra-green">Base</td>
+            <td>{{ accident.get('site_name', 'N/A') }}</td>
+        </tr>
+        <tr>
+            <td class="vibra-green">Local da Base</td>
             <td>{{ accident.get('base_location', 'N/A') }}</td>
         </tr>
         <tr>
@@ -267,7 +274,7 @@ HTML_TEMPLATE = """
     <table class="form-table">
         <tr>
             <td width="25%"><span class="label">Número do Registro</span><span class="value">{{ accident.get('registry_number', 'N/A') }}</span></td>
-            <td width="25%"><span class="label">Local da Base</span><span class="value">{{ accident.get('base_location', 'N/A') }}</span></td>
+            <td width="25%"><span class="label">Base</span><span class="value">{{ accident.get('site_name', 'N/A') }}</span></td>
             <td width="25%"><span class="label">Data de Ocorrência</span><span class="value">
                 {% if accident.get('occurrence_date') %}
                     {{ accident.occurrence_date }}
@@ -278,6 +285,12 @@ HTML_TEMPLATE = """
                 {% endif %}
             </span></td>
             <td width="25%"><span class="label">Status</span><span class="value">{{ accident.get('status', 'N/A') }}</span></td>
+        </tr>
+        <tr>
+            <td colspan="4">
+                <span class="label">Local da Base</span>
+                <span class="value">{{ accident.get('base_location', 'N/A') }}</span>
+            </td>
         </tr>
         <tr>
             <td colspan="4">

@@ -270,8 +270,21 @@ def get_accident(accident_id: str) -> Optional[Dict[str, Any]]:
             st.error("Erro ao conectar com o banco de dados")
             return None
         
-        # Busca EXCLUSIVAMENTE por ID (nunca por nome/título)
-        response = supabase.table("accidents").select("*").eq("id", accident_id).execute()
+        # Busca EXCLUSIVAMENTE por ID (nunca por nome/título) com JOIN na tabela sites
+        # Nota: Supabase usa sintaxe especial para foreign keys
+        try:
+            response = supabase.table("accidents").select("*, sites!accidents_site_id_fkey(name, code)").eq("id", accident_id).execute()
+        except:
+            # Fallback: busca sem JOIN e depois busca site separadamente
+            response = supabase.table("accidents").select("*").eq("id", accident_id).execute()
+            if response.data and len(response.data) > 0:
+                acc = response.data[0]
+                site_id = acc.get('site_id')
+                if site_id:
+                    site_response = supabase.table("sites").select("name, code").eq("id", site_id).execute()
+                    if site_response.data and len(site_response.data) > 0:
+                        acc['sites'] = site_response.data[0]
+                response.data[0] = acc
         
         # Validação de segurança: verifica se usuário tem acesso
         if response.data and len(response.data) > 0:
@@ -285,11 +298,22 @@ def get_accident(accident_id: str) -> Optional[Dict[str, Any]]:
                     st.warning("Você não tem permissão para acessar este acidente")
                     return None
             
+            # Extrai informações do site (se houver)
+            site_info = acc.get('sites')
+            site_name = None
+            if site_info:
+                if isinstance(site_info, dict):
+                    site_name = site_info.get('name')
+                elif isinstance(site_info, list) and len(site_info) > 0:
+                    site_name = site_info[0].get('name')
+            
             # Normaliza os dados para compatibilidade
             normalized = {
                 "id": acc.get("id"),
                 "title": acc.get("title") or acc.get("description", "Acidente sem título"),
                 "description": acc.get("description", ""),
+                "site_id": acc.get("site_id"),
+                "site_name": site_name,
                 "occurrence_date": acc.get("occurrence_date") or acc.get("occurred_at"),
                 # Normaliza status: 'aberto'/'fechado' -> 'Open'/'Closed'
                 "status": "Open" if acc.get("status", "aberto").lower() in ["aberto", "open"] else "Closed",
