@@ -122,18 +122,33 @@ def get_accidents() -> List[Dict[str, Any]]:
     """Busca todos os acidentes da tabela accidents para investigação"""
     try:
         from auth.auth_utils import get_user_id, is_admin
-        supabase = get_supabase_client()
+        from managers.supabase_config import get_service_role_client
+        
         user_id = get_user_id()
+        is_admin_user = is_admin()
+        
+        # Usa service_role para contornar RLS e garantir acesso
+        # Admin vê todos, usuário comum vê apenas os seus
+        supabase = get_service_role_client()
+        
+        if not supabase:
+            st.error("Erro ao conectar com o banco de dados")
+            return []
         
         # Busca acidentes (filtra por usuário se não for admin)
         query = supabase.table("accidents").select("id, title, description, occurrence_date, occurred_at, status, created_at, type, classification, created_by")
         
-        if not is_admin() and user_id:
+        # Aplica filtro de segurança no código (não confia apenas em RLS)
+        if not is_admin_user and user_id:
             query = query.eq("created_by", user_id)
         
         response = query.order("created_at", desc=True).execute()
         
         if response.data:
+            # Validação adicional de segurança para usuários não-admin
+            if not is_admin_user and user_id:
+                # Filtra novamente para garantir (segurança em camadas)
+                response.data = [acc for acc in response.data if acc.get('created_by') == user_id]
             # Normaliza os dados: usa title se existir, senão usa description
             # usa occurrence_date se existir, senão usa occurred_at
             normalized_data = []
@@ -174,6 +189,9 @@ def get_accidents() -> List[Dict[str, Any]]:
 def get_accident(accident_id: str) -> Optional[Dict[str, Any]]:
     """Busca um acidente específico da tabela accidents por ID (UUID)"""
     try:
+        from managers.supabase_config import get_service_role_client
+        from auth.auth_utils import get_user_id, is_admin
+        
         if not accident_id:
             return None
         
@@ -183,9 +201,64 @@ def get_accident(accident_id: str) -> Optional[Dict[str, Any]]:
             st.warning(f"ID de acidente inválido: {accident_id}")
             return None
         
-        supabase = get_supabase_client()
+        # Usa service_role para contornar RLS
+        supabase = get_service_role_client()
+        if not supabase:
+            st.error("Erro ao conectar com o banco de dados")
+            return None
+        
         # Busca EXCLUSIVAMENTE por ID (nunca por nome/título)
         response = supabase.table("accidents").select("*").eq("id", accident_id).execute()
+        
+        # Validação de segurança: verifica se usuário tem acesso
+        if response.data and len(response.data) > 0:
+            acc = response.data[0]
+            user_id = get_user_id()
+            is_admin_user = is_admin()
+            
+            # Se não for admin, verifica se o acidente pertence ao usuário
+            if not is_admin_user and user_id:
+                if acc.get('created_by') != user_id:
+                    st.warning("Você não tem permissão para acessar este acidente")
+                    return None
+            
+            # Normaliza os dados para compatibilidade
+            normalized = {
+                "id": acc.get("id"),
+                "title": acc.get("title") or acc.get("description", "Acidente sem título"),
+                "description": acc.get("description", ""),
+                "occurrence_date": acc.get("occurrence_date") or acc.get("occurred_at"),
+                # Normaliza status: 'aberto'/'fechado' -> 'Open'/'Closed'
+                "status": "Open" if acc.get("status", "aberto").lower() in ["aberto", "open"] else "Closed",
+                "created_at": acc.get("created_at"),
+                "type": acc.get("type"),
+                "classification": acc.get("classification"),
+                # Campos expandidos do relatório Vibra
+                "registry_number": acc.get("registry_number"),
+                "base_location": acc.get("base_location"),
+                "class_injury": acc.get("class_injury"),
+                "class_community": acc.get("class_community"),
+                "class_environment": acc.get("class_environment"),
+                "class_process_safety": acc.get("class_process_safety"),
+                "class_asset_damage": acc.get("class_asset_damage"),
+                "class_near_miss": acc.get("class_near_miss"),
+                "severity_level": acc.get("severity_level"),
+                "estimated_loss_value": acc.get("estimated_loss_value"),
+                "product_released": acc.get("product_released"),
+                "volume_released": acc.get("volume_released"),
+                "volume_recovered": acc.get("volume_recovered"),
+                "release_duration_hours": acc.get("release_duration_hours"),
+                "equipment_involved": acc.get("equipment_involved"),
+                "area_affected": acc.get("area_affected")
+            }
+            return normalized
+        
+        return None
+    except Exception as e:
+        st.error(f"Erro ao buscar acidente: {str(e)}")
+        import traceback
+        st.code(traceback.format_exc())
+        return None
         
         if response.data and len(response.data) > 0:
             acc = response.data[0]

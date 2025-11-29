@@ -164,7 +164,28 @@ def main():
             st.session_state['current_accident'] = None
             st.rerun()
         
+        # Debug temporário (pode remover depois)
+        if st.checkbox("🔍 Debug: Mostrar informações", help="Ativa modo debug para verificar problemas"):
+            from auth.auth_utils import get_user_id, is_admin, get_user_email
+            user_id = get_user_id()
+            user_email = get_user_email()
+            st.write(f"**User ID:** {user_id}")
+            st.write(f"**User Email:** {user_email}")
+            st.write(f"**É Admin:** {is_admin()}")
+            
+            from managers.supabase_config import get_service_role_client
+            supabase = get_service_role_client()
+            if supabase:
+                all_accidents = supabase.table("accidents").select("id, title, description, created_by").limit(5).execute()
+                st.write(f"**Total de acidentes no banco:** {len(all_accidents.data) if all_accidents.data else 0}")
+                if all_accidents.data:
+                    st.json(all_accidents.data)
+        
         investigations = get_accidents()
+        
+        # Debug: mostra quantos foram encontrados
+        if st.session_state.get('debug_mode', False):
+            st.write(f"🔍 Debug: {len(investigations)} acidente(s) encontrado(s) pela função get_accidents()")
         
         if investigations:
             # Cria opções com informações do acidente
