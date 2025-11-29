@@ -1031,6 +1031,7 @@ def app(filters=None):
                         if result.data:
                             accident_id = result.data[0]['id']
                             st.success("✅ Acidente registrado com sucesso!")
+                            st.info("💡 **Dica:** Agora você pode iniciar a investigação deste acidente na página 'Investigação de Acidentes'.")
                             
                             # Registra log da ação
                             try:

@@ -57,7 +57,7 @@ Todas as tabelas têm RLS habilitado com políticas públicas para testes. **IMP
 ## 📁 Arquivos Criados
 
 1. **`services/investigation.py`**: Serviço com todas as funções de banco de dados
-2. **`pages/10_Investigacao_Acidentes.py`**: Página principal do Streamlit
+2. **`pages/investigation.py`**: Página principal do Streamlit (versão wizard/guided)
 3. **`requirements.txt`**: Atualizado com `graphviz>=0.20.0`
 
 ## ⚙️ Configuração Necessária
@@ -100,7 +100,7 @@ AND table_name IN ('nbr_standards', 'accidents_investigation', 'evidence', 'time
 
 ## 🎯 Como Usar
 
-1. **Acesse a página**: No menu do Streamlit, vá para "10_Investigacao_Acidentes"
+1. **Acesse a página**: No menu do Streamlit, vá para "Investigação de Acidentes" na seção "📊 Análise"
 
 2. **Crie uma investigação**: Clique em "➕ Nova Investigação" e descreva o evento principal
 

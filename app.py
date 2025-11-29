@@ -60,6 +60,7 @@ def main():
             st.Page("pages/2_Acidentes.py", title="Acidentes", icon="🚨"),
             st.Page("pages/3_Quase_Acidentes.py", title="Quase-Acidentes", icon="⚠️"),
             st.Page("pages/4_Nao_Conformidades.py", title="Não Conformidades", icon="📋"),
+            st.Page("pages/investigation.py", title="Investigação de Acidentes", icon="🔍"),
         ],
         "📈 Controles": [
             st.Page("pages/5_KPIs_e_Controles.py", title="KPIs e Controles", icon="📈"),

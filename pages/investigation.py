@@ -155,20 +155,41 @@ def main():
     with st.sidebar:
         st.header("📋 Gerenciamento de Investigação")
         
-        # Seleção de investigação existente
-        st.subheader("Selecionar Investigação")
+        # Seleção de acidente para investigação
+        st.subheader("Selecionar Acidente para Investigação")
+        st.info("💡 **Crie o acidente na página 'Acidentes' primeiro, depois selecione aqui para iniciar a investigação.**")
+        
         investigations = get_accidents()
         
         if investigations:
-            investigation_options = {f"{inv['title'][:40]}... ({inv['status']})": inv['id'] 
-                                    for inv in investigations}
-            investigation_options["-- Nova Investigação --"] = None
+            # Cria opções com informações do acidente
+            investigation_options = {}
+            for inv in investigations:
+                # Formata a label com informações relevantes
+                acc_type = inv.get('type', 'N/A')
+                acc_date = ""
+                if inv.get('occurrence_date'):
+                    try:
+                        acc_date = pd.to_datetime(inv['occurrence_date']).strftime('%d/%m/%Y')
+                    except:
+                        acc_date = ""
+                elif inv.get('occurred_at'):
+                    try:
+                        acc_date = pd.to_datetime(inv['occurred_at']).strftime('%d/%m/%Y')
+                    except:
+                        acc_date = ""
+                
+                label = f"{inv['title'][:35]}... | {acc_type} | {acc_date}"
+                investigation_options[label] = inv['id']
+            
+            investigation_options["-- Selecione um acidente --"] = None
             
             selected_label = st.selectbox(
-                "Investigação:",
+                "Acidente:",
                 options=list(investigation_options.keys()),
                 key="investigation_selector",
-                index=0 if not st.session_state.get('current_accident') else None
+                index=0 if not st.session_state.get('current_accident') else None,
+                help="Selecione um acidente criado na página 'Acidentes' para iniciar a investigação"
             )
             
             selected_id = investigation_options[selected_label]
@@ -181,57 +202,37 @@ def main():
                 st.session_state['current_accident'] = None
                 st.session_state['current_step'] = 0
         else:
-            st.info("Nenhuma investigação encontrada")
+            st.warning("⚠️ Nenhum acidente encontrado.")
+            st.info("""
+            **Como iniciar uma investigação:**
+            1. Vá para a página **"Acidentes"** no menu
+            2. Crie um novo acidente usando o formulário
+            3. Volte para esta página e selecione o acidente criado
+            """)
             st.session_state['current_accident'] = None
             st.session_state['current_step'] = 0
         
         st.divider()
-        
-        # Criar nova investigação
-        with st.expander("➕ Criar Nova Investigação", expanded=False):
-            with st.form("new_investigation_form"):
-                title = st.text_input(
-                    "Título do Acidente:",
-                    placeholder="Ex: Queda durante manutenção",
-                    key="new_accident_title"
-                )
-                description = st.text_area(
-                    "Descrição:",
-                    placeholder="Descreva o acidente...",
-                    height=100,
-                    key="new_accident_description"
-                )
-                occurrence_date = st.date_input(
-                    "Data de Ocorrência:",
-                    value=date.today(),
-                    key="new_accident_date"
-                )
-                
-                submitted = st.form_submit_button("Criar Investigação", type="primary")
-                
-                if submitted:
-                    if title:
-                        occurrence_dt = datetime.combine(occurrence_date, time(12, 0))
-                        new_id = create_accident(title, description, occurrence_dt)
-                        if new_id:
-                            st.success("✅ Investigação criada com sucesso!")
-                            st.session_state['current_accident'] = new_id
-                            st.session_state['current_step'] = 0
-                            st.rerun()
-                    else:
-                        st.error("⚠️ Título é obrigatório")
+        st.markdown("""
+        **📋 Fluxo de Investigação:**
+        1. **Criar Acidente** → Página "Acidentes"
+        2. **Selecionar Acidente** → Esta página (sidebar)
+        3. **Preencher Investigação** → Passos 1-4 abaixo
+        """)
     
     # ========== VERIFICAÇÃO DE ACCIDENT_ID ==========
     accident_id = st.session_state.get('current_accident')
     
     if not accident_id:
-        st.info("👆 **Por favor, selecione uma investigação na barra lateral ou crie uma nova.**")
+        st.info("👆 **Por favor, selecione um acidente na barra lateral para iniciar a investigação.**")
         st.markdown("""
         ### Como usar:
-        1. **Selecione uma investigação existente** no menu lateral
-        2. **Ou crie uma nova investigação** usando o expander "➕ Criar Nova Investigação"
-        3. Após selecionar/criar, siga o assistente passo a passo
+        1. **Crie um acidente** na página **"Acidentes"** (menu superior)
+        2. **Volte para esta página** e selecione o acidente criado na barra lateral
+        3. Após selecionar, siga o assistente passo a passo para preencher a investigação
         """)
+        st.markdown("---")
+        st.markdown("**💡 Dica:** O acidente deve ser criado primeiro na página 'Acidentes' antes de iniciar a investigação aqui.**")
         return
     
     # ========== CARREGA DADOS DA INVESTIGAÇÃO ==========
@@ -255,8 +256,15 @@ def main():
     col_status, col_info = st.columns([1, 3])
     
     with col_status:
-        status_color = "🟢" if investigation['status'] == 'Open' else "🔴"
-        st.markdown(f"**Status:** {status_color} {investigation['status']}")
+        # Normaliza status para exibição
+        acc_status = investigation.get('status', 'Open')
+        if acc_status.lower() in ['aberto', 'open']:
+            status_color = "🟢"
+            status_text = "Aberto"
+        else:
+            status_color = "🔴"
+            status_text = "Fechado"
+        st.markdown(f"**Status:** {status_color} {status_text}")
     
     with col_info:
         st.markdown(f"**📋 Investigação:** {investigation.get('title', 'N/A')}")

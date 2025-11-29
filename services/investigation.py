@@ -119,24 +119,85 @@ def upsert_involved_people(accident_id: str, people: List[Dict[str, Any]]) -> bo
 
 
 def get_accidents() -> List[Dict[str, Any]]:
-    """Busca todas as investigações de acidentes"""
+    """Busca todos os acidentes da tabela accidents para investigação"""
     try:
+        from auth.auth_utils import get_user_id, is_admin
         supabase = get_supabase_client()
-        response = supabase.table("accidents").select("id, title, description, occurrence_date, status, created_at").order("created_at", desc=True).execute()
-        return response.data if response.data else []
+        user_id = get_user_id()
+        
+        # Busca acidentes (filtra por usuário se não for admin)
+        query = supabase.table("accidents").select("id, title, description, occurrence_date, occurred_at, status, created_at, type, classification")
+        
+        if not is_admin() and user_id:
+            query = query.eq("created_by", user_id)
+        
+        response = query.order("created_at", desc=True).execute()
+        
+        if response.data:
+            # Normaliza os dados: usa title se existir, senão usa description
+            # usa occurrence_date se existir, senão usa occurred_at
+            normalized_data = []
+            for acc in response.data:
+                normalized = {
+                    "id": acc.get("id"),
+                    "title": acc.get("title") or acc.get("description", "Acidente sem título")[:50],
+                    "description": acc.get("description", ""),
+                    "occurrence_date": acc.get("occurrence_date") or acc.get("occurred_at"),
+                    "status": acc.get("status", "aberto"),
+                    "created_at": acc.get("created_at"),
+                    "type": acc.get("type"),
+                    "classification": acc.get("classification")
+                }
+                normalized_data.append(normalized)
+            
+            return normalized_data
+        return []
     except Exception as e:
-        st.error(f"Erro ao buscar investigações: {str(e)}")
+        st.error(f"Erro ao buscar acidentes: {str(e)}")
         return []
 
 
 def get_accident(accident_id: str) -> Optional[Dict[str, Any]]:
-    """Busca uma investigação específica"""
+    """Busca um acidente específico da tabela accidents"""
     try:
         supabase = get_supabase_client()
         response = supabase.table("accidents").select("*").eq("id", accident_id).execute()
-        return response.data[0] if response.data else None
+        
+        if response.data and len(response.data) > 0:
+            acc = response.data[0]
+            # Normaliza os dados para compatibilidade
+            normalized = {
+                "id": acc.get("id"),
+                "title": acc.get("title") or acc.get("description", "Acidente sem título"),
+                "description": acc.get("description", ""),
+                "occurrence_date": acc.get("occurrence_date") or acc.get("occurred_at"),
+                # Normaliza status: 'aberto'/'fechado' -> 'Open'/'Closed'
+                "status": "Open" if acc.get("status", "aberto").lower() in ["aberto", "open"] else "Closed",
+                "created_at": acc.get("created_at"),
+                "type": acc.get("type"),
+                "classification": acc.get("classification"),
+                # Campos expandidos do relatório Vibra
+                "registry_number": acc.get("registry_number"),
+                "base_location": acc.get("base_location"),
+                "class_injury": acc.get("class_injury"),
+                "class_community": acc.get("class_community"),
+                "class_environment": acc.get("class_environment"),
+                "class_process_safety": acc.get("class_process_safety"),
+                "class_asset_damage": acc.get("class_asset_damage"),
+                "class_near_miss": acc.get("class_near_miss"),
+                "severity_level": acc.get("severity_level"),
+                "estimated_loss_value": acc.get("estimated_loss_value"),
+                "product_released": acc.get("product_released"),
+                "volume_released": acc.get("volume_released"),
+                "volume_recovered": acc.get("volume_recovered"),
+                "release_duration_hours": acc.get("release_duration_hours"),
+                "equipment_involved": acc.get("equipment_involved"),
+                "area_affected": acc.get("area_affected")
+            }
+            return normalized
+        return None
     except Exception as e:
-        st.error(f"Erro ao buscar investigação: {str(e)}")
+        st.error(f"Erro ao buscar acidente: {str(e)}")
         return None
 
 
@@ -463,10 +524,12 @@ def build_fault_tree_json(accident_id: str) -> Optional[Dict[str, Any]]:
 
 
 def update_accident_status(accident_id: str, status: str) -> bool:
-    """Atualiza status da investigação"""
+    """Atualiza status do acidente (normaliza para 'aberto'/'fechado')"""
     try:
         supabase = get_supabase_client()
-        response = supabase.table("accidents").update({"status": status}).eq("id", accident_id).execute()
+        # Normaliza status: 'Open'/'Closed' -> 'aberto'/'fechado'
+        normalized_status = "aberto" if status.lower() in ['open', 'aberto'] else "fechado"
+        response = supabase.table("accidents").update({"status": normalized_status}).eq("id", accident_id).execute()
         return bool(response.data)
     except Exception as e:
         st.error(f"Erro ao atualizar status: {str(e)}")
