@@ -90,95 +90,227 @@ def render_progress_bar(current_step: int, total_steps: int = 4):
 
 
 def render_fault_tree_html(tree_json: Dict[str, Any]) -> str:
-    """Renderiza a árvore de falhas em HTML/CSS bonito e visual"""
+    """Renderiza a árvore de falhas no padrão FTA (Fault Tree Analysis) - idêntico ao diagrama"""
     if not tree_json:
         return ""
     
-    # Cores e ícones baseados no status
-    status_config = {
-        'validated': {
-            'bg_color': '#d4edda',
-            'border_color': '#28a745',
-            'text_color': '#155724',
-            'icon': '✅',
-            'badge': 'Confirmado',
-            'badge_bg': '#28a745'
-        },
-        'discarded': {
-            'bg_color': '#f8d7da',
-            'border_color': '#dc3545',
-            'text_color': '#721c24',
-            'icon': '❌',
-            'badge': 'Descartado',
-            'badge_bg': '#dc3545'
-        },
-        'pending': {
-            'bg_color': '#e2e3e5',
-            'border_color': '#6c757d',
-            'text_color': '#383d41',
-            'icon': '⏳',
-            'badge': 'Em Análise',
-            'badge_bg': '#6c757d'
-        }
-    }
+    import html
     
-    # Mapeamento de tipos
-    type_labels = {
-        'root': '🎯 Evento Principal',
-        'hypothesis': '💭 Hipótese',
-        'fact': '📌 Fato Confirmado'
-    }
+    # Contadores para numeração automática
+    hypothesis_counter = 0
+    basic_cause_counter = 0
+    
+    def get_node_number(node_type: str, status: str, has_children: bool) -> str:
+        """Retorna o número do nó (H1, H2, CB1, CB2, etc.)"""
+        nonlocal hypothesis_counter, basic_cause_counter
+        
+        # Causa básica: fact validado sem filhos
+        if node_type == 'fact' and status == 'validated' and not has_children:
+            basic_cause_counter += 1
+            return f"CB {basic_cause_counter}"
+        # Hipótese: qualquer hypothesis ou fact com filhos
+        elif node_type == 'hypothesis' or (node_type == 'fact' and has_children):
+            hypothesis_counter += 1
+            return f"H{hypothesis_counter}"
+        # Root não tem numeração
+        return ""
+    
+    def get_node_shape(node_type: str, status: str, has_children: bool) -> Dict[str, str]:
+        """Retorna a forma e cor do nó baseado no tipo e status"""
+        # Root ou causa intermediária validada: Retângulo arredondado amarelo
+        if node_type == 'root' or (status == 'validated' and has_children):
+            return {
+                'shape': 'rounded-rect',
+                'bg_color': '#fff9c4',  # Amarelo claro
+                'border_color': '#f9a825',
+                'text_color': '#000000',
+                'border_radius': '10px'
+            }
+        # Causa básica (fact validado sem filhos): Oval verde
+        elif node_type == 'fact' and status == 'validated' and not has_children:
+            return {
+                'shape': 'oval',
+                'bg_color': '#c8e6c9',  # Verde claro
+                'border_color': '#4caf50',
+                'text_color': '#000000',
+                'border_radius': '50px'
+            }
+        # Hipótese descartada: Losango vermelho com X
+        elif status == 'discarded':
+            return {
+                'shape': 'diamond',
+                'bg_color': '#ffcdd2',  # Vermelho claro
+                'border_color': '#f44336',
+                'text_color': '#000000',
+                'border_radius': '0px'
+            }
+        # Hipótese pendente: Losango
+        else:
+            return {
+                'shape': 'diamond',
+                'bg_color': '#e0e0e0',  # Cinza claro
+                'border_color': '#757575',
+                'text_color': '#000000',
+                'border_radius': '0px'
+            }
     
     def render_node(node: Dict[str, Any], level: int = 0) -> str:
-        """Renderiza um nó recursivamente"""
+        """Renderiza um nó recursivamente no formato FTA"""
         status = node.get('status', 'pending')
         node_type = node.get('type', 'hypothesis')
         label = node.get('label', '')
         nbr_code = node.get('nbr_code')
+        children = node.get('children', [])
+        has_children = len(children) > 0
         
-        config = status_config.get(status, status_config['pending'])
-        type_label = type_labels.get(node_type, node_type)
+        # Obtém número do nó
+        node_number = get_node_number(node_type, status, has_children)
         
-        # Indentação baseada no nível (reduzida)
-        margin_left = min(level * 35, 150)
+        # Obtém forma e cores
+        shape_config = get_node_shape(node_type, status, has_children)
         
-        # Escapa HTML no label para evitar problemas
-        import html
+        # Escapa HTML
         label_escaped = html.escape(label).replace('\n', '<br>')
         
-        # Estilo do card (menor - padding e margins reduzidos)
-        card_style = f"margin-left: {margin_left}px; margin-bottom: 12px; margin-top: 6px; padding: 10px 12px; background: linear-gradient(to right, {config['bg_color']} 0%, {config['bg_color']} 3px, #ffffff 3px); border-left: 3px solid {config['border_color']}; border-radius: 6px; box-shadow: 0 1px 4px rgba(0,0,0,0.06);"
+        # Determina forma CSS
+        if shape_config['shape'] == 'diamond':
+            # Losango usando clip-path
+            shape_style = f"clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%); width: 220px; min-height: 80px;"
+        elif shape_config['shape'] == 'oval':
+            # Oval
+            shape_style = f"border-radius: 50px; width: 220px; min-height: 70px;"
+        else:
+            # Retângulo arredondado
+            shape_style = f"border-radius: {shape_config['border_radius']}; width: 280px; min-height: 70px;"
         
-        # Badge de status (menor)
-        badge_style = f"display: inline-block; padding: 3px 8px; background-color: {config['badge_bg']}; color: white; border-radius: 10px; font-size: 0.65em; font-weight: 600; margin-right: 6px; text-transform: uppercase; letter-spacing: 0.3px;"
+        # Estilo do nó
+        node_style = f"""
+            position: relative;
+            {shape_style}
+            background-color: {shape_config['bg_color']};
+            border: 2px solid {shape_config['border_color']};
+            padding: 12px 15px;
+            margin: 10px 5px;
+            display: inline-flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.25);
+            font-size: 0.9em;
+            line-height: 1.3;
+            word-wrap: break-word;
+        """
         
-        # Linha conectora vertical (se não for raiz) - menor
-        connector = ""
-        if level > 0:
-            connector = f'<div style="position: relative; margin-left: {margin_left - 18}px; width: 2px; height: 10px; background: linear-gradient(to bottom, {config["border_color"]}, transparent); margin-bottom: -2px;"></div>'
+        # Número do nó (se houver)
+        number_html = ""
+        if node_number:
+            number_html = f'<div style="position: absolute; top: -12px; left: -12px; background-color: {shape_config["border_color"]}; color: white; width: 35px; height: 35px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 0.85em; box-shadow: 0 2px 6px rgba(0,0,0,0.4); z-index: 10;">{node_number}</div>'
         
-        # Código NBR (se existir) - menor
+        # X para descartado
+        discard_x = ""
+        if status == 'discarded':
+            discard_x = '<div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 2.5em; color: #d32f2f; font-weight: bold; pointer-events: none; z-index: 5; text-shadow: 2px 2px 4px rgba(255,255,255,0.8);">✕</div>'
+        
+        # Código NBR (se existir)
         nbr_html = ""
         if nbr_code:
             nbr_code_escaped = html.escape(str(nbr_code))
-            nbr_html = f'<div style="margin-top: 8px; padding: 6px 8px; background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); border-radius: 4px; border: 1px solid #dee2e6;"><div style="display: flex; align-items: center; gap: 6px;"><span style="font-size: 0.9em;">📋</span><span style="font-weight: 600; color: #495057; margin-right: 6px; font-size: 0.85em;">Código NBR:</span><code style="background-color: #fff; padding: 2px 8px; border-radius: 3px; font-weight: 600; color: #0066cc; border: 1px solid #cce5ff; font-size: 0.85em;">{nbr_code_escaped}</code></div></div>'
+            nbr_html = f'<div style="margin-top: 6px; font-size: 0.8em; color: #1976d2; font-weight: 600;">NBR: {nbr_code_escaped}</div>'
         
         # Renderiza filhos
         children_html = ""
-        children = node.get('children', [])
+        children_container = ""
+        connector_line = ""
         if children:
-            children_html = "".join([render_node(child, level + 1) for child in children])
+            children_items = []
+            for child in children:
+                child_html = render_node(child, level + 1)
+                children_items.append(child_html)
+            children_html = "".join(children_items)
+            
+            # Container dos filhos com linhas conectivas
+            children_container = f'''
+            <div style="position: relative; margin-top: 30px; padding-top: 20px;">
+                <!-- Linha vertical do pai -->
+                <div style="position: absolute; left: 50%; top: 0; width: 3px; height: 20px; background-color: #2196f3; transform: translateX(-50%); z-index: 1;"></div>
+                <!-- Linha horizontal conectando filhos -->
+                <div style="position: absolute; left: 0; right: 0; top: 20px; height: 3px; background-color: #2196f3; z-index: 1;"></div>
+                <!-- Linhas verticais dos filhos -->
+                <div style="display: flex; flex-wrap: wrap; justify-content: center; align-items: flex-start; position: relative; padding-top: 23px;">
+                    {children_html}
+                </div>
+            </div>
+            '''
         
-        # HTML do nó (compacto, menor)
-        node_html = f'{connector}<div style="{card_style}"><div style="display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin-bottom: 8px;"><span style="font-size: 1.1em; margin-right: 2px;">{config["icon"]}</span><span style="{badge_style}">{config["badge"]}</span><span style="color: #6c757d; font-size: 0.8em; font-weight: 500;">{type_label}</span></div><div style="color: {config["text_color"]}; font-weight: 500; font-size: 0.95em; line-height: 1.4; word-wrap: break-word;">{label_escaped}</div>{nbr_html}</div>{children_html}'
+        # Linha vertical do nó (se não for raiz e tiver pai)
+        node_connector = ""
+        if level > 0:
+            node_connector = f'<div style="position: absolute; left: 50%; top: -23px; width: 3px; height: 23px; background-color: #2196f3; transform: translateX(-50%); z-index: 1;"></div>'
+        
+        # HTML do nó
+        node_html = f'''
+        <div style="position: relative; display: inline-block; vertical-align: top; margin: 0 15px;">
+            {node_connector}
+            <div style="{node_style}">
+                {number_html}
+                {discard_x}
+                <div style="color: {shape_config['text_color']}; font-weight: 500; z-index: 2; position: relative;">
+                    {label_escaped}
+                </div>
+                {nbr_html}
+            </div>
+            {children_container}
+        </div>
+        '''
         
         return node_html
     
     # Renderiza a árvore completa
     tree_html = render_node(tree_json, level=0)
     
-    # HTML completo com estilos e container (compacto, menor)
-    full_html = f'<div style="font-family: -apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, \'Helvetica Neue\', Arial, sans-serif; padding: 15px; background: linear-gradient(135deg, #f5f7fa 0%, #ffffff 100%); border-radius: 8px; border: 1px solid #e1e8ed; margin: 15px 0;"><div style="margin-bottom: 12px; padding-bottom: 10px; border-bottom: 2px solid #e1e8ed;"><h3 style="margin: 0; color: #2c3e50; font-size: 1.1em; font-weight: 600;">🌳 Árvore de Causas</h3><p style="margin: 3px 0 0 0; color: #7f8c8d; font-size: 0.85em;">Estrutura hierárquica das causas identificadas</p></div>{tree_html}</div>'
+    # Legenda
+    legend_html = '''
+    <div style="position: absolute; top: 10px; right: 10px; background: white; border: 2px solid #333; padding: 10px; border-radius: 5px; font-size: 0.8em; z-index: 1000; box-shadow: 0 2px 8px rgba(0,0,0,0.3);">
+        <div style="font-weight: bold; margin-bottom: 8px; border-bottom: 1px solid #ccc; padding-bottom: 5px;">LEGENDA</div>
+        <div style="margin-bottom: 5px;"><strong>H:</strong> Numeração de Hipóteses</div>
+        <div style="margin-bottom: 5px;"><strong>CB:</strong> Numeração de Causas Básicas</div>
+        <div style="margin-bottom: 5px; display: flex; align-items: center; gap: 5px;">
+            <div style="width: 20px; height: 20px; clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%); background: #e0e0e0; border: 2px solid #757575;"></div>
+            <span>Hipótese</span>
+        </div>
+        <div style="margin-bottom: 5px; display: flex; align-items: center; gap: 5px;">
+            <div style="width: 20px; height: 20px; clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%); background: #ffcdd2; border: 2px solid #f44336; position: relative;">
+                <span style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: #d32f2f; font-weight: bold;">✕</span>
+            </div>
+            <span>Hipótese Descartada</span>
+        </div>
+        <div style="margin-bottom: 5px; display: flex; align-items: center; gap: 5px;">
+            <div style="width: 20px; height: 20px; background: #fff9c4; border: 2px solid #f9a825; border-radius: 5px;"></div>
+            <span>Causa Intermediária</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 5px;">
+            <div style="width: 20px; height: 20px; background: #c8e6c9; border: 2px solid #4caf50; border-radius: 50px;"></div>
+            <span>Causa Básica</span>
+        </div>
+    </div>
+    '''
+    
+    # HTML completo
+    full_html = f'''
+    <div style="position: relative; font-family: Arial, sans-serif; padding: 40px 20px; background: white; min-height: 400px; overflow-x: auto;">
+        <div style="text-align: center; margin-bottom: 30px;">
+            <h2 style="margin: 0; color: #333; font-size: 1.5em;">ÁRVORE DE FALHAS</h2>
+            <div style="color: #666; font-size: 0.9em; margin-top: 5px;">{date.today().strftime('%d/%m/%Y')}</div>
+        </div>
+        {legend_html}
+        <div style="display: flex; justify-content: center; align-items: flex-start; min-height: 300px; padding: 20px 0;">
+            <div style="text-align: center;">
+                {tree_html}
+            </div>
+        </div>
+    </div>
+    '''
     
     return full_html
 
