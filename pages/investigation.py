@@ -1011,7 +1011,102 @@ def main():
                 st.session_state['current_step'] = 2
                 st.rerun()
         with col_next:
-            st.success("✅ Investigação concluída! Você pode revisar os dados ou criar um plano de ação.")
+            st.success("✅ Investigação concluída! Você pode revisar os dados ou gerar o relatório PDF.")
+        
+        # ========== GERAÇÃO DE RELATÓRIO PDF ==========
+        st.divider()
+        st.markdown("### 📄 Relatório Final PDF")
+        st.markdown("**Gere o relatório completo no padrão Vibra**")
+        
+        if st.button("📥 Gerar Relatório PDF Oficial", type="primary", use_container_width=True):
+            with st.spinner("🔄 Gerando PDF no padrão Vibra... Isso pode levar alguns segundos."):
+                try:
+                    from utils.report_generator import generate_pdf_report
+                    
+                    # 1. Busca dados completos
+                    accident_full = get_accident(accident_id)
+                    if not accident_full:
+                        st.error("Erro ao buscar dados do acidente")
+                        return
+                    
+                    # 2. Busca pessoas envolvidas
+                    all_people = get_involved_people(accident_id)
+                    
+                    # 3. Busca timeline
+                    timeline_events = get_timeline(accident_id)
+                    
+                    # 4. Busca causas validadas com códigos NBR
+                    validated_nodes = get_validated_nodes(accident_id)
+                    verified_causes = []
+                    
+                    # Processa nós validados (já vem com join de nbr_standards)
+                    for node in validated_nodes:
+                        node_label = node.get('label', 'N/A')
+                        nbr_info = node.get('nbr_standards')
+                        
+                        if nbr_info:
+                            # nbr_standards vem do join (pode ser dict ou list)
+                            if isinstance(nbr_info, dict):
+                                verified_causes.append({
+                                    'label': node_label,
+                                    'nbr_code': nbr_info.get('code', 'N/A'),
+                                    'nbr_description': nbr_info.get('description', 'N/A')
+                                })
+                            elif isinstance(nbr_info, list) and len(nbr_info) > 0:
+                                nbr = nbr_info[0]
+                                verified_causes.append({
+                                    'label': node_label,
+                                    'nbr_code': nbr.get('code', 'N/A'),
+                                    'nbr_description': nbr.get('description', 'N/A')
+                                })
+                        else:
+                            # Nó validado mas sem código NBR ainda
+                            verified_causes.append({
+                                'label': node_label,
+                                'nbr_code': 'Pendente',
+                                'nbr_description': 'Aguardando classificação NBR'
+                            })
+                    
+                    # 5. Busca evidências
+                    evidence_list = get_evidence(accident_id)
+                    evidence_images = [e.get('image_url', '') for e in evidence_list if e.get('image_url')]
+                    
+                    # 6. Busca JSON da árvore para gerar imagem
+                    tree_json = build_fault_tree_json(accident_id)
+                    
+                    # 7. Gera PDF
+                    pdf_bytes = generate_pdf_report(
+                        accident_data=accident_full,
+                        people_data=all_people,
+                        timeline_events=timeline_events,
+                        verified_causes=verified_causes,
+                        evidence_images=evidence_images,
+                        fault_tree_json=tree_json
+                    )
+                    
+                    # 8. Botão de download
+                    registry_num = accident_full.get('registry_number', 'N/A').replace('/', '-') if accident_full.get('registry_number') else 'N/A'
+                    filename = f"Relatorio_Vibra_{registry_num}_{datetime.now().strftime('%Y%m%d')}.pdf"
+                    
+                    st.success("✅ PDF gerado com sucesso!")
+                    st.download_button(
+                        label="⬇️ Baixar Relatório PDF",
+                        data=pdf_bytes,
+                        file_name=filename,
+                        mime="application/pdf",
+                        type="primary",
+                        use_container_width=True
+                    )
+                    
+                    st.info("💡 **Dica:** O relatório segue o padrão visual da Vibra com todas as seções do documento original.")
+                    
+                except ImportError as e:
+                    st.error(f"❌ Erro: Bibliotecas não instaladas. Execute: `pip install jinja2 weasyprint`")
+                    st.code("pip install jinja2 weasyprint", language="bash")
+                except Exception as e:
+                    st.error(f"❌ Erro ao gerar PDF: {str(e)}")
+                    import traceback
+                    st.code(traceback.format_exc())
 
 
 if __name__ == "__main__":
