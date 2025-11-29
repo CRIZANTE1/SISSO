@@ -59,18 +59,46 @@ def create_accident(title: str, description: str = "", occurrence_date: Optional
 def update_accident(accident_id: str, **kwargs) -> bool:
     """Atualiza dados de uma investigação de acidente"""
     try:
-        supabase = get_supabase_client()
+        from managers.supabase_config import get_service_role_client
+        from auth.auth_utils import get_user_id, is_admin
+        
+        # Usa service_role para contornar RLS
+        supabase = get_service_role_client()
+        if not supabase:
+            st.error("Erro ao conectar com o banco de dados")
+            return False
+        
+        # Validação de segurança: verifica se usuário tem acesso
+        user_id = get_user_id()
+        is_admin_user = is_admin()
+        
+        if not is_admin_user and user_id:
+            # Verifica se o acidente pertence ao usuário
+            check_response = supabase.table("accidents").select("created_by").eq("id", accident_id).execute()
+            if check_response.data and len(check_response.data) > 0:
+                if check_response.data[0].get('created_by') != user_id:
+                    st.warning("Você não tem permissão para atualizar este acidente")
+                    return False
         
         # Remove campos None
         update_data = {k: v for k, v in kwargs.items() if v is not None}
         
         if not update_data:
+            st.warning("⚠️ Nenhum dado para atualizar (todos os campos estão vazios ou None)")
             return True  # Nada para atualizar
         
+        # Executa atualização
         response = supabase.table("accidents").update(update_data).eq("id", accident_id).execute()
-        return bool(response.data)
+        
+        if response.data and len(response.data) > 0:
+            return True
+        else:
+            st.error("❌ Nenhum dado foi atualizado. Verifique se o acidente existe e se você tem permissão.")
+            return False
     except Exception as e:
         st.error(f"Erro ao atualizar investigação: {str(e)}")
+        import traceback
+        st.code(traceback.format_exc())
         return False
 
 

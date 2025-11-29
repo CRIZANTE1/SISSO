@@ -652,6 +652,15 @@ def main():
                                 'job_title': comm_role or None
                             })
             
+            # Inicializa variáveis de processo (caso a seção não tenha sido exibida)
+            if not show_process_details:
+                product_released = None
+                volume_released = 0.0
+                volume_recovered = 0.0
+                release_duration_hours = 0.0
+                equipment_involved = None
+                area_affected = None
+            
             # Botão de salvar
             col_save, col_empty = st.columns([1, 1])
             with col_save:
@@ -673,6 +682,7 @@ def main():
                         'estimated_loss_value': estimated_loss_value if estimated_loss_value > 0 else None
                     }
                     
+                    # Adiciona dados de processo se a seção foi exibida
                     if show_process_details:
                         update_data.update({
                             'product_released': product_released if product_released else None,
@@ -683,14 +693,31 @@ def main():
                             'area_affected': area_affected if area_affected else None
                         })
                     
-                    if update_accident(accident_id, **update_data):
+                    # Debug: mostra dados que serão salvos
+                    if st.session_state.get('debug_save', False):
+                        st.json(update_data)
+                        st.write(f"Accident ID: {accident_id}")
+                    
+                    # Salva dados do acidente
+                    success = update_accident(accident_id, **update_data)
+                    
+                    if success:
                         # Salva pessoas envolvidas
                         all_people = drivers + injured + witnesses + commission
-                        if upsert_involved_people(accident_id, all_people):
+                        people_success = upsert_involved_people(accident_id, all_people)
+                        
+                        if people_success:
                             st.success("✅ Dados salvos com sucesso!")
-                            st.rerun()
-        
-        # Upload de evidências (separado do formulário)
+                        else:
+                            st.warning("⚠️ Dados do acidente salvos, mas houve problema ao salvar pessoas envolvidas.")
+                        
+                        # Avança para próximo passo
+                        st.session_state['current_step'] = 1
+                        st.rerun()
+                    else:
+                        st.error("❌ Erro ao salvar dados. Verifique os campos e tente novamente.")
+            
+            # Upload de evidências (separado do formulário)
         st.divider()
         st.markdown("### 📷 Adicionar Evidências (Fotos/Vídeos)")
         with st.expander("➕ Upload de Fotos/Vídeos", expanded=False):
