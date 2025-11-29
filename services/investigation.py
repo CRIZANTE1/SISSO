@@ -546,11 +546,13 @@ def upload_evidence_image(accident_id: str, file_bytes: bytes, filename: str, de
                 public_url = f"{url}/storage/v1/object/public/{bucket}/{path}"
             
             # Registra no banco de dados
+            # Nota: uploaded_by referencia auth.users.id, mas get_user_id() retorna profiles.id
+            # Como o campo é nullable, deixamos como NULL para evitar erro de foreign key
             evidence_data = {
                 "accident_id": accident_id,
                 "image_url": public_url,
                 "description": description,
-                "uploaded_by": user_id
+                "uploaded_by": None  # Campo nullable - evita erro de FK (evidence.uploaded_by -> auth.users.id)
             }
             
             response = supabase.table("evidence").insert(evidence_data).execute()
@@ -593,17 +595,14 @@ def add_timeline_event(accident_id: str, event_time: datetime, description: str)
             st.error("Erro ao conectar com o banco de dados")
             return False
         
-        user_id = get_user_id()
-        
-        if not user_id:
-            st.error("Usuário não autenticado")
-            return False
-        
+        # Nota: created_by referencia auth.users.id, mas get_user_id() retorna profiles.id
+        # Como o campo é nullable, deixamos como NULL para evitar erro de foreign key
+        # Conforme documentado no schema: "O campo created_by é deixado como NULL para evitar erros de FK"
         data = {
             "accident_id": accident_id,
             "event_time": event_time.isoformat(),
             "description": description,
-            "created_by": user_id
+            "created_by": None  # Campo nullable - evita erro de FK (timeline.created_by -> auth.users.id)
         }
         
         response = supabase.table("timeline").insert(data).execute()
@@ -652,18 +651,14 @@ def create_root_node(accident_id: str, label: str) -> Optional[str]:
             st.error("Erro ao conectar com o banco de dados")
             return None
         
-        user_id = get_user_id()
-        
-        if not user_id:
-            st.error("Usuário não autenticado")
-            return None
-        
+        # Nota: created_by referencia auth.users.id, mas get_user_id() retorna profiles.id
+        # Como o campo é nullable, deixamos como NULL para evitar erro de foreign key
         data = {
             "accident_id": accident_id,
             "label": label,
             "type": "root",
             "status": "pending",
-            "created_by": user_id
+            "created_by": None  # Campo nullable - evita erro de FK (fault_tree_nodes.created_by -> auth.users.id)
         }
         
         response = supabase.table("fault_tree_nodes").insert(data).execute()
@@ -685,18 +680,14 @@ def add_fault_tree_node(accident_id: str, parent_id: Optional[str], label: str, 
             st.error("Erro ao conectar com o banco de dados")
             return None
         
-        user_id = get_user_id()
-        
-        if not user_id:
-            st.error("Usuário não autenticado")
-            return None
-        
+        # Nota: created_by referencia auth.users.id, mas get_user_id() retorna profiles.id
+        # Como o campo é nullable, deixamos como NULL para evitar erro de foreign key
         data = {
             "accident_id": accident_id,
             "label": label,
             "type": node_type,
             "status": "pending",
-            "created_by": user_id
+            "created_by": None  # Campo nullable - evita erro de FK (fault_tree_nodes.created_by -> auth.users.id)
         }
         
         if parent_id:
