@@ -438,7 +438,7 @@ HTML_TEMPLATE = """
             <td>{{ member.get('name', 'N/A') }}</td>
             <td>{{ member.get('job_title', 'N/A') }}</td>
             <td>{{ member.get('registration_id', 'N/A') }}</td>
-            <td>{{ member.get('training_status', 'Membro da Comissão') }}</td>
+            <td>{{ member.get('commission_role') or member.get('training_status') or 'Membro da Comissão' }}</td>
         </tr>
         {% endfor %}
     </table>

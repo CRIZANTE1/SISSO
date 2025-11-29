@@ -206,13 +206,11 @@ def upsert_involved_people(accident_id: str, people: List[Dict[str, Any]]) -> bo
         
         logger.info("[UPSERT_PEOPLE] Cliente Service Role obtido com sucesso (RLS bypass ativo)")
         
-        user_id = get_user_id()
-        
-        if not user_id:
-            logger.error("[UPSERT_PEOPLE] Usuário não autenticado")
-            return False
-        
+        # O campo created_by aponta para auth.users.id, não profiles.id
+        # Como o campo é nullable e pode causar problemas de FK, não vamos passá-lo
+        # Isso evita erros quando o ID de profiles não corresponde ao ID de auth.users
         logger.info(f"[UPSERT_PEOPLE] Salvando {len(people)} pessoas para acidente {accident_id}")
+        logger.info("[UPSERT_PEOPLE] Campo created_by não será passado (nullable) para evitar problemas de FK com auth.users")
         
         # Remove pessoas existentes do mesmo accident_id
         delete_response = supabase.table("involved_people").delete().eq("accident_id", accident_id).execute()
@@ -222,10 +220,18 @@ def upsert_involved_people(accident_id: str, people: List[Dict[str, Any]]) -> bo
         if people:
             batch_data = []
             for person in people:
+                # Valida campos obrigatórios
+                person_type = person.get('person_type')
+                name = person.get('name')
+                
+                if not person_type or not name:
+                    logger.warning(f"[UPSERT_PEOPLE] Pessoa ignorada: person_type={person_type}, name={name}")
+                    continue
+                
                 person_data = {
                     'accident_id': accident_id,
-                    'person_type': person.get('person_type'),
-                    'name': person.get('name'),
+                    'person_type': person_type,
+                    'name': name,
                     'registration_id': person.get('registration_id'),
                     'job_title': person.get('job_title'),
                     'company': person.get('company'),
@@ -233,15 +239,25 @@ def upsert_involved_people(accident_id: str, people: List[Dict[str, Any]]) -> bo
                     'time_in_role': person.get('time_in_role'),
                     'aso_date': person.get('aso_date'),
                     'training_status': person.get('training_status'),
-                    'created_by': user_id
+                    'commission_role': person.get('commission_role'),  # Função na comissão de investigação
+                    # created_by não é passado (será NULL no banco) para evitar erro de FK com auth.users
                 }
+                # Remove campos None para não enviar dados desnecessários
+                person_data = {k: v for k, v in person_data.items() if v is not None}
                 batch_data.append(person_data)
+            
+            if not batch_data:
+                logger.warning("[UPSERT_PEOPLE] Nenhum dado válido após validação")
+                return False
             
             logger.info(f"[UPSERT_PEOPLE] Dados preparados: {len(batch_data)} registros")
             logger.info(f"[UPSERT_PEOPLE] Tipos de pessoas: {[p.get('person_type') for p in batch_data]}")
             
             # Insere em lote (batch insert)
             try:
+                logger.info(f"[UPSERT_PEOPLE] Tentando inserir {len(batch_data)} registros")
+                logger.info(f"[UPSERT_PEOPLE] Primeiro registro (exemplo): {batch_data[0] if batch_data else 'N/A'}")
+                
                 response = supabase.table("involved_people").insert(batch_data).execute()
                 
                 if response.data:
@@ -250,15 +266,32 @@ def upsert_involved_people(accident_id: str, people: List[Dict[str, Any]]) -> bo
                     return True
                 else:
                     logger.error(f"[UPSERT_PEOPLE] Nenhum dado foi inserido. Response: {response}")
+                    logger.error(f"[UPSERT_PEOPLE] Response completo: {response}")
                     return False
             except Exception as insert_error:
-                logger.error(f"[UPSERT_PEOPLE] Erro na execução do insert: {str(insert_error)}")
+                error_msg = str(insert_error)
+                logger.error(f"[UPSERT_PEOPLE] Erro na execução do insert: {error_msg}")
                 logger.error(f"[UPSERT_PEOPLE] Tipo de erro: {type(insert_error).__name__}")
+                
+                # Log detalhado do erro
+                if hasattr(insert_error, 'message'):
+                    logger.error(f"[UPSERT_PEOPLE] Mensagem do erro: {insert_error.message}")
+                if hasattr(insert_error, 'code'):
+                    logger.error(f"[UPSERT_PEOPLE] Código do erro: {insert_error.code}")
+                if hasattr(insert_error, 'details'):
+                    logger.error(f"[UPSERT_PEOPLE] Detalhes do erro: {insert_error.details}")
+                
                 # Verifica se é erro de RLS
-                error_str = str(insert_error).lower()
+                error_str = error_msg.lower()
                 if 'permission' in error_str or 'policy' in error_str or 'rls' in error_str:
                     logger.error("[UPSERT_PEOPLE] Possível problema de RLS detectado")
-                raise insert_error
+                elif 'foreign key' in error_str or 'constraint' in error_str:
+                    logger.error("[UPSERT_PEOPLE] Erro de foreign key constraint detectado")
+                elif 'null value' in error_str or 'not null' in error_str:
+                    logger.error("[UPSERT_PEOPLE] Erro de campo obrigatório (NOT NULL) detectado")
+                
+                # Não faz raise, retorna False para que a UI mostre o erro
+                return False
         
         logger.info("[UPSERT_PEOPLE] Nenhuma pessoa para salvar")
         return True

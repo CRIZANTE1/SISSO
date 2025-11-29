@@ -679,9 +679,12 @@ def main():
                             comm_role_options = ["", "Coordenador", "Membro", "Relator", "Secretário", "Outro"]
                             comm_role_current = ""
                             if i < len(involved_commission):
-                                training_status = involved_commission[i].get('training_status')
-                                if training_status and isinstance(training_status, str):
-                                    comm_role_current = training_status
+                                # Tenta buscar de commission_role primeiro, depois training_status (para compatibilidade)
+                                comm_role_current = involved_commission[i].get('commission_role') or involved_commission[i].get('training_status')
+                                if comm_role_current and isinstance(comm_role_current, str):
+                                    comm_role_current = comm_role_current
+                                else:
+                                    comm_role_current = ""
                             comm_role_index = comm_role_options.index(comm_role_current) if comm_role_current in comm_role_options else 0
                             comm_role = st.selectbox(
                                 f"Função na Comissão {i+1}:",
@@ -700,7 +703,7 @@ def main():
                                 'name': comm_name,
                                 'registration_id': comm_reg or None,
                                 'job_title': comm_job or None,  # Cargo profissional
-                                'training_status': comm_role or None  # Função na comissão (usando campo training_status temporariamente)
+                                'commission_role': comm_role or None  # Função na comissão (Coordenador, Membro, Relator, etc.)
                             })
             
             # Inicializa variáveis de processo (caso a seção não tenha sido exibida)
@@ -774,7 +777,8 @@ def main():
                                     st.success(f"✅ {len(all_people)} pessoa(s) envolvida(s) salva(s) com sucesso!")
                                 else:
                                     logger.warning(f"[INVESTIGATION] Dados do acidente salvos, mas houve problema ao salvar pessoas envolvidas")
-                                    st.warning("⚠️ Dados do acidente salvos, mas houve problema ao salvar pessoas envolvidas. Verifique os logs.")
+                                    st.warning("⚠️ Dados do acidente salvos, mas houve problema ao salvar pessoas envolvidas.")
+                                    st.info("ℹ️ Verifique os logs no terminal para mais detalhes sobre o erro.")
                             else:
                                 logger.info("[INVESTIGATION] Nenhuma pessoa envolvida para salvar")
                                 st.info("ℹ️ Nenhuma pessoa envolvida registrada.")
