@@ -80,17 +80,20 @@ def app(filters=None):
                     st.error("Código e nome são obrigatórios.")
                 else:
                     try:
-                        supabase = get_supabase_client()
-                        
-                        site_data = {
-                            "code": site_code.upper(),
-                            "name": site_name,
-                            "type": site_type,
-                            "description": description,
-                            "is_active": is_active
-                        }
-                        
-                        result = supabase.table("sites").insert(site_data).execute()
+                        from managers.supabase_config import get_service_role_client
+                        supabase = get_service_role_client()
+                        if not supabase:
+                            st.error("Erro ao conectar com o banco de dados")
+                        else:
+                            site_data = {
+                                "code": site_code.upper(),
+                                "name": site_name,
+                                "type": site_type,
+                                "description": description,
+                                "is_active": is_active
+                            }
+                            
+                            result = supabase.table("sites").insert(site_data).execute()
                         
                         if result.data:
                             st.success("✅ Site cadastrado com sucesso!")
@@ -146,71 +149,77 @@ def app(filters=None):
                     st.error("E-mail é obrigatório.")
                 else:
                     try:
-                        supabase = get_supabase_client()
-                        
-                        # Verifica se o perfil já existe antes de criar
-                        existing_profile = supabase.table("profiles").select("*").eq("email", email).execute()
-                        
-                        if existing_profile.data:
-                            st.warning(f"⚠️ Já existe um perfil para o email {email}. Atualizando perfil existente...")
-                            
-                            # Atualiza perfil existente
-                            profile_data = {
-                                "role": role,
-                                "status": "ativo" if is_active else "inativo"
-                            }
-                            
-                            result = supabase.table("profiles").update(profile_data).eq("email", email).execute()
-                            
-                            if result.data:
-                                st.success("✅ Perfil atualizado com sucesso!")
-                                st.rerun()
-                            else:
-                                st.error("Erro ao atualizar perfil do usuário.")
+                        from managers.supabase_config import get_service_role_client
+                        supabase = get_service_role_client()
+                        if not supabase:
+                            st.error("Erro ao conectar com o banco de dados")
                         else:
-                            # Cria usuário no Auth
-                            auth_response = supabase.auth.admin.create_user({
-                                "email": email,
-                                "password": "temp_password_123",  # Usuário deve alterar no primeiro login
-                                "email_confirm": True
-                            })
+                            # Verifica se o perfil já existe antes de criar
+                            existing_profile = supabase.table("profiles").select("*").eq("email", email).execute()
                             
-                            if auth_response.user:
-                                # Cria perfil do usuário
-                                # Extrai o nome do email para usar como full_name
-                                from auth.auth_utils import extract_name_from_email
-                                full_name = extract_name_from_email(email)
+                            if existing_profile.data:
+                                st.warning(f"⚠️ Já existe um perfil para o email {email}. Atualizando perfil existente...")
                                 
-                                profile_data = {
-                                    "email": email,
-                                    "full_name": full_name,
-                                    "role": role,
-                                    "status": "ativo" if is_active else "inativo"
-                                }
-                                
-                                result = supabase.table("profiles").insert(profile_data).execute()
-                                
-                                if result.data:
-                                    st.success("✅ Usuário criado com sucesso!")
-                                    st.info("🔑 Senha temporária: temp_password_123 (usuário deve alterar no primeiro login)")
-                                    st.rerun()
-                                else:
-                                    st.error("Erro ao criar perfil do usuário.")
-                            else:
-                                st.error("Erro ao criar usuário no sistema de autenticação.")
-                            
-                    except Exception as e:
-                        # Se o erro for de chave duplicada, tenta atualizar o perfil existente
-                        if "duplicate key value violates unique constraint" in str(e):
-                            try:
-                                st.warning(f"⚠️ Perfil já existe para {email}. Atualizando perfil existente...")
-                                
+                                # Atualiza perfil existente
                                 profile_data = {
                                     "role": role,
                                     "status": "ativo" if is_active else "inativo"
                                 }
                                 
                                 result = supabase.table("profiles").update(profile_data).eq("email", email).execute()
+                                
+                                if result.data:
+                                    st.success("✅ Perfil atualizado com sucesso!")
+                                    st.rerun()
+                                else:
+                                    st.error("Erro ao atualizar perfil do usuário.")
+                            else:
+                                # Cria usuário no Auth
+                                auth_response = supabase.auth.admin.create_user({
+                                    "email": email,
+                                    "password": "temp_password_123",  # Usuário deve alterar no primeiro login
+                                    "email_confirm": True
+                                })
+                                
+                                if auth_response.user:
+                                    # Cria perfil do usuário
+                                    # Extrai o nome do email para usar como full_name
+                                    from auth.auth_utils import extract_name_from_email
+                                    full_name = extract_name_from_email(email)
+                                    
+                                    profile_data = {
+                                        "email": email,
+                                        "full_name": full_name,
+                                        "role": role,
+                                        "status": "ativo" if is_active else "inativo"
+                                    }
+                                    
+                                    result = supabase.table("profiles").insert(profile_data).execute()
+                                    
+                                    if result.data:
+                                        st.success("✅ Usuário criado com sucesso!")
+                                        st.info("🔑 Senha temporária: temp_password_123 (usuário deve alterar no primeiro login)")
+                                        st.rerun()
+                                    else:
+                                        st.error("Erro ao criar perfil do usuário.")
+                                else:
+                                    st.error("Erro ao criar usuário no sistema de autenticação.")
+                            
+                    except Exception as e:
+                        # Se o erro for de chave duplicada, tenta atualizar o perfil existente
+                        if "duplicate key value violates unique constraint" in str(e):
+                            try:
+                                from managers.supabase_config import get_service_role_client
+                                supabase = get_service_role_client()
+                                if supabase:
+                                    st.warning(f"⚠️ Perfil já existe para {email}. Atualizando perfil existente...")
+                                    
+                                    profile_data = {
+                                        "role": role,
+                                        "status": "ativo" if is_active else "inativo"
+                                    }
+                                    
+                                    result = supabase.table("profiles").update(profile_data).eq("email", email).execute()
                                 
                                 if result.data:
                                     st.success("✅ Perfil atualizado com sucesso!")
@@ -449,19 +458,22 @@ def app(filters=None):
         st.subheader("📊 Estatísticas do Sistema")
         
         try:
-            supabase = get_supabase_client()
-            
-            # Conta registros em cada tabela
-            stats = {}
-            
-            tables = ['sites', 'accidents', 'near_misses', 'nonconformities', 'hours_worked_monthly']
-            
-            for table in tables:
-                try:
-                    result = supabase.table(table).select("id", count="exact").execute()
-                    stats[table] = result.count
-                except:
-                    stats[table] = 0
+            from managers.supabase_config import get_service_role_client
+            supabase = get_service_role_client()
+            if not supabase:
+                st.error("Erro ao conectar com o banco de dados")
+            else:
+                # Conta registros em cada tabela
+                stats = {}
+                
+                tables = ['sites', 'accidents', 'near_misses', 'nonconformities', 'hours_worked_monthly']
+                
+                for table in tables:
+                    try:
+                        result = supabase.table(table).select("id", count="exact").execute()
+                        stats[table] = result.count
+                    except:
+                        stats[table] = 0
             
             col1, col2, col3 = st.columns(3)
             
@@ -483,9 +495,12 @@ def app(filters=None):
 def get_sites():
     """Busca sites disponíveis"""
     try:
-        supabase = get_supabase_client()
+        from managers.supabase_config import get_service_role_client
+        supabase = get_service_role_client()
+        if not supabase:
+            return []
         response = supabase.table("sites").select("*").execute()
-        return response.data
+        return response.data if response.data else []
     except:
         return []
 
@@ -494,7 +509,10 @@ def get_sites():
 def get_users():
     """Busca usuários disponíveis"""
     try:
-        supabase = get_supabase_client()
+        from managers.supabase_config import get_service_role_client
+        supabase = get_service_role_client()
+        if not supabase:
+            return []
         response = supabase.table("profiles").select("*").execute()
         return response.data
     except:

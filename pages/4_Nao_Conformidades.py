@@ -653,9 +653,12 @@ def app(filters=None):
 def get_sites():
     """Busca sites disponíveis"""
     try:
-        supabase = get_supabase_client()
+        from managers.supabase_config import get_service_role_client
+        supabase = get_service_role_client()
+        if not supabase:
+            return []
         response = supabase.table("sites").select("id, code, name").execute()
-        return response.data
+        return response.data if response.data else []
     except:
         return []
 
@@ -672,7 +675,10 @@ def get_employees():
 def download_attachment(bucket, path):
     """Download de anexo"""
     try:
-        supabase = get_supabase_client()
+        from managers.supabase_config import get_service_role_client
+        supabase = get_service_role_client()
+        if not supabase:
+            return None
         response = supabase.storage.from_(bucket).download(path)
         return response
     except:
@@ -681,7 +687,10 @@ def download_attachment(bucket, path):
 def delete_attachment(attachment_id):
     """Remove anexo"""
     try:
-        supabase = get_supabase_client()
+        from managers.supabase_config import get_service_role_client
+        supabase = get_service_role_client()
+        if not supabase:
+            return False
         supabase.table("attachments").delete().eq("id", attachment_id).execute()
         return True
     except:

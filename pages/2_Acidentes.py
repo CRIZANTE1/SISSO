@@ -959,7 +959,12 @@ def app(filters=None):
                                 }
                                 # Campos removidos: phone, employee_id, site_id (não existem na tabela)
                                 
-                                result = supabase.table("employees").insert(employee_data).execute()
+                                from managers.supabase_config import get_service_role_client
+                                supabase_service = get_service_role_client()
+                                if not supabase_service:
+                                    st.error("Erro ao conectar com o banco de dados")
+                                else:
+                                    result = supabase_service.table("employees").insert(employee_data).execute()
                                 
                                 if result.data:
                                     st.success("✅ Funcionário cadastrado com sucesso!")
@@ -1173,7 +1178,8 @@ def app(filters=None):
 def download_attachment(bucket, path):
     """Download de anexo"""
     try:
-        supabase = get_supabase_client()
+        from managers.supabase_config import get_service_role_client
+        supabase = get_service_role_client()
         if supabase:
             response = supabase.storage.from_(bucket).download(path)
             return response
@@ -1184,7 +1190,8 @@ def download_attachment(bucket, path):
 def delete_attachment(attachment_id):
     """Remove anexo"""
     try:
-        supabase = get_supabase_client()
+        from managers.supabase_config import get_service_role_client
+        supabase = get_service_role_client()
         if supabase:
             supabase.table("attachments").delete().eq("id", attachment_id).execute()
             return True

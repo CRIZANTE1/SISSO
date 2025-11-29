@@ -574,7 +574,10 @@ def app(filters=None):
 def download_attachment(bucket, path):
     """Download de anexo"""
     try:
-        supabase = get_supabase_client()
+        from managers.supabase_config import get_service_role_client
+        supabase = get_service_role_client()
+        if not supabase:
+            return None
         response = supabase.storage.from_(bucket).download(path)
         return response
     except:
@@ -583,7 +586,10 @@ def download_attachment(bucket, path):
 def delete_attachment(attachment_id):
     """Remove anexo"""
     try:
-        supabase = get_supabase_client()
+        from managers.supabase_config import get_service_role_client
+        supabase = get_service_role_client()
+        if not supabase:
+            return False
         supabase.table("attachments").delete().eq("id", attachment_id).execute()
         return True
     except:

@@ -10,7 +10,10 @@ import pandas as pd
 def get_user_feedbacks() -> List[Dict]:
     """Busca todos os feedbacks do usuário logado"""
     try:
-        supabase = get_supabase_client()
+        supabase = get_service_role_client()
+        if not supabase:
+            return []
+        
         user_id = get_user_id()
         
         if not user_id:
@@ -49,7 +52,11 @@ def get_all_feedbacks(include_resolved: bool = False) -> List[Dict]:
 def create_feedback(feedback_data: Dict) -> bool:
     """Cria um novo feedback"""
     try:
-        supabase = get_supabase_client()
+        supabase = get_service_role_client()
+        if not supabase:
+            st.error("Erro ao conectar com o banco de dados")
+            return False
+        
         user_id = get_user_id()
         
         if not user_id:
@@ -93,7 +100,11 @@ def create_feedback(feedback_data: Dict) -> bool:
 def update_feedback_status(feedback_id: str, new_status: str, admin_notes: Optional[str] = None) -> bool:
     """Atualiza o status de um feedback (apenas admins ou o próprio usuário se estiver aberto)"""
     try:
-        supabase = get_supabase_client()
+        supabase = get_service_role_client()
+        if not supabase:
+            st.error("Erro ao conectar com o banco de dados")
+            return False
+        
         user_id = get_user_id()
         
         if not user_id:
@@ -127,7 +138,11 @@ def update_feedback_status(feedback_id: str, new_status: str, admin_notes: Optio
 def delete_feedback(feedback_id: str) -> bool:
     """Remove um feedback (apenas se for do usuário e estiver aberto)"""
     try:
-        supabase = get_supabase_client()
+        supabase = get_service_role_client()
+        if not supabase:
+            st.error("Erro ao conectar com o banco de dados")
+            return False
+        
         user_id = get_user_id()
         
         if not user_id:

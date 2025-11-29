@@ -725,22 +725,17 @@ def fetch_detailed_accidents(user_email: str, start_date=None, end_date=None) ->
     Busca dados detalhados de acidentes do usuário atual
     """
     try:
-        from managers.supabase_config import get_supabase_client
-        from auth.auth_utils import get_user_id
-        supabase = get_supabase_client()
-        
-        # Busca dados de acidentes usando UUID do usuário (created_by agora é UUID)
         from managers.supabase_config import get_service_role_client
-        from auth.auth_utils import is_admin
+        from auth.auth_utils import get_user_id, is_admin
+        
+        # Sempre usa service_role e aplica filtro de segurança no código
+        supabase = get_service_role_client()
+        if not supabase:
+            return pd.DataFrame()
+        
         user_id = get_user_id()
         if not user_id:
             return pd.DataFrame()
-        
-        # Admin usa service_role para ver todos os dados, usuário comum usa client normal
-        if is_admin():
-            supabase = get_service_role_client()
-        else:
-            supabase = get_supabase_client()
         
         query = supabase.table("accidents").select("*")
         

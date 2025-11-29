@@ -10,17 +10,26 @@ import pandas as pd
 def get_actions_by_entity(entity_type: str, entity_id: str) -> List[Dict]:
     """Busca todas as ações relacionadas a uma entidade (accident, near_miss, nonconformity)"""
     try:
-        if is_admin():
-            supabase = get_service_role_client()
-        else:
-            supabase = get_supabase_client()
-            
-        response = supabase.table("actions")\
+        # Sempre usa service_role e aplica filtro de segurança no código
+        supabase = get_service_role_client()
+        if not supabase:
+            return []
+        
+        # Validação de segurança: verifica se usuário tem acesso
+        from auth.auth_utils import get_user_id, is_admin
+        user_id = get_user_id()
+        is_admin_user = is_admin()
+        
+        # Se não for admin, filtra por created_by
+        query = supabase.table("actions")\
             .select("*")\
             .eq("entity_type", entity_type)\
-            .eq("entity_id", entity_id)\
-            .order("when_date", desc=True)\
-            .execute()
+            .eq("entity_id", entity_id)
+        
+        if not is_admin_user and user_id:
+            query = query.eq("created_by", user_id)
+            
+        response = query.order("when_date", desc=True).execute()
             
         return response.data if response.data else []
     except Exception as e:
@@ -30,7 +39,11 @@ def get_actions_by_entity(entity_type: str, entity_id: str) -> List[Dict]:
 def create_action(action_data: Dict) -> bool:
     """Cria uma nova ação corretiva"""
     try:
-        supabase = get_supabase_client()
+        supabase = get_service_role_client()
+        if not supabase:
+            st.error("Erro ao conectar com o banco de dados")
+            return False
+        
         user_id = get_user_id()
         
         if not user_id:
@@ -68,7 +81,11 @@ def create_action(action_data: Dict) -> bool:
 def update_action_status(action_id: str, new_status: str) -> bool:
     """Atualiza o status de uma ação"""
     try:
-        supabase = get_supabase_client()
+        supabase = get_service_role_client()
+        if not supabase:
+            st.error("Erro ao conectar com o banco de dados")
+            return False
+        
         result = supabase.table("actions")\
             .update({"status": new_status})\
             .eq("id", action_id)\
@@ -86,7 +103,11 @@ def update_action_status(action_id: str, new_status: str) -> bool:
 def delete_action(action_id: str) -> bool:
     """Remove uma ação"""
     try:
-        supabase = get_supabase_client()
+        supabase = get_service_role_client()
+        if not supabase:
+            st.error("Erro ao conectar com o banco de dados")
+            return False
+        
         result = supabase.table("actions")\
             .delete()\
             .eq("id", action_id)\

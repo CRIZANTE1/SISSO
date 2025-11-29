@@ -22,7 +22,12 @@ def upload_evidence(file_bytes: bytes,
             st.error("Usuário não identificado para upload")
             return None
             
-        supabase = get_supabase_client()
+        from managers.supabase_config import get_service_role_client
+        supabase = get_service_role_client()
+        if not supabase:
+            st.error("Erro ao conectar com o banco de dados")
+            return None
+        
         bucket = "evidencias"
         
         # Gera path único baseado no timestamp
@@ -63,9 +68,13 @@ def upload_evidence(file_bytes: bytes,
 def get_attachments(entity_type: str, entity_id: str) -> List[Dict[str, Any]]:
     """Busca anexos de uma entidade"""
     try:
-        supabase = get_supabase_client()
+        from managers.supabase_config import get_service_role_client
+        supabase = get_service_role_client()
+        if not supabase:
+            return []
+        
         response = supabase.table("attachments").select("*").eq("entity_type", entity_type).eq("entity_id", entity_id).execute()
-        return response.data
+        return response.data if response.data else []
     except Exception as e:
         st.error(f"Erro ao buscar anexos: {str(e)}")
         return []
@@ -73,7 +82,11 @@ def get_attachments(entity_type: str, entity_id: str) -> List[Dict[str, Any]]:
 def download_attachment(bucket: str, path: str) -> Optional[bytes]:
     """Download de anexo do Supabase Storage"""
     try:
-        supabase = get_supabase_client()
+        from managers.supabase_config import get_service_role_client
+        supabase = get_service_role_client()
+        if not supabase:
+            return None
+        
         response = supabase.storage.from_(bucket).download(path)
         return response
     except Exception as e:
@@ -83,7 +96,11 @@ def download_attachment(bucket: str, path: str) -> Optional[bytes]:
 def delete_attachment(attachment_id: str) -> bool:
     """Remove anexo do banco e storage"""
     try:
-        supabase = get_supabase_client()
+        from managers.supabase_config import get_service_role_client
+        supabase = get_service_role_client()
+        if not supabase:
+            st.error("Erro ao conectar com o banco de dados")
+            return False
         
         # Busca dados do anexo
         attachment = supabase.table("attachments").select("*").eq("id", attachment_id).execute()
@@ -108,7 +125,11 @@ def import_hours_csv(df: pd.DataFrame, site_mapping: Dict[str, str]) -> bool:
     """Importa dados de horas trabalhadas de CSV"""
     try:
         from auth.auth_utils import get_user_id
-        supabase = get_supabase_client()
+        from managers.supabase_config import get_service_role_client
+        supabase = get_service_role_client()
+        if not supabase:
+            st.error("Erro ao conectar com o banco de dados")
+            return False
         
         # Valida colunas necessárias (site_id removido da tabela)
         required_cols = ['year', 'month', 'hours']

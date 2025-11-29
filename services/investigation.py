@@ -15,7 +15,12 @@ def create_accident(title: str, description: str = "", occurrence_date: Optional
                    **kwargs) -> Optional[str]:
     """Cria uma nova investigação de acidente com campos expandidos do relatório Vibra"""
     try:
-        supabase = get_supabase_client()
+        from managers.supabase_config import get_service_role_client
+        supabase = get_service_role_client()
+        if not supabase:
+            st.error("Erro ao conectar com o banco de dados")
+            return None
+        
         user_id = get_user_id()
         
         if not user_id:
@@ -105,7 +110,11 @@ def update_accident(accident_id: str, **kwargs) -> bool:
 def get_involved_people(accident_id: str, person_type: Optional[str] = None) -> List[Dict[str, Any]]:
     """Busca pessoas envolvidas em uma investigação"""
     try:
-        supabase = get_supabase_client()
+        from managers.supabase_config import get_service_role_client
+        supabase = get_service_role_client()
+        if not supabase:
+            return []
+        
         query = supabase.table("involved_people").select("*").eq("accident_id", accident_id)
         
         if person_type:
@@ -121,7 +130,12 @@ def get_involved_people(accident_id: str, person_type: Optional[str] = None) -> 
 def upsert_involved_people(accident_id: str, people: List[Dict[str, Any]]) -> bool:
     """Insere ou atualiza pessoas envolvidas (remove existentes e insere novas)"""
     try:
-        supabase = get_supabase_client()
+        from managers.supabase_config import get_service_role_client
+        supabase = get_service_role_client()
+        if not supabase:
+            st.error("Erro ao conectar com o banco de dados")
+            return False
+        
         user_id = get_user_id()
         
         if not user_id:
@@ -143,6 +157,8 @@ def upsert_involved_people(accident_id: str, people: List[Dict[str, Any]]) -> bo
         return True
     except Exception as e:
         st.error(f"Erro ao salvar pessoas envolvidas: {str(e)}")
+        import traceback
+        st.code(traceback.format_exc())
         return False
 
 
@@ -329,7 +345,12 @@ def get_accident(accident_id: str) -> Optional[Dict[str, Any]]:
 def upload_evidence_image(accident_id: str, file_bytes: bytes, filename: str, description: str = "") -> Optional[str]:
     """Upload de imagem de evidência para Supabase Storage"""
     try:
-        supabase = get_supabase_client()
+        from managers.supabase_config import get_service_role_client
+        supabase = get_service_role_client()
+        if not supabase:
+            st.error("Erro ao conectar com o banco de dados")
+            return None
+        
         user_id = get_user_id()
         
         if not user_id:
@@ -389,7 +410,11 @@ def upload_evidence_image(accident_id: str, file_bytes: bytes, filename: str, de
 def get_evidence(accident_id: str) -> List[Dict[str, Any]]:
     """Busca evidências de uma investigação"""
     try:
-        supabase = get_supabase_client()
+        from managers.supabase_config import get_service_role_client
+        supabase = get_service_role_client()
+        if not supabase:
+            return []
+        
         response = supabase.table("evidence").select("*").eq("accident_id", accident_id).order("uploaded_at", desc=True).execute()
         return response.data if response.data else []
     except Exception as e:
@@ -400,7 +425,12 @@ def get_evidence(accident_id: str) -> List[Dict[str, Any]]:
 def add_timeline_event(accident_id: str, event_time: datetime, description: str) -> bool:
     """Adiciona evento à timeline"""
     try:
-        supabase = get_supabase_client()
+        from managers.supabase_config import get_service_role_client
+        supabase = get_service_role_client()
+        if not supabase:
+            st.error("Erro ao conectar com o banco de dados")
+            return False
+        
         user_id = get_user_id()
         
         if not user_id:
@@ -424,7 +454,11 @@ def add_timeline_event(accident_id: str, event_time: datetime, description: str)
 def get_timeline(accident_id: str) -> List[Dict[str, Any]]:
     """Busca timeline de uma investigação"""
     try:
-        supabase = get_supabase_client()
+        from managers.supabase_config import get_service_role_client
+        supabase = get_service_role_client()
+        if not supabase:
+            return []
+        
         response = supabase.table("timeline").select("*").eq("accident_id", accident_id).order("event_time", desc=False).execute()
         return response.data if response.data else []
     except Exception as e:
@@ -435,7 +469,11 @@ def get_timeline(accident_id: str) -> List[Dict[str, Any]]:
 def get_root_node(accident_id: str) -> Optional[Dict[str, Any]]:
     """Busca o nó raiz de uma investigação"""
     try:
-        supabase = get_supabase_client()
+        from managers.supabase_config import get_service_role_client
+        supabase = get_service_role_client()
+        if not supabase:
+            return None
+        
         response = supabase.table("fault_tree_nodes").select("*").eq("accident_id", accident_id).eq("type", "root").limit(1).execute()
         return response.data[0] if response.data else None
     except Exception as e:
@@ -446,7 +484,12 @@ def get_root_node(accident_id: str) -> Optional[Dict[str, Any]]:
 def create_root_node(accident_id: str, label: str) -> Optional[str]:
     """Cria nó raiz para uma investigação"""
     try:
-        supabase = get_supabase_client()
+        from managers.supabase_config import get_service_role_client
+        supabase = get_service_role_client()
+        if not supabase:
+            st.error("Erro ao conectar com o banco de dados")
+            return None
+        
         user_id = get_user_id()
         
         if not user_id:
@@ -474,7 +517,12 @@ def create_root_node(accident_id: str, label: str) -> Optional[str]:
 def add_fault_tree_node(accident_id: str, parent_id: Optional[str], label: str, node_type: str) -> Optional[str]:
     """Adiciona nó à árvore de falhas"""
     try:
-        supabase = get_supabase_client()
+        from managers.supabase_config import get_service_role_client
+        supabase = get_service_role_client()
+        if not supabase:
+            st.error("Erro ao conectar com o banco de dados")
+            return None
+        
         user_id = get_user_id()
         
         if not user_id:
@@ -505,7 +553,11 @@ def add_fault_tree_node(accident_id: str, parent_id: Optional[str], label: str, 
 def get_tree_nodes(accident_id: str) -> List[Dict[str, Any]]:
     """Busca todos os nós da árvore de falhas de uma investigação"""
     try:
-        supabase = get_supabase_client()
+        from managers.supabase_config import get_service_role_client
+        supabase = get_service_role_client()
+        if not supabase:
+            return []
+        
         response = supabase.table("fault_tree_nodes").select("*").eq("accident_id", accident_id).execute()
         return response.data if response.data else []
     except Exception as e:
@@ -516,7 +568,12 @@ def get_tree_nodes(accident_id: str) -> List[Dict[str, Any]]:
 def update_node_status(node_id: str, status: str) -> bool:
     """Atualiza status de validação de um nó"""
     try:
-        supabase = get_supabase_client()
+        from managers.supabase_config import get_service_role_client
+        supabase = get_service_role_client()
+        if not supabase:
+            st.error("Erro ao conectar com o banco de dados")
+            return False
+        
         response = supabase.table("fault_tree_nodes").update({"status": status}).eq("id", node_id).execute()
         return bool(response.data)
     except Exception as e:
@@ -527,7 +584,12 @@ def update_node_status(node_id: str, status: str) -> bool:
 def link_nbr_standard_to_node(node_id: str, nbr_standard_id: int) -> bool:
     """Vincula um padrão NBR a um nó validado"""
     try:
-        supabase = get_supabase_client()
+        from managers.supabase_config import get_service_role_client
+        supabase = get_service_role_client()
+        if not supabase:
+            st.error("Erro ao conectar com o banco de dados")
+            return False
+        
         response = supabase.table("fault_tree_nodes").update({"nbr_standard_id": nbr_standard_id}).eq("id", node_id).execute()
         return bool(response.data)
     except Exception as e:
@@ -538,7 +600,11 @@ def link_nbr_standard_to_node(node_id: str, nbr_standard_id: int) -> bool:
 def get_nbr_standards(category: Optional[str] = None) -> List[Dict[str, Any]]:
     """Busca padrões NBR, opcionalmente filtrados por categoria"""
     try:
-        supabase = get_supabase_client()
+        from managers.supabase_config import get_service_role_client
+        supabase = get_service_role_client()
+        if not supabase:
+            return []
+        
         query = supabase.table("nbr_standards").select("*")
         
         if category:
@@ -554,7 +620,11 @@ def get_nbr_standards(category: Optional[str] = None) -> List[Dict[str, Any]]:
 def get_validated_nodes(accident_id: str) -> List[Dict[str, Any]]:
     """Busca apenas nós validados de uma investigação"""
     try:
-        supabase = get_supabase_client()
+        from managers.supabase_config import get_service_role_client
+        supabase = get_service_role_client()
+        if not supabase:
+            return []
+        
         response = supabase.table("fault_tree_nodes").select("*, nbr_standards(code, description, category)").eq("accident_id", accident_id).eq("status", "validated").execute()
         return response.data if response.data else []
     except Exception as e:
@@ -579,12 +649,14 @@ def build_fault_tree_json(accident_id: str) -> Optional[Dict[str, Any]]:
         # Busca padrões NBR para incluir códigos
         nbr_standards_map = {}
         try:
-            supabase = get_supabase_client()
-            # Busca todos os padrões NBR
-            nbr_response = supabase.table("nbr_standards").select("id, code").execute()
-            if nbr_response.data:
-                # Cria mapa: nbr_standard_id (int) -> code (string)
-                nbr_standards_map = {int(std['id']): std['code'] for std in nbr_response.data}
+            from managers.supabase_config import get_service_role_client
+            supabase = get_service_role_client()
+            if supabase:
+                # Busca todos os padrões NBR
+                nbr_response = supabase.table("nbr_standards").select("id, code").execute()
+                if nbr_response.data:
+                    # Cria mapa: nbr_standard_id (int) -> code (string)
+                    nbr_standards_map = {int(std['id']): std['code'] for std in nbr_response.data}
         except Exception as e:
             # Se falhar, continua sem códigos NBR
             pass
@@ -651,7 +723,12 @@ def build_fault_tree_json(accident_id: str) -> Optional[Dict[str, Any]]:
 def update_accident_status(accident_id: str, status: str) -> bool:
     """Atualiza status do acidente (normaliza para 'aberto'/'fechado')"""
     try:
-        supabase = get_supabase_client()
+        from managers.supabase_config import get_service_role_client
+        supabase = get_service_role_client()
+        if not supabase:
+            st.error("Erro ao conectar com o banco de dados")
+            return False
+        
         # Normaliza status: 'Open'/'Closed' -> 'aberto'/'fechado'
         normalized_status = "aberto" if status.lower() in ['open', 'aberto'] else "fechado"
         response = supabase.table("accidents").update({"status": normalized_status}).eq("id", accident_id).execute()

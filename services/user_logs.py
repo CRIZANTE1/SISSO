@@ -107,16 +107,18 @@ def get_user_logs(
         Lista de logs
     """
     try:
-        supabase = get_supabase_client()
+        supabase = get_service_role_client()
+        if not supabase:
+            return []
+        
         user_id = get_user_id()
         
         if not user_id:
             return []
         
-        query = supabase.table("user_logs").select("*")
+        query = supabase.table("user_logs").select("*").eq("user_id", user_id)
         
-        # RLS já filtra para mostrar apenas logs do usuário logado
-        # Mas podemos adicionar filtro adicional para garantir
+        # Filtro explícito por user_id para garantir segurança
         
         if start_date:
             query = query.gte("created_at", start_date.isoformat())
