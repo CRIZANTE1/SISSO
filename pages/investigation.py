@@ -104,19 +104,31 @@ def render_fault_tree_html(tree_json: Dict[str, Any]) -> str:
         """Retorna o número do nó (H1, H2, CB1, CB2, etc.)"""
         nonlocal hypothesis_counter, basic_cause_counter
         
+        # Root NUNCA tem numeração
+        if node_type == 'root':
+            return ""
+        
         # Causa básica: fact validado sem filhos
         if node_type == 'fact' and status == 'validated' and not has_children:
             basic_cause_counter += 1
             return f"CB{basic_cause_counter}"
-        # Hipótese: qualquer hypothesis (pendente ou descartada) ou fact com filhos
-        elif node_type == 'hypothesis' or (node_type == 'fact' and has_children) or (status in ['pending', 'discarded']):
+        # Hipótese: qualquer hypothesis (pendente ou descartada)
+        elif node_type == 'hypothesis':
             hypothesis_counter += 1
             return f"H{hypothesis_counter}"
-        # Causa intermediária validada: também pode ter numeração H
-        elif status == 'validated' and has_children:
+        # Fact com filhos: trata como hipótese
+        elif node_type == 'fact' and has_children:
             hypothesis_counter += 1
             return f"H{hypothesis_counter}"
-        # Root não tem numeração
+        # Causa intermediária validada (não root): também pode ter numeração H
+        elif status == 'validated' and has_children and node_type != 'root':
+            hypothesis_counter += 1
+            return f"H{hypothesis_counter}"
+        # Status pending ou discarded (mas não root)
+        elif status in ['pending', 'discarded'] and node_type != 'root':
+            hypothesis_counter += 1
+            return f"H{hypothesis_counter}"
+        # Sem numeração
         return ""
     
     def get_node_shape(node_type: str, status: str, has_children: bool) -> Dict[str, str]:
@@ -178,17 +190,21 @@ def render_fault_tree_html(tree_json: Dict[str, Any]) -> str:
         
         # Determina forma CSS
         if shape_config['shape'] == 'diamond':
-            # Losango usando clip-path
-            shape_style = f"clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%); width: 220px; min-height: 80px;"
+            # Losango usando clip-path - ajustado para melhor posicionamento do texto
+            shape_style = f"clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%); width: 220px; min-height: 100px; padding: 20px 15px;"
         elif shape_config['shape'] == 'oval':
             # Oval
-            shape_style = f"border-radius: 50px; width: 220px; min-height: 70px;"
+            shape_style = f"border-radius: 50px; width: 220px; min-height: 70px; padding: 12px 15px;"
         else:
             # Retângulo arredondado
-            shape_style = f"border-radius: {shape_config['border_radius']}; width: 280px; min-height: 70px;"
+            shape_style = f"border-radius: {shape_config['border_radius']}; width: 280px; min-height: 70px; padding: 12px 15px;"
         
-        # Estilo do nó (compacto)
-        node_style = f"position: relative; {shape_style} background-color: {shape_config['bg_color']}; border: 2px solid {shape_config['border_color']}; padding: 12px 15px; margin: 10px 5px; display: inline-flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; box-shadow: 0 2px 6px rgba(0,0,0,0.25); font-size: 0.9em; line-height: 1.3; word-wrap: break-word;"
+        # Estilo do nó (compacto) - ajustado para losangos
+        if shape_config['shape'] == 'diamond':
+            # Para losangos, usar padding maior e garantir que o texto fique centralizado
+            node_style = f"position: relative; {shape_style} background-color: {shape_config['bg_color']}; border: 2px solid {shape_config['border_color']}; margin: 10px 5px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; box-shadow: 0 2px 6px rgba(0,0,0,0.25); font-size: 0.85em; line-height: 1.4; word-wrap: break-word; overflow: visible;"
+        else:
+            node_style = f"position: relative; {shape_style} background-color: {shape_config['bg_color']}; border: 2px solid {shape_config['border_color']}; margin: 10px 5px; display: inline-flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; box-shadow: 0 2px 6px rgba(0,0,0,0.25); font-size: 0.9em; line-height: 1.3; word-wrap: break-word;"
         
         # Número do nó (se houver)
         number_html = ""
