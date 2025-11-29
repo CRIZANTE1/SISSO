@@ -126,7 +126,7 @@ def get_accidents() -> List[Dict[str, Any]]:
         user_id = get_user_id()
         
         # Busca acidentes (filtra por usuário se não for admin)
-        query = supabase.table("accidents").select("id, title, description, occurrence_date, occurred_at, status, created_at, type, classification")
+        query = supabase.table("accidents").select("id, title, description, occurrence_date, occurred_at, status, created_at, type, classification, created_by")
         
         if not is_admin() and user_id:
             query = query.eq("created_by", user_id)
@@ -138,15 +138,27 @@ def get_accidents() -> List[Dict[str, Any]]:
             # usa occurrence_date se existir, senão usa occurred_at
             normalized_data = []
             for acc in response.data:
+                # Garante que title nunca seja None
+                title = acc.get("title")
+                description = acc.get("description", "")
+                
+                if not title or title.strip() == "":
+                    # Se não tem title, usa description (limitado a 50 chars)
+                    if description:
+                        title = description[:50] + ("..." if len(description) > 50 else "")
+                    else:
+                        title = "Acidente sem título"
+                
                 normalized = {
                     "id": acc.get("id"),
-                    "title": acc.get("title") or acc.get("description", "Acidente sem título")[:50],
-                    "description": acc.get("description", ""),
+                    "title": title,
+                    "description": description,
                     "occurrence_date": acc.get("occurrence_date") or acc.get("occurred_at"),
                     "status": acc.get("status", "aberto"),
                     "created_at": acc.get("created_at"),
                     "type": acc.get("type"),
-                    "classification": acc.get("classification")
+                    "classification": acc.get("classification"),
+                    "created_by": acc.get("created_by")
                 }
                 normalized_data.append(normalized)
             
@@ -154,6 +166,8 @@ def get_accidents() -> List[Dict[str, Any]]:
         return []
     except Exception as e:
         st.error(f"Erro ao buscar acidentes: {str(e)}")
+        import traceback
+        st.code(traceback.format_exc())
         return []
 
 

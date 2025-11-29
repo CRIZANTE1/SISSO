@@ -159,6 +159,11 @@ def main():
         st.subheader("Selecionar Acidente para Investigação")
         st.info("💡 **Crie o acidente na página 'Acidentes' primeiro, depois selecione aqui para iniciar a investigação.**")
         
+        # Botão de refresh para forçar atualização
+        if st.button("🔄 Atualizar Lista de Acidentes", help="Clique se o acidente não aparecer"):
+            st.session_state['current_accident'] = None
+            st.rerun()
+        
         investigations = get_accidents()
         
         if investigations:
@@ -167,19 +172,41 @@ def main():
             for inv in investigations:
                 # Formata a label com informações relevantes
                 acc_type = inv.get('type', 'N/A')
+                
+                # Pega título ou descrição (já normalizado em get_accidents)
+                title_text = inv.get('title', 'Acidente sem título')
+                if not title_text or title_text == 'Acidente sem título':
+                    title_text = inv.get('description', 'Acidente sem título')
+                
+                # Limita tamanho do título
+                if len(title_text) > 35:
+                    title_text = title_text[:35] + "..."
+                
+                # Formata data
                 acc_date = ""
                 if inv.get('occurrence_date'):
                     try:
                         acc_date = pd.to_datetime(inv['occurrence_date']).strftime('%d/%m/%Y')
                     except:
-                        acc_date = ""
+                        try:
+                            acc_date = str(inv['occurrence_date'])[:10]
+                        except:
+                            acc_date = ""
                 elif inv.get('occurred_at'):
                     try:
                         acc_date = pd.to_datetime(inv['occurred_at']).strftime('%d/%m/%Y')
                     except:
-                        acc_date = ""
+                        try:
+                            acc_date = str(inv['occurred_at'])[:10]
+                        except:
+                            acc_date = ""
                 
-                label = f"{inv['title'][:35]}... | {acc_type} | {acc_date}"
+                # Cria label
+                if acc_date:
+                    label = f"{title_text} | {acc_type} | {acc_date}"
+                else:
+                    label = f"{title_text} | {acc_type}"
+                
                 investigation_options[label] = inv['id']
             
             investigation_options["-- Selecione um acidente --"] = None
