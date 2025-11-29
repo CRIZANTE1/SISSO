@@ -172,9 +172,19 @@ def get_accidents() -> List[Dict[str, Any]]:
 
 
 def get_accident(accident_id: str) -> Optional[Dict[str, Any]]:
-    """Busca um acidente específico da tabela accidents"""
+    """Busca um acidente específico da tabela accidents por ID (UUID)"""
     try:
+        if not accident_id:
+            return None
+        
+        # Garante que accident_id é uma string válida (UUID)
+        accident_id = str(accident_id).strip()
+        if not accident_id or len(accident_id) < 10:  # UUID mínimo tem 36 caracteres, mas vamos ser flexíveis
+            st.warning(f"ID de acidente inválido: {accident_id}")
+            return None
+        
         supabase = get_supabase_client()
+        # Busca EXCLUSIVAMENTE por ID (nunca por nome/título)
         response = supabase.table("accidents").select("*").eq("id", accident_id).execute()
         
         if response.data and len(response.data) > 0:

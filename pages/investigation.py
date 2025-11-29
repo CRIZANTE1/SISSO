@@ -219,9 +219,19 @@ def main():
                 help="Selecione um acidente criado na página 'Acidentes' para iniciar a investigação"
             )
             
-            selected_id = investigation_options[selected_label]
+            # Obtém o ID do acidente selecionado (NUNCA usa nome/título)
+            selected_id = investigation_options.get(selected_label)
+            
+            # Valida que selected_id é um UUID válido
+            if selected_id:
+                selected_id = str(selected_id).strip()
+                # UUID tem 36 caracteres, mas vamos aceitar qualquer string não vazia
+                if len(selected_id) < 10:
+                    st.error(f"❌ ID de acidente inválido: {selected_id}")
+                    selected_id = None
             
             if selected_id and selected_id != st.session_state.get('current_accident'):
+                # Armazena o ID (UUID) no session_state
                 st.session_state['current_accident'] = selected_id
                 st.session_state['current_step'] = 0  # Reset step ao mudar investigação
                 st.rerun()
@@ -248,7 +258,17 @@ def main():
         """)
     
     # ========== VERIFICAÇÃO DE ACCIDENT_ID ==========
+    # IMPORTANTE: Sempre usa ID (UUID), NUNCA nome/título
     accident_id = st.session_state.get('current_accident')
+    
+    # Valida que accident_id é um UUID válido (não é nome/título)
+    if accident_id:
+        accident_id = str(accident_id).strip()
+        # UUID tem 36 caracteres, mas aceita qualquer string com pelo menos 10 chars
+        if len(accident_id) < 10:
+            st.error(f"❌ ID de acidente inválido: {accident_id}")
+            st.session_state['current_accident'] = None
+            accident_id = None
     
     if not accident_id:
         st.info("👆 **Por favor, selecione um acidente na barra lateral para iniciar a investigação.**")
@@ -262,10 +282,12 @@ def main():
         st.markdown("**💡 Dica:** O acidente deve ser criado primeiro na página 'Acidentes' antes de iniciar a investigação aqui.**")
         return
     
-    # ========== CARREGA DADOS DA INVESTIGAÇÃO ==========
+    # ========== CARREGA DADOS DA INVESTIGAÇÃO (BUSCA POR ID) ==========
+    # IMPORTANTE: get_accident() busca EXCLUSIVAMENTE por ID (UUID), nunca por nome/título
     investigation = get_accident(accident_id)
     if not investigation:
-        st.error("❌ Investigação não encontrada")
+        st.error(f"❌ Acidente não encontrado com ID: {accident_id[:8]}...")
+        st.info("💡 Tente selecionar o acidente novamente na barra lateral.")
         st.session_state['current_accident'] = None
         st.rerun()
         return
