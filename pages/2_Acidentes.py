@@ -973,6 +973,13 @@ def app(filters=None):
             # Campos de investigação removidos - não existem na tabela accidents
             # investigation_completed, investigation_date, investigation_responsible, investigation_notes, corrective_actions não existem na tabela
             
+            # Campo de título (importante para investigação)
+            title = st.text_input(
+                "Título do Acidente",
+                placeholder="Ex: Queda durante manutenção, Vazamento de produto, etc.",
+                help="Título breve que identifica o acidente. Será usado na página de investigação."
+            )
+            
             description = st.text_area("Descrição do Acidente", height=100)
 
             # Status padronizado
@@ -1021,6 +1028,13 @@ def app(filters=None):
                             "status": status,
                             "created_by": user_id
                         }
+                        
+                        # Adiciona título se fornecido (usa description como fallback)
+                        if title and title.strip():
+                            accident_data["title"] = title.strip()
+                        else:
+                            # Se não forneceu título, usa os primeiros 50 caracteres da descrição
+                            accident_data["title"] = description[:50].strip() if description else "Acidente sem título"
                         
                         # Adiciona employee_id se um funcionário foi selecionado
                         if employee_id:
