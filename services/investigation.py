@@ -82,15 +82,23 @@ def create_accident(title: str, description: str = "", occurrence_date: Optional
 
 def update_accident(accident_id: str, **kwargs) -> bool:
     """Atualiza dados de uma investigação de acidente"""
+    import logging
+    logger = logging.getLogger(__name__)
+    
     try:
         from managers.supabase_config import get_service_role_client
         from auth.auth_utils import get_user_id, is_admin
         
+        logger.info(f"[UPDATE_ACCIDENT] Iniciando atualização do acidente {accident_id}")
+        logger.info(f"[UPDATE_ACCIDENT] Campos recebidos: {list(kwargs.keys())}")
+        
         # Usa service_role para contornar RLS
         supabase = get_service_role_client()
         if not supabase:
-            st.error("Erro ao conectar com o banco de dados")
+            logger.error("[UPDATE_ACCIDENT] Erro ao conectar com o banco de dados - Service Role não disponível")
             return False
+        
+        logger.info("[UPDATE_ACCIDENT] Cliente Service Role obtido com sucesso (RLS bypass ativo)")
         
         # Validação de segurança: verifica se usuário tem acesso
         user_id = get_user_id()
@@ -101,28 +109,66 @@ def update_accident(accident_id: str, **kwargs) -> bool:
             check_response = supabase.table("accidents").select("created_by").eq("id", accident_id).execute()
             if check_response.data and len(check_response.data) > 0:
                 if check_response.data[0].get('created_by') != user_id:
-                    st.warning("Você não tem permissão para atualizar este acidente")
+                    logger.warning(f"[UPDATE_ACCIDENT] Usuário {user_id} não tem permissão para atualizar acidente {accident_id}")
                     return False
         
-        # Remove campos None
-        update_data = {k: v for k, v in kwargs.items() if v is not None}
+        # Mantém todos os campos válidos (incluindo None para limpar campos)
+        valid_columns = [
+            'title', 'description', 'occurrence_date', 'registry_number', 'base_location', 'site_id',
+            'class_injury', 'class_community', 'class_environment', 'class_process_safety',
+            'class_asset_damage', 'class_near_miss', 'severity_level', 'estimated_loss_value',
+            'product_released', 'volume_released', 'volume_recovered', 'release_duration_hours',
+            'equipment_involved', 'area_affected', 'status'
+        ]
         
-        if not update_data:
-            st.warning("⚠️ Nenhum dado para atualizar (todos os campos estão vazios ou None)")
+        # Filtra apenas campos válidos, mantém todos (incluindo None)
+        filtered_data = {k: v for k, v in kwargs.items() if k in valid_columns}
+        
+        logger.info(f"[UPDATE_ACCIDENT] Campos filtrados: {list(filtered_data.keys())}")
+        logger.info(f"[UPDATE_ACCIDENT] Valores: {filtered_data}")
+        
+        if not filtered_data:
+            logger.warning("[UPDATE_ACCIDENT] Nenhum campo válido para atualizar")
             return True  # Nada para atualizar
         
-        # Executa atualização
-        response = supabase.table("accidents").update(update_data).eq("id", accident_id).execute()
+        # Envia todos os campos válidos
+        # Remove apenas campos None para campos obrigatórios, mantém None para nullable
+        final_data = {}
+        for k, v in filtered_data.items():
+            # Campos obrigatórios que não podem ser None
+            required_fields = ['title']
+            if k in required_fields and v is None:
+                continue  # Pula campos obrigatórios None
+            final_data[k] = v
         
-        if response.data and len(response.data) > 0:
+        logger.info(f"[UPDATE_ACCIDENT] Payload final: {list(final_data.keys())}")
+        logger.info(f"[UPDATE_ACCIDENT] Valores: {final_data}")
+        
+        if not final_data:
+            logger.warning("[UPDATE_ACCIDENT] Nenhum campo para atualizar após filtro")
             return True
-        else:
-            st.error("❌ Nenhum dado foi atualizado. Verifique se o acidente existe e se você tem permissão.")
-            return False
+        
+        # Executa atualização
+        try:
+            response = supabase.table("accidents").update(final_data).eq("id", accident_id).execute()
+            
+            if response.data and len(response.data) > 0:
+                logger.info(f"[UPDATE_ACCIDENT] Acidente {accident_id} atualizado com sucesso. Registros afetados: {len(response.data)}")
+                return True
+            else:
+                logger.error(f"[UPDATE_ACCIDENT] Nenhum dado foi atualizado para acidente {accident_id}")
+                logger.error(f"[UPDATE_ACCIDENT] Response: {response}")
+                return False
+        except Exception as update_error:
+            logger.error(f"[UPDATE_ACCIDENT] Erro na execução do update: {str(update_error)}")
+            logger.error(f"[UPDATE_ACCIDENT] Tipo de erro: {type(update_error).__name__}")
+            # Verifica se é erro de RLS
+            error_str = str(update_error).lower()
+            if 'permission' in error_str or 'policy' in error_str or 'rls' in error_str:
+                logger.error("[UPDATE_ACCIDENT] Possível problema de RLS detectado")
+            raise update_error
     except Exception as e:
-        st.error(f"Erro ao atualizar investigação: {str(e)}")
-        import traceback
-        st.code(traceback.format_exc())
+        logger.error(f"[UPDATE_ACCIDENT] Erro ao atualizar investigação: {str(e)}", exc_info=True)
         return False
 
 
@@ -147,37 +193,77 @@ def get_involved_people(accident_id: str, person_type: Optional[str] = None) -> 
 
 
 def upsert_involved_people(accident_id: str, people: List[Dict[str, Any]]) -> bool:
-    """Insere ou atualiza pessoas envolvidas (remove existentes e insere novas)"""
+    """Insere ou atualiza pessoas envolvidas (remove existentes e insere novas) usando batch insert"""
+    import logging
+    logger = logging.getLogger(__name__)
+    
     try:
         from managers.supabase_config import get_service_role_client
         supabase = get_service_role_client()
         if not supabase:
-            st.error("Erro ao conectar com o banco de dados")
+            logger.error("[UPSERT_PEOPLE] Erro ao conectar com o banco de dados - Service Role não disponível")
             return False
+        
+        logger.info("[UPSERT_PEOPLE] Cliente Service Role obtido com sucesso (RLS bypass ativo)")
         
         user_id = get_user_id()
         
         if not user_id:
-            st.error("Usuário não autenticado")
+            logger.error("[UPSERT_PEOPLE] Usuário não autenticado")
             return False
         
-        # Remove pessoas existentes
-        supabase.table("involved_people").delete().eq("accident_id", accident_id).execute()
+        logger.info(f"[UPSERT_PEOPLE] Salvando {len(people)} pessoas para acidente {accident_id}")
         
-        # Insere novas pessoas
+        # Remove pessoas existentes do mesmo accident_id
+        delete_response = supabase.table("involved_people").delete().eq("accident_id", accident_id).execute()
+        logger.info(f"[UPSERT_PEOPLE] Removidas pessoas existentes: {delete_response}")
+        
+        # Prepara dados para inserção em lote
         if people:
+            batch_data = []
             for person in people:
-                person['accident_id'] = accident_id
-                person['created_by'] = user_id
+                person_data = {
+                    'accident_id': accident_id,
+                    'person_type': person.get('person_type'),
+                    'name': person.get('name'),
+                    'registration_id': person.get('registration_id'),
+                    'job_title': person.get('job_title'),
+                    'company': person.get('company'),
+                    'age': person.get('age'),
+                    'time_in_role': person.get('time_in_role'),
+                    'aso_date': person.get('aso_date'),
+                    'training_status': person.get('training_status'),
+                    'created_by': user_id
+                }
+                batch_data.append(person_data)
             
-            response = supabase.table("involved_people").insert(people).execute()
-            return bool(response.data)
+            logger.info(f"[UPSERT_PEOPLE] Dados preparados: {len(batch_data)} registros")
+            logger.info(f"[UPSERT_PEOPLE] Tipos de pessoas: {[p.get('person_type') for p in batch_data]}")
+            
+            # Insere em lote (batch insert)
+            try:
+                response = supabase.table("involved_people").insert(batch_data).execute()
+                
+                if response.data:
+                    logger.info(f"[UPSERT_PEOPLE] {len(response.data)} pessoas salvas com sucesso")
+                    logger.info(f"[UPSERT_PEOPLE] Dados salvos: {[p.get('person_type') + ' - ' + p.get('name', 'N/A') for p in response.data]}")
+                    return True
+                else:
+                    logger.error(f"[UPSERT_PEOPLE] Nenhum dado foi inserido. Response: {response}")
+                    return False
+            except Exception as insert_error:
+                logger.error(f"[UPSERT_PEOPLE] Erro na execução do insert: {str(insert_error)}")
+                logger.error(f"[UPSERT_PEOPLE] Tipo de erro: {type(insert_error).__name__}")
+                # Verifica se é erro de RLS
+                error_str = str(insert_error).lower()
+                if 'permission' in error_str or 'policy' in error_str or 'rls' in error_str:
+                    logger.error("[UPSERT_PEOPLE] Possível problema de RLS detectado")
+                raise insert_error
         
+        logger.info("[UPSERT_PEOPLE] Nenhuma pessoa para salvar")
         return True
     except Exception as e:
-        st.error(f"Erro ao salvar pessoas envolvidas: {str(e)}")
-        import traceback
-        st.code(traceback.format_exc())
+        logger.error(f"[UPSERT_PEOPLE] Erro ao salvar pessoas envolvidas: {str(e)}", exc_info=True)
         return False
 
 

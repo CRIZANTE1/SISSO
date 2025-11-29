@@ -165,28 +165,7 @@ def main():
             st.session_state['current_accident'] = None
             st.rerun()
         
-        # Debug temporário (pode remover depois)
-        if st.checkbox("🔍 Debug: Mostrar informações", help="Ativa modo debug para verificar problemas"):
-            from auth.auth_utils import get_user_id, is_admin, get_user_email
-            user_id = get_user_id()
-            user_email = get_user_email()
-            st.write(f"**User ID:** {user_id}")
-            st.write(f"**User Email:** {user_email}")
-            st.write(f"**É Admin:** {is_admin()}")
-            
-            from managers.supabase_config import get_service_role_client
-            supabase = get_service_role_client()
-            if supabase:
-                all_accidents = supabase.table("accidents").select("id, title, description, created_by").limit(5).execute()
-                st.write(f"**Total de acidentes no banco:** {len(all_accidents.data) if all_accidents.data else 0}")
-                if all_accidents.data:
-                    st.json(all_accidents.data)
-        
         investigations = get_accidents()
-        
-        # Debug: mostra quantos foram encontrados
-        if st.session_state.get('debug_mode', False):
-            st.write(f"🔍 Debug: {len(investigations)} acidente(s) encontrado(s) pela função get_accidents()")
         
         if investigations:
             # Cria opções com informações do acidente
@@ -737,13 +716,13 @@ def main():
             col_save, col_empty = st.columns([1, 1])
             with col_save:
                 if st.form_submit_button("💾 Salvar Dados e Continuar", type="primary", use_container_width=True):
-                    # Atualiza dados do acidente
+                    # Atualiza dados do acidente - TODOS os campos válidos
                     update_data = {
+                        'title': title if title else investigation.get('title', 'Acidente sem título'),
+                        'description': description if description else None,
                         'registry_number': registry_number if registry_number else None,
                         'base_location': base_location if base_location else None,
                         'site_id': selected_site_id,
-                        'title': title,
-                        'description': description if description else None,
                         'occurrence_date': occurrence_datetime.isoformat() if occurrence_datetime else None,
                         'class_injury': class_injury,
                         'class_community': class_community,
@@ -755,40 +734,64 @@ def main():
                         'estimated_loss_value': estimated_loss_value if estimated_loss_value > 0 else None
                     }
                     
-                    # Adiciona dados de processo se a seção foi exibida
-                    if show_process_details:
-                        update_data.update({
-                            'product_released': product_released if product_released else None,
-                            'volume_released': volume_released if volume_released > 0 else None,
-                            'volume_recovered': volume_recovered if volume_recovered > 0 else None,
-                            'release_duration_hours': release_duration_hours if release_duration_hours > 0 else None,
-                            'equipment_involved': equipment_involved if equipment_involved else None,
-                            'area_affected': area_affected if area_affected else None
-                        })
+                    # Adiciona dados de processo (sempre inclui, mesmo se None)
+                    update_data.update({
+                        'product_released': product_released if product_released else None,
+                        'volume_released': volume_released if volume_released and volume_released > 0 else None,
+                        'volume_recovered': volume_recovered if volume_recovered and volume_recovered > 0 else None,
+                        'release_duration_hours': release_duration_hours if release_duration_hours and release_duration_hours > 0 else None,
+                        'equipment_involved': equipment_involved if equipment_involved else None,
+                        'area_affected': area_affected if area_affected and area_affected != "" else None
+                    })
                     
-                    # Debug: mostra dados que serão salvos
-                    if st.session_state.get('debug_save', False):
-                        st.json(update_data)
-                        st.write(f"Accident ID: {accident_id}")
+                    # Logs para debug (terminal)
+                    import logging
+                    logger = logging.getLogger(__name__)
+                    logger.info(f"[INVESTIGATION] Salvando dados do acidente {accident_id}")
+                    logger.info(f"[INVESTIGATION] Campos de update: {list(update_data.keys())}")
+                    logger.info(f"[INVESTIGATION] Total de drivers: {len(drivers)}")
+                    logger.info(f"[INVESTIGATION] Total de injured: {len(injured)}")
+                    logger.info(f"[INVESTIGATION] Total de witnesses: {len(witnesses)}")
+                    logger.info(f"[INVESTIGATION] Total de commission: {len(commission)}")
                     
                     # Salva dados do acidente
-                    success = update_accident(accident_id, **update_data)
-                    
-                    if success:
-                        # Salva pessoas envolvidas
-                        all_people = drivers + injured + witnesses + commission
-                        people_success = upsert_involved_people(accident_id, all_people)
+                    try:
+                        success = update_accident(accident_id, **update_data)
                         
-                        if people_success:
-                            st.success("✅ Dados salvos com sucesso!")
+                        if success:
+                            st.success("✅ Dados do acidente salvos com sucesso!")
+                            
+                            # Salva pessoas envolvidas (incluindo comissão)
+                            all_people = drivers + injured + witnesses + commission
+                            logger.info(f"[INVESTIGATION] Total de pessoas para salvar: {len(all_people)}")
+                            logger.info(f"[INVESTIGATION] Tipos: {[p.get('person_type') for p in all_people]}")
+                            
+                            if all_people:
+                                people_success = upsert_involved_people(accident_id, all_people)
+                                
+                                if people_success:
+                                    logger.info(f"[INVESTIGATION] Dados salvos com sucesso para acidente {accident_id}")
+                                    st.success(f"✅ {len(all_people)} pessoa(s) envolvida(s) salva(s) com sucesso!")
+                                else:
+                                    logger.warning(f"[INVESTIGATION] Dados do acidente salvos, mas houve problema ao salvar pessoas envolvidas")
+                                    st.warning("⚠️ Dados do acidente salvos, mas houve problema ao salvar pessoas envolvidas. Verifique os logs.")
+                            else:
+                                logger.info("[INVESTIGATION] Nenhuma pessoa envolvida para salvar")
+                                st.info("ℹ️ Nenhuma pessoa envolvida registrada.")
+                            
+                            # Avança para próximo passo
+                            st.session_state['current_step'] = 1
+                            st.rerun()
                         else:
-                            st.warning("⚠️ Dados do acidente salvos, mas houve problema ao salvar pessoas envolvidas.")
-                        
-                        # Avança para próximo passo
-                        st.session_state['current_step'] = 1
-                        st.rerun()
-                    else:
-                        st.error("❌ Erro ao salvar dados. Verifique os campos e tente novamente.")
+                            logger.error(f"[INVESTIGATION] Erro ao salvar dados do acidente {accident_id}")
+                            st.error("❌ Erro ao salvar dados do acidente. Verifique os logs no terminal.")
+                    except Exception as save_error:
+                        logger.error(f"[INVESTIGATION] Exceção ao salvar: {str(save_error)}", exc_info=True)
+                        error_msg = str(save_error).lower()
+                        if 'permission' in error_msg or 'policy' in error_msg or 'rls' in error_msg:
+                            st.error("❌ Erro de permissão (RLS). Verifique se você tem acesso a este acidente.")
+                        else:
+                            st.error(f"❌ Erro ao salvar: {str(save_error)}")
             
             # Upload de evidências (separado do formulário)
         st.divider()
