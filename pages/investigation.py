@@ -642,14 +642,32 @@ def main():
                             comm_name = st.text_input(f"Nome {i+1}:", value=involved_commission[i].get('name', '') if i < len(involved_commission) else '', key=f"comm_name_{i}")
                             comm_reg = st.text_input(f"Matrícula/ID {i+1}:", value=involved_commission[i].get('registration_id', '') if i < len(involved_commission) else '', key=f"comm_reg_{i}")
                         with col2:
-                            comm_role = st.text_input(f"Função/Cargo {i+1}:", value=involved_commission[i].get('job_title', '') if i < len(involved_commission) else '', key=f"comm_role_{i}")
+                            comm_job = st.text_input(f"Cargo/Função {i+1}:", value=involved_commission[i].get('job_title', '') if i < len(involved_commission) else '', key=f"comm_job_{i}", help="Cargo ou função profissional do membro")
+                            comm_role_options = ["", "Coordenador", "Membro", "Relator", "Secretário", "Outro"]
+                            comm_role_current = ""
+                            if i < len(involved_commission):
+                                training_status = involved_commission[i].get('training_status')
+                                if training_status and isinstance(training_status, str):
+                                    comm_role_current = training_status
+                            comm_role_index = comm_role_options.index(comm_role_current) if comm_role_current in comm_role_options else 0
+                            comm_role = st.selectbox(
+                                f"Função na Comissão {i+1}:",
+                                options=comm_role_options,
+                                index=comm_role_index,
+                                key=f"comm_role_{i}",
+                                help="Função específica do membro na comissão de investigação"
+                            )
+                            if comm_role == "Outro":
+                                comm_role_other = st.text_input(f"Especificar função {i+1}:", value="", key=f"comm_role_other_{i}")
+                                comm_role = comm_role_other if comm_role_other else comm_role
                         
                         if comm_name:
                             commission.append({
                                 'person_type': 'Commission_Member',
                                 'name': comm_name,
                                 'registration_id': comm_reg or None,
-                                'job_title': comm_role or None
+                                'job_title': comm_job or None,  # Cargo profissional
+                                'training_status': comm_role or None  # Função na comissão (usando campo training_status temporariamente)
                             })
             
             # Inicializa variáveis de processo (caso a seção não tenha sido exibida)
