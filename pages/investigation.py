@@ -190,70 +190,77 @@ def render_fault_tree_html(tree_json: Dict[str, Any]) -> str:
         
         # Determina forma CSS
         if shape_config['shape'] == 'diamond':
-            # Losango usando clip-path - ajustado para melhor posicionamento do texto
-            shape_style = f"clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%); width: 220px; min-height: 100px; padding: 20px 15px;"
+            # Losango: usa div externa para dimensões e interna para conteúdo
+            shape_style = "width: 220px; height: 220px; position: relative;"
+            inner_style = f"position: absolute; top: 0; left: 0; width: 100%; height: 100%; clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%); background-color: {shape_config['bg_color']}; border: 2px solid {shape_config['border_color']}; box-shadow: 0 2px 6px rgba(0,0,0,0.15);"
+            content_container = "position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 60%; text-align: center; z-index: 2;"
         elif shape_config['shape'] == 'oval':
-            # Oval
-            shape_style = f"border-radius: 50px; width: 220px; min-height: 70px; padding: 12px 15px;"
+            shape_style = "border-radius: 50%; width: 200px; min-height: 80px; display: flex; align-items: center; justify-content: center; padding: 15px 20px; position: relative;"
+            inner_style = ""
+            content_container = "z-index: 2; position: relative;"
         else:
-            # Retângulo arredondado
-            shape_style = f"border-radius: {shape_config['border_radius']}; width: 280px; min-height: 70px; padding: 12px 15px;"
+            shape_style = f"border-radius: {shape_config['border_radius']}; width: 240px; min-height: 80px; display: flex; align-items: center; justify-content: center; padding: 15px 20px; position: relative;"
+            inner_style = ""
+            content_container = "z-index: 2; position: relative;"
         
-        # Estilo do nó (compacto) - ajustado para losangos
+        # Estilo base do nó (wrapper)
         if shape_config['shape'] == 'diamond':
-            # Para losangos, usar padding maior e garantir que o texto fique centralizado
-            node_style = f"position: relative; {shape_style} background-color: {shape_config['bg_color']}; border: 2px solid {shape_config['border_color']}; margin: 10px 5px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; box-shadow: 0 2px 6px rgba(0,0,0,0.25); font-size: 0.85em; line-height: 1.4; word-wrap: break-word; overflow: visible;"
+            node_style = f"{shape_style}"
+            node_bg_border = inner_style
         else:
-            node_style = f"position: relative; {shape_style} background-color: {shape_config['bg_color']}; border: 2px solid {shape_config['border_color']}; margin: 10px 5px; display: inline-flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; box-shadow: 0 2px 6px rgba(0,0,0,0.25); font-size: 0.9em; line-height: 1.3; word-wrap: break-word;"
+            node_style = f"{shape_style} background-color: {shape_config['bg_color']}; border: 2px solid {shape_config['border_color']}; box-shadow: 0 2px 6px rgba(0,0,0,0.15);"
+            node_bg_border = ""
         
-        # Número do nó (se houver)
+        # Número do nó
         number_html = ""
         if node_number:
-            number_html = f'<div style="position: absolute; top: -10px; left: -10px; background-color: {shape_config["border_color"]}; color: white; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 0.8em; box-shadow: 0 2px 4px rgba(0,0,0,0.3); z-index: 10;">{node_number}</div>'
+            number_html = f'<div style="position: absolute; top: -12px; left: -12px; background-color: {shape_config["border_color"]}; color: white; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 0.75em; box-shadow: 0 2px 4px rgba(0,0,0,0.3); z-index: 10;">{node_number}</div>'
         
         # X para descartado
         discard_x = ""
         if status == 'discarded':
-            discard_x = '<div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 2.5em; color: #d32f2f; font-weight: bold; pointer-events: none; z-index: 5; text-shadow: 2px 2px 4px rgba(255,255,255,0.8);">✕</div>'
+            discard_x = '<div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 3em; color: #d32f2f; font-weight: bold; pointer-events: none; z-index: 5; text-shadow: 1px 1px 3px rgba(255,255,255,0.9);">✕</div>'
         
-        # Código NBR (se existir)
+        # Código NBR
         nbr_html = ""
         if nbr_code:
             nbr_code_escaped = html.escape(str(nbr_code))
-            nbr_html = f'<div style="margin-top: 6px; font-size: 0.8em; color: #1976d2; font-weight: 600;">NBR: {nbr_code_escaped}</div>'
+            nbr_html = f'<div style="margin-top: 6px; font-size: 0.7em; color: #1976d2; font-weight: 600;">NBR: {nbr_code_escaped}</div>'
+        
+        # Container do conteúdo do nó
+        content_html = f'<div style="{content_container}"><div style="color: {shape_config["text_color"]}; font-weight: 500; font-size: 0.85em; line-height: 1.3; word-wrap: break-word;">{label_escaped}{nbr_html}</div></div>'
+        
+        # Monta o nó completo
+        if shape_config['shape'] == 'diamond':
+            node_html_inner = f'<div style="{node_style} margin: 10px;">{number_html}<div style="{node_bg_border}"></div>{discard_x}{content_html}</div>'
+        else:
+            node_html_inner = f'<div style="{node_style} margin: 10px;">{number_html}{discard_x}{content_html}</div>'
         
         # Renderiza filhos
         children_html = ""
-        children_container = ""
         if children:
-            children_items = []
-            for child in children:
-                child_html = render_node(child, level + 1)
-                children_items.append(child_html)
+            children_items = [render_node(child, level + 1) for child in children]
             children_html = "".join(children_items)
             
-            # Container dos filhos com linhas conectivas (ajustado)
-            # Linha vertical do pai + linha horizontal + container dos filhos
-            children_container = f'<div style="position: relative; margin-top: 25px; padding-top: 15px; width: 100%;"><div style="position: absolute; left: 50%; top: 0; width: 2px; height: 15px; background-color: #2196f3; transform: translateX(-50%); z-index: 1;"></div><div style="position: absolute; left: 0; right: 0; top: 15px; height: 2px; background-color: #2196f3; z-index: 1;"></div><div style="display: flex; flex-wrap: wrap; justify-content: center; align-items: flex-start; position: relative; padding-top: 17px; gap: 10px;">{children_html}</div></div>'
+            # Container dos filhos com linhas conectivas
+            children_html = f'<div style="position: relative; margin-top: 20px;"><div style="position: absolute; left: 50%; top: 0; width: 2px; height: 20px; background-color: #2196f3; transform: translateX(-50%);"></div><div style="position: absolute; left: 0; right: 0; top: 20px; height: 2px; background-color: #2196f3;"></div><div style="display: flex; flex-wrap: wrap; justify-content: center; align-items: flex-start; gap: 20px; padding-top: 40px;">{children_html}</div></div>'
         
-        # Linha vertical do nó conectando ao pai (se não for raiz)
-        node_connector = ""
+        # Linha conectora ao pai
+        connector = ""
         if level > 0:
-            node_connector = f'<div style="position: absolute; left: 50%; top: -17px; width: 2px; height: 17px; background-color: #2196f3; transform: translateX(-50%); z-index: 1;"></div>'
+            connector = '<div style="position: absolute; left: 50%; top: -20px; width: 2px; height: 20px; background-color: #2196f3; transform: translateX(-50%);"></div>'
         
-        # HTML do nó (compacto, sem quebras de linha)
-        node_html = f'<div style="position: relative; display: inline-block; vertical-align: top; margin: 0 10px;">{node_connector}<div style="{node_style}">{number_html}{discard_x}<div style="color: {shape_config["text_color"]}; font-weight: 500; z-index: 2; position: relative;">{label_escaped}</div>{nbr_html}</div>{children_container}</div>'
-        
-        return node_html
+        # HTML completo do nó
+        return f'<div style="position: relative; display: inline-flex; flex-direction: column; align-items: center;">{connector}{node_html_inner}{children_html}</div>'
     
     # Renderiza a árvore completa
     tree_html = render_node(tree_json, level=0)
     
-    # Legenda (compacta)
-    legend_html = '<div style="position: absolute; top: 10px; right: 10px; background: white; border: 2px solid #333; padding: 10px; border-radius: 5px; font-size: 0.8em; z-index: 1000; box-shadow: 0 2px 8px rgba(0,0,0,0.3);"><div style="font-weight: bold; margin-bottom: 8px; border-bottom: 1px solid #ccc; padding-bottom: 5px;">LEGENDA</div><div style="margin-bottom: 5px;"><strong>H:</strong> Numeração de Hipóteses</div><div style="margin-bottom: 5px;"><strong>CB:</strong> Numeração de Causas Básicas</div><div style="margin-bottom: 5px; display: flex; align-items: center; gap: 5px;"><div style="width: 20px; height: 20px; clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%); background: #e0e0e0; border: 2px solid #757575;"></div><span>Hipótese</span></div><div style="margin-bottom: 5px; display: flex; align-items: center; gap: 5px;"><div style="width: 20px; height: 20px; clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%); background: #ffcdd2; border: 2px solid #f44336; position: relative;"><span style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: #d32f2f; font-weight: bold;">✕</span></div><span>Hipótese Descartada</span></div><div style="margin-bottom: 5px; display: flex; align-items: center; gap: 5px;"><div style="width: 20px; height: 20px; background: #fff9c4; border: 2px solid #f9a825; border-radius: 5px;"></div><span>Causa Intermediária</span></div><div style="display: flex; align-items: center; gap: 5px;"><div style="width: 20px; height: 20px; background: #c8e6c9; border: 2px solid #4caf50; border-radius: 50px;"></div><span>Causa Básica</span></div></div>'
+    # Legenda
+    legend_html = '<div style="position: absolute; top: 10px; right: 10px; background: white; border: 2px solid #333; padding: 12px; border-radius: 6px; font-size: 0.8em; z-index: 1000; box-shadow: 0 2px 8px rgba(0,0,0,0.2); max-width: 220px;"><div style="font-weight: bold; margin-bottom: 10px; border-bottom: 1px solid #ccc; padding-bottom: 6px;">LEGENDA</div><div style="margin-bottom: 6px;"><strong>H:</strong> Hipótese</div><div style="margin-bottom: 6px;"><strong>CB:</strong> Causa Básica</div><div style="margin-bottom: 6px; display: flex; align-items: center; gap: 8px;"><div style="width: 18px; height: 18px; clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%); background: #e0e0e0; border: 2px solid #757575;"></div><span>Hipótese</span></div><div style="margin-bottom: 6px; display: flex; align-items: center; gap: 8px;"><div style="width: 18px; height: 18px; clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%); background: #ffcdd2; border: 2px solid #f44336; position: relative;"><span style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: #d32f2f; font-size: 12px;">✕</span></div><span>Descartada</span></div><div style="margin-bottom: 6px; display: flex; align-items: center; gap: 8px;"><div style="width: 18px; height: 18px; background: #fff9c4; border: 2px solid #f9a825; border-radius: 4px;"></div><span>Intermediária</span></div><div style="display: flex; align-items: center; gap: 8px;"><div style="width: 18px; height: 18px; background: #c8e6c9; border: 2px solid #4caf50; border-radius: 50%;"></div><span>Causa Básica</span></div></div>'
     
-    # HTML completo (compacto, sem quebras de linha)
-    full_html = f'<div style="position: relative; font-family: Arial, sans-serif; padding: 40px 20px; background: white; min-height: 400px; overflow-x: auto; overflow-y: auto;"><div style="text-align: center; margin-bottom: 30px;"><h2 style="margin: 0; color: #333; font-size: 1.5em; font-weight: bold;">ÁRVORE DE FALHAS</h2><div style="color: #666; font-size: 0.9em; margin-top: 5px;">{date.today().strftime("%d/%m/%Y")}</div></div>{legend_html}<div style="display: flex; justify-content: center; align-items: flex-start; min-height: 300px; padding: 20px 0; width: 100%;"><div style="text-align: center; width: 100%;">{tree_html}</div></div></div>'
+    # HTML completo
+    return f'<div style="position: relative; font-family: Arial, sans-serif; padding: 30px 20px; background: white; min-height: 400px; overflow-x: auto; border: 1px solid #e0e0e0; border-radius: 8px;"><div style="text-align: center; margin-bottom: 30px;"><h2 style="margin: 0; color: #333; font-size: 1.5em; font-weight: bold;">ÁRVORE DE FALHAS (FTA)</h2><div style="color: #666; font-size: 0.9em; margin-top: 5px;">{date.today().strftime("%d/%m/%Y")}</div></div>{legend_html}<div style="display: flex; justify-content: center; align-items: flex-start; min-height: 300px; padding: 20px 0;">{tree_html}</div></div>'
     
     return full_html
 
