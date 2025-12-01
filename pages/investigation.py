@@ -6,6 +6,7 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime, date, time
 from typing import Optional, Dict, Any, List
+import requests
 from services.investigation import (
     create_accident,
     get_accidents,
@@ -1005,11 +1006,6 @@ def main():
         st.markdown("### 🖼️ Galeria de Evidências")
         evidence_list = get_evidence(accident_id)
         
-        # Debug temporário (remover depois)
-        if evidence_list:
-            with st.expander("🔍 Debug - Dados das Evidências", expanded=False):
-                st.json(evidence_list)
-        
         if evidence_list:
             cols_per_row = 3
             for i in range(0, len(evidence_list), cols_per_row):
@@ -1021,11 +1017,51 @@ def main():
                             image_url = evidence.get('image_url')
                             if image_url:
                                 try:
-                                    st.image(image_url, use_container_width=True, caption=evidence.get('description', 'Sem descrição'))
+                                    # Tenta exibir a imagem diretamente pela URL
+                                    st.image(
+                                        image_url, 
+                                        use_container_width=True, 
+                                        caption=evidence.get('description', 'Sem descrição')
+                                    )
                                 except Exception as e:
-                                    st.error(f"Erro ao carregar imagem: {str(e)}")
-                                    st.text(f"URL: {image_url}")
-                                    st.caption(evidence.get('description', 'Sem descrição'))
+                                    # Se falhar, tenta baixar e exibir como bytes
+                                    try:
+                                        response = requests.get(image_url, timeout=10, stream=True)
+                                        if response.status_code == 200:
+                                            st.image(
+                                                response.content, 
+                                                use_container_width=True, 
+                                                caption=evidence.get('description', 'Sem descrição')
+                                            )
+                                        else:
+                                            raise Exception(f"HTTP {response.status_code}")
+                                    except Exception as e2:
+                                        # Se ainda falhar, tenta baixar do Supabase Storage diretamente
+                                        try:
+                                            # Extrai o path da URL
+                                            if '/storage/v1/object/public/evidencias/' in image_url:
+                                                path = image_url.split('/storage/v1/object/public/evidencias/')[1]
+                                                from managers.supabase_config import get_service_role_client
+                                                supabase = get_service_role_client()
+                                                if supabase:
+                                                    image_bytes = supabase.storage.from_('evidencias').download(path)
+                                                    if image_bytes:
+                                                        st.image(
+                                                            image_bytes, 
+                                                            use_container_width=True, 
+                                                            caption=evidence.get('description', 'Sem descrição')
+                                                        )
+                                                    else:
+                                                        raise Exception("Download retornou vazio")
+                                                else:
+                                                    raise Exception("Cliente Supabase não disponível")
+                                            else:
+                                                raise Exception("URL não reconhecida")
+                                        except Exception as e3:
+                                            # Se tudo falhar, mostra erro e link
+                                            st.error(f"⚠️ Erro ao carregar imagem")
+                                            st.markdown(f"**URL:** [{image_url}]({image_url})")
+                                            st.caption(evidence.get('description', 'Sem descrição'))
                             else:
                                 st.warning("⚠️ URL da imagem não disponível")
                                 st.caption(evidence.get('description', 'Sem descrição'))
