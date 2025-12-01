@@ -115,6 +115,121 @@ body {
     page-break-inside: avoid;
 }
 
+/* Estilos para árvore de falhas HTML/CSS */
+.fault-tree-container {
+    position: relative;
+    font-family: Arial, sans-serif;
+    padding: 20px;
+    background: white;
+    min-height: 300px;
+    page-break-inside: avoid;
+    margin: 15px 0;
+}
+
+.fault-tree-title {
+    text-align: center;
+    margin-bottom: 20px;
+    color: #333;
+    font-size: 12pt;
+    font-weight: bold;
+}
+
+.fault-tree-legend {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: white;
+    border: 2px solid #333;
+    padding: 8px;
+    border-radius: 4px;
+    font-size: 7pt;
+    z-index: 1000;
+    max-width: 180px;
+}
+
+.fault-tree-node {
+    position: relative;
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    margin: 5px;
+}
+
+.fault-tree-node-diamond {
+    width: 180px;
+    height: 180px;
+    position: relative;
+}
+
+.fault-tree-node-oval {
+    border-radius: 50%;
+    width: 180px;
+    min-height: 70px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 12px 18px;
+}
+
+.fault-tree-node-rect {
+    border-radius: 8px;
+    width: 200px;
+    min-height: 70px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 12px 18px;
+}
+
+.fault-tree-connector {
+    position: absolute;
+    left: 50%;
+    top: -15px;
+    width: 2px;
+    height: 15px;
+    background-color: #2196f3;
+    transform: translateX(-50%);
+}
+
+.fault-tree-children {
+    position: relative;
+    margin-top: 15px;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: flex-start;
+    gap: 15px;
+    padding-top: 30px;
+}
+
+.fault-tree-node-number {
+    position: absolute;
+    top: -10px;
+    left: -10px;
+    background-color: #f9a825;
+    color: white;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: 8pt;
+    z-index: 10;
+}
+
+.fault-tree-discard-x {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 2.5em;
+    color: #d32f2f;
+    font-weight: bold;
+    z-index: 5;
+}
+
 /* Capa */
 .cover-title { 
     text-align: center; 
@@ -429,14 +544,12 @@ HTML_TEMPLATE = """
     
     <p style="margin-bottom: 15px;">Abaixo a representação gráfica da Árvore de Falhas gerada durante a investigação.</p>
     
-    <!-- Imagem da árvore gerada pelo Graphviz -->
-    <div style="text-align: center;">
-        {% if fault_tree_image %}
-            <img src="{{ fault_tree_image }}" class="tree-image">
-        {% else %}
-            <p style="color: #999; font-style: italic;">[Árvore de Falhas não disponível]</p>
-        {% endif %}
-    </div>
+    <!-- Árvore renderizada em HTML/CSS (idêntica à visualização) -->
+    {% if fault_tree_html %}
+        {{ fault_tree_html|safe }}
+    {% else %}
+        <p style="color: #999; font-style: italic;">[Árvore de Falhas não disponível]</p>
+    {% endif %}
 
     <!-- Causas e Classificação NBR 14280 -->
     {% if verified_causes %}
@@ -586,67 +699,180 @@ def convert_image_url_to_base64(image_url: str) -> Optional[str]:
         return None
 
 
-def generate_fault_tree_image(tree_json: Dict[str, Any]) -> Optional[str]:
+def render_fault_tree_html_for_pdf(tree_json: Dict[str, Any]) -> str:
     """
-    Gera imagem da árvore de falhas usando Graphviz e retorna como base64
+    Renderiza a árvore de falhas em HTML/CSS idêntica à visualização da interface.
+    Esta função é uma cópia da render_fault_tree_html de pages/investigation.py
+    adaptada para uso no PDF.
     """
-    try:
-        import graphviz
+    if not tree_json:
+        return ""
+    
+    import html
+    from datetime import date
+    
+    # Contadores para numeração automática
+    hypothesis_counter = 0
+    basic_cause_counter = 0
+    
+    def get_node_number(node_type: str, status: str, has_children: bool) -> str:
+        """Retorna o número do nó (H1, H2, CB1, CB2, etc.)"""
+        nonlocal hypothesis_counter, basic_cause_counter
         
-        if not tree_json:
-            return None
+        # Root NUNCA tem numeração
+        if node_type == 'root':
+            return ""
         
-        dot = graphviz.Digraph(comment='Fault Tree Analysis')
-        dot.attr(rankdir='TB')
-        dot.attr('node', shape='box', style='rounded')
+        # Causa básica: fact validado sem filhos
+        if node_type == 'fact' and status == 'validated' and not has_children:
+            basic_cause_counter += 1
+            return f"CB{basic_cause_counter}"
+        # Hipótese: qualquer hypothesis (pendente ou descartada)
+        elif node_type == 'hypothesis':
+            hypothesis_counter += 1
+            return f"H{hypothesis_counter}"
+        # Fact com filhos: trata como hipótese
+        elif node_type == 'fact' and has_children:
+            hypothesis_counter += 1
+            return f"H{hypothesis_counter}"
+        # Causa intermediária validada (não root): também pode ter numeração H
+        elif status == 'validated' and has_children and node_type != 'root':
+            hypothesis_counter += 1
+            return f"H{hypothesis_counter}"
+        # Status pending ou discarded (mas não root)
+        elif status in ['pending', 'discarded'] and node_type != 'root':
+            hypothesis_counter += 1
+            return f"H{hypothesis_counter}"
+        # Sem numeração
+        return ""
+    
+    def get_node_shape(node_type: str, status: str, has_children: bool) -> Dict[str, str]:
+        """Retorna a forma e cor do nó baseado no tipo e status"""
+        # Root ou causa intermediária validada: Retângulo arredondado amarelo
+        if node_type == 'root' or (status == 'validated' and has_children):
+            return {
+                'shape': 'rounded-rect',
+                'bg_color': '#fff9c4',
+                'border_color': '#f9a825',
+                'text_color': '#000000',
+                'border_radius': '10px'
+            }
+        # Causa básica (fact validado sem filhos): Oval verde
+        elif node_type == 'fact' and status == 'validated' and not has_children:
+            return {
+                'shape': 'oval',
+                'bg_color': '#c8e6c9',
+                'border_color': '#4caf50',
+                'text_color': '#000000',
+                'border_radius': '50px'
+            }
+        # Hipótese descartada: Losango vermelho com X
+        elif status == 'discarded':
+            return {
+                'shape': 'diamond',
+                'bg_color': '#ffcdd2',
+                'border_color': '#f44336',
+                'text_color': '#000000',
+                'border_radius': '0px'
+            }
+        # Hipótese pendente: Losango
+        else:
+            return {
+                'shape': 'diamond',
+                'bg_color': '#e0e0e0',
+                'border_color': '#757575',
+                'text_color': '#000000',
+                'border_radius': '0px'
+            }
+    
+    def render_node(node: Dict[str, Any], level: int = 0) -> str:
+        """Renderiza um nó recursivamente no formato FTA"""
+        status = node.get('status', 'pending')
+        node_type = node.get('type', 'hypothesis')
+        label = node.get('label', '')
+        nbr_code = node.get('nbr_code')
+        children = node.get('children', [])
+        has_children = len(children) > 0
         
-        # Cores baseadas no status
-        color_map = {
-            'validated': '#28a745',  # Verde - Confirmado
-            'discarded': '#dc3545',  # Vermelho - Descartado
-            'pending': '#6c757d'     # Cinza - Em análise
-        }
+        # Obtém número do nó
+        node_number = get_node_number(node_type, status, has_children)
         
-        def add_node_recursive(node_json: Dict[str, Any]):
-            """Função recursiva para adicionar nós e arestas"""
-            node_id = node_json['id']
-            label = node_json['label'][:40] + '...' if len(node_json['label']) > 40 else node_json['label']
-            status = node_json['status']
-            node_type = node_json['type']
-            nbr_code = node_json.get('nbr_code')
-            
-            # Define cor e estilo
-            color = color_map.get(status, '#6c757d')
-            style = 'filled'
-            if status == 'discarded':
-                style = 'filled,strikethrough'
-            
-            # Label com tipo e código NBR
-            display_label = f"{label}\n[{node_type}]"
-            if nbr_code:
-                display_label += f"\nNBR: {nbr_code}"
-            
-            font_color = 'white' if status != 'pending' else 'black'
-            dot.node(node_id, display_label, fillcolor=color, style=style, fontcolor=font_color)
-            
-            # Processa filhos recursivamente
-            for child in node_json.get('children', []):
-                dot.edge(node_id, child['id'])
-                add_node_recursive(child)
+        # Obtém forma e cores
+        shape_config = get_node_shape(node_type, status, has_children)
         
-        # Inicia recursão a partir do nó raiz
-        add_node_recursive(tree_json)
+        # Escapa HTML
+        label_escaped = html.escape(label).replace('\n', '<br>')
         
-        # Gera PNG em bytes
-        png_data = dot.pipe(format='png')
+        # Determina forma CSS
+        if shape_config['shape'] == 'diamond':
+            shape_style = "width: 200px; height: 200px; position: relative;"
+            inner_style = f"position: absolute; top: 0; left: 0; width: 100%; height: 100%; clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%); background-color: {shape_config['bg_color']}; border: 2px solid {shape_config['border_color']}; box-shadow: 0 2px 6px rgba(0,0,0,0.15);"
+            content_container = "position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 60%; text-align: center; z-index: 2;"
+        elif shape_config['shape'] == 'oval':
+            shape_style = "border-radius: 50%; width: 200px; min-height: 80px; display: flex; align-items: center; justify-content: center; padding: 15px 20px; position: relative;"
+            inner_style = ""
+            content_container = "z-index: 2; position: relative;"
+        else:
+            shape_style = f"border-radius: {shape_config['border_radius']}; width: 240px; min-height: 80px; display: flex; align-items: center; justify-content: center; padding: 15px 20px; position: relative;"
+            inner_style = ""
+            content_container = "z-index: 2; position: relative;"
         
-        # Converte para base64
-        tree_b64 = base64.b64encode(png_data).decode('utf-8')
-        return f"data:image/png;base64,{tree_b64}"
+        # Estilo base do nó
+        if shape_config['shape'] == 'diamond':
+            node_style = f"{shape_style}"
+            node_bg_border = inner_style
+        else:
+            node_style = f"{shape_style} background-color: {shape_config['bg_color']}; border: 2px solid {shape_config['border_color']}; box-shadow: 0 2px 6px rgba(0,0,0,0.15);"
+            node_bg_border = ""
         
-    except Exception as e:
-        print(f"Erro ao gerar imagem da árvore: {str(e)}")
-        return None
+        # Número do nó
+        number_html = ""
+        if node_number:
+            number_html = f'<div style="position: absolute; top: -12px; left: -12px; background-color: {shape_config["border_color"]}; color: white; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 0.75em; box-shadow: 0 2px 4px rgba(0,0,0,0.3); z-index: 10;">{node_number}</div>'
+        
+        # X para descartado
+        discard_x = ""
+        if status == 'discarded':
+            discard_x = '<div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 3em; color: #d32f2f; font-weight: bold; pointer-events: none; z-index: 5; text-shadow: 1px 1px 3px rgba(255,255,255,0.9);">✕</div>'
+        
+        # Código NBR
+        nbr_html = ""
+        if nbr_code:
+            nbr_code_escaped = html.escape(str(nbr_code))
+            nbr_html = f'<div style="margin-top: 6px; font-size: 0.7em; color: #1976d2; font-weight: 600;">NBR: {nbr_code_escaped}</div>'
+        
+        # Container do conteúdo
+        content_html = f'<div style="{content_container}"><div style="color: {shape_config["text_color"]}; font-weight: 500; font-size: 0.85em; line-height: 1.3; word-wrap: break-word;">{label_escaped}{nbr_html}</div></div>'
+        
+        # Monta o nó completo
+        if shape_config['shape'] == 'diamond':
+            node_html_inner = f'<div style="{node_style} margin: 10px;">{number_html}<div style="{node_bg_border}"></div>{discard_x}{content_html}</div>'
+        else:
+            node_html_inner = f'<div style="{node_style} margin: 10px;">{number_html}{discard_x}{content_html}</div>'
+        
+        # Renderiza filhos
+        children_html = ""
+        if children:
+            children_items = [render_node(child, level + 1) for child in children]
+            children_html = "".join(children_items)
+            children_html = f'<div style="position: relative; margin-top: 20px;"><div style="position: absolute; left: 50%; top: 0; width: 2px; height: 20px; background-color: #2196f3; transform: translateX(-50%);"></div><div style="position: absolute; left: 0; right: 0; top: 20px; height: 2px; background-color: #2196f3;"></div><div style="display: flex; flex-wrap: wrap; justify-content: center; align-items: flex-start; gap: 20px; padding-top: 40px;">{children_html}</div></div>'
+        
+        # Linha conectora ao pai
+        connector = ""
+        if level > 0:
+            connector = '<div style="position: absolute; left: 50%; top: -20px; width: 2px; height: 20px; background-color: #2196f3; transform: translateX(-50%);"></div>'
+        
+        # HTML completo do nó
+        return f'<div style="position: relative; display: inline-flex; flex-direction: column; align-items: center;">{connector}{node_html_inner}{children_html}</div>'
+    
+    # Renderiza a árvore completa
+    tree_html = render_node(tree_json, level=0)
+    
+    # Legenda
+    legend_html = '<div style="position: absolute; top: 10px; right: 10px; background: white; border: 2px solid #333; padding: 12px; border-radius: 6px; font-size: 0.8em; z-index: 1000; box-shadow: 0 2px 8px rgba(0,0,0,0.2); max-width: 220px;"><div style="font-weight: bold; margin-bottom: 10px; border-bottom: 1px solid #ccc; padding-bottom: 6px;">LEGENDA</div><div style="margin-bottom: 6px;"><strong>H:</strong> Hipótese</div><div style="margin-bottom: 6px;"><strong>CB:</strong> Causa Básica</div><div style="margin-bottom: 6px; display: flex; align-items: center; gap: 8px;"><div style="width: 18px; height: 18px; clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%); background: #e0e0e0; border: 2px solid #757575;"></div><span>Hipótese</span></div><div style="margin-bottom: 6px; display: flex; align-items: center; gap: 8px;"><div style="width: 18px; height: 18px; clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%); background: #ffcdd2; border: 2px solid #f44336; position: relative;"><span style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: #d32f2f; font-size: 12px;">✕</span></div><span>Descartada</span></div><div style="margin-bottom: 6px; display: flex; align-items: center; gap: 8px;"><div style="width: 18px; height: 18px; background: #fff9c4; border: 2px solid #f9a825; border-radius: 4px;"></div><span>Intermediária</span></div><div style="display: flex; align-items: center; gap: 8px;"><div style="width: 18px; height: 18px; background: #c8e6c9; border: 2px solid #4caf50; border-radius: 50%;"></div><span>Causa Básica</span></div></div>'
+    
+    # HTML completo
+    return f'<div style="position: relative; font-family: Arial, sans-serif; padding: 30px 20px; background: white; min-height: 400px; page-break-inside: avoid; border: 1px solid #e0e0e0; border-radius: 8px;"><div style="text-align: center; margin-bottom: 30px;"><h2 style="margin: 0; color: #333; font-size: 1.5em; font-weight: bold;">ÁRVORE DE FALHAS (FTA)</h2><div style="color: #666; font-size: 0.9em; margin-top: 5px;">{date.today().strftime("%d/%m/%Y")}</div></div>{legend_html}<div style="display: flex; justify-content: center; align-items: flex-start; min-height: 300px; padding: 20px 0;">{tree_html}</div></div>'
 
 
 def extract_hypotheses_from_tree(tree_json: Optional[Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -715,10 +941,10 @@ def generate_pdf_report(
         bytes: PDF gerado
     """
     try:
-        # Gera imagem da árvore se JSON fornecido
-        fault_tree_image = None
+        # Gera HTML da árvore se JSON fornecido (idêntica à visualização)
+        fault_tree_html = None
         if fault_tree_json:
-            fault_tree_image = generate_fault_tree_image(fault_tree_json)
+            fault_tree_html = render_fault_tree_html_for_pdf(fault_tree_json)
         
         # Extrai hipóteses da árvore
         hypotheses = extract_hypotheses_from_tree(fault_tree_json)
@@ -751,7 +977,7 @@ def generate_pdf_report(
             timeline_events=timeline_events,
             verified_causes=verified_causes,
             hypotheses=hypotheses,
-            fault_tree_image=fault_tree_image,
+            fault_tree_html=fault_tree_html,
             evidence_images=evidence_images_b64,
             commission=commission,
             current_date=current_date
