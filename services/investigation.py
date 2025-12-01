@@ -564,11 +564,48 @@ def upload_evidence_image(accident_id: str, file_bytes: bytes, filename: str, de
         if result:
             # Obtém URL pública
             try:
-                public_url = supabase.storage.from_(bucket).get_public_url(path)
-            except:
+                # Tenta obter URL pública do Supabase
+                public_url_response = supabase.storage.from_(bucket).get_public_url(path)
+                if public_url_response:
+                    public_url = public_url_response
+                else:
+                    raise Exception("URL pública não retornada")
+            except Exception as url_error:
                 # Se não conseguir URL pública, constrói manualmente
-                url = os.environ.get("SUPABASE_URL") or st.secrets.get("supabase", {}).get("url", "")
-                public_url = f"{url}/storage/v1/object/public/{bucket}/{path}"
+                try:
+                    # Tenta obter URL do Supabase de várias fontes
+                    url = None
+                    
+                    # 1. Tenta variável de ambiente
+                    url = os.environ.get("SUPABASE_URL")
+                    
+                    # 2. Tenta secrets do Streamlit
+                    if not url:
+                        try:
+                            url = st.secrets.get("supabase", {}).get("url", "")
+                        except:
+                            pass
+                    
+                    # 3. Tenta obter do cliente Supabase (se tiver atributo)
+                    if not url:
+                        try:
+                            if hasattr(supabase, 'supabase_url'):
+                                url = supabase.supabase_url
+                            elif hasattr(supabase, 'url'):
+                                url = supabase.url
+                        except:
+                            pass
+                    
+                    if url:
+                        # Remove barra final se houver
+                        url = url.rstrip('/')
+                        public_url = f"{url}/storage/v1/object/public/{bucket}/{path}"
+                    else:
+                        st.error("Não foi possível obter URL do Supabase para gerar URL pública da imagem")
+                        return None
+                except Exception as e:
+                    st.error(f"Erro ao construir URL pública: {str(e)}")
+                    return None
             
             # Registra no banco de dados
             # Nota: uploaded_by referencia auth.users.id, mas get_user_id() retorna profiles.id

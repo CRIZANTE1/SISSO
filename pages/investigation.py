@@ -1005,6 +1005,11 @@ def main():
         st.markdown("### 🖼️ Galeria de Evidências")
         evidence_list = get_evidence(accident_id)
         
+        # Debug temporário (remover depois)
+        if evidence_list:
+            with st.expander("🔍 Debug - Dados das Evidências", expanded=False):
+                st.json(evidence_list)
+        
         if evidence_list:
             cols_per_row = 3
             for i in range(0, len(evidence_list), cols_per_row):
@@ -1013,8 +1018,16 @@ def main():
                     if i + j < len(evidence_list):
                         evidence = evidence_list[i + j]
                         with col:
-                            if evidence.get('image_url'):
-                                st.image(evidence['image_url'], use_container_width=True)
+                            image_url = evidence.get('image_url')
+                            if image_url:
+                                try:
+                                    st.image(image_url, use_container_width=True, caption=evidence.get('description', 'Sem descrição'))
+                                except Exception as e:
+                                    st.error(f"Erro ao carregar imagem: {str(e)}")
+                                    st.text(f"URL: {image_url}")
+                                    st.caption(evidence.get('description', 'Sem descrição'))
+                            else:
+                                st.warning("⚠️ URL da imagem não disponível")
                                 st.caption(evidence.get('description', 'Sem descrição'))
         else:
             st.info("📭 Nenhuma evidência adicionada ainda. Adicione fotos para documentar o acidente.")
