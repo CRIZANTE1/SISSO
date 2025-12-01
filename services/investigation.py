@@ -4,6 +4,8 @@ Adaptado para arquitetura multi-acidente com session_state
 """
 import io
 import time
+import tempfile
+import os
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 from managers.supabase_config import get_supabase_client
@@ -533,7 +535,27 @@ def upload_evidence_image(accident_id: str, file_bytes: bytes, filename: str, de
         except:
             pass
         
-        result = supabase.storage.from_(bucket).upload(path, io.BytesIO(file_bytes), file_options={"content-type": f"image/{file_extension}", "upsert": "true"})
+        # Cria arquivo temporário para upload (Supabase Storage requer caminho de arquivo)
+        temp_file_path = None
+        try:
+            # Cria arquivo temporário
+            with tempfile.NamedTemporaryFile(delete=False, suffix=f".{file_extension}") as temp_file:
+                temp_file.write(file_bytes)
+                temp_file_path = temp_file.name
+            
+            # Faz upload usando o caminho do arquivo temporário
+            result = supabase.storage.from_(bucket).upload(
+                path, 
+                temp_file_path, 
+                file_options={"content-type": f"image/{file_extension}", "upsert": "true"}
+            )
+        finally:
+            # Remove arquivo temporário após upload
+            if temp_file_path and os.path.exists(temp_file_path):
+                try:
+                    os.unlink(temp_file_path)
+                except:
+                    pass
         
         if result:
             # Obtém URL pública
