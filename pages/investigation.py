@@ -24,6 +24,8 @@ from services.investigation import (
     get_tree_nodes,
     update_node_status,
     update_node_label,
+    reorganize_nodes,
+    update_node_display_order,
     link_nbr_standard_to_node,
     get_nbr_standards,
     get_validated_nodes,
@@ -1308,6 +1310,36 @@ def main():
                     st.rerun()
             else:
                 st.warning("⚠️ Forneça uma descrição da causa")
+        
+        st.divider()
+        
+        # Reorganização inteligente de causas
+        st.markdown("### 🔄 Reorganizar Causas")
+        with st.expander("⚙️ Opções de Reorganização", expanded=False):
+            col_reorg1, col_reorg2 = st.columns(2)
+            
+            with col_reorg1:
+                sort_option = st.selectbox(
+                    "Ordenar por:",
+                    options=["status", "type", "alphabetical", "chronological", "priority"],
+                    format_func=lambda x: {
+                        "status": "Status (Validadas primeiro)",
+                        "type": "Tipo (Root → Fact → Hypothesis)",
+                        "alphabetical": "Alfabético (A-Z)",
+                        "chronological": "Cronológico (Mais antigas primeiro)",
+                        "priority": "Prioridade (Validadas + Tipo)"
+                    }.get(x, x),
+                    help="Escolha como reorganizar as causas na árvore"
+                )
+            
+            with col_reorg2:
+                st.write("")  # Espaçamento
+                if st.button("🔄 Reorganizar Agora", type="primary", use_container_width=True):
+                    if reorganize_nodes(accident_id, sort_option):
+                        st.success("✅ Causas reorganizadas com sucesso!")
+                        st.rerun()
+                    else:
+                        st.error("❌ Erro ao reorganizar causas")
         
         st.divider()
         

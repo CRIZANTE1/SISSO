@@ -779,6 +779,18 @@ def add_fault_tree_node(accident_id: str, parent_id: Optional[str], label: str, 
             st.error("Erro ao conectar com o banco de dados")
             return None
         
+        # Calcula display_order: próximo número disponível para o mesmo parent_id
+        max_order = 0
+        if parent_id:
+            existing_nodes = supabase.table("fault_tree_nodes").select("display_order").eq("accident_id", accident_id).eq("parent_id", parent_id).execute()
+            if existing_nodes.data:
+                max_order = max([n.get('display_order', 0) or 0 for n in existing_nodes.data], default=0)
+        else:
+            # Para nós raiz
+            existing_nodes = supabase.table("fault_tree_nodes").select("display_order").eq("accident_id", accident_id).is_("parent_id", "null").execute()
+            if existing_nodes.data:
+                max_order = max([n.get('display_order', 0) or 0 for n in existing_nodes.data], default=0)
+        
         # Nota: created_by referencia auth.users.id, mas get_user_id() retorna profiles.id
         # Como o campo é nullable, deixamos como NULL para evitar erro de foreign key
         data = {
@@ -786,6 +798,7 @@ def add_fault_tree_node(accident_id: str, parent_id: Optional[str], label: str, 
             "label": label,
             "type": node_type,
             "status": "pending",
+            "display_order": max_order + 1,
             "created_by": None  # Campo nullable - evita erro de FK (fault_tree_nodes.created_by -> auth.users.id)
         }
         
@@ -803,18 +816,112 @@ def add_fault_tree_node(accident_id: str, parent_id: Optional[str], label: str, 
 
 
 def get_tree_nodes(accident_id: str) -> List[Dict[str, Any]]:
-    """Busca todos os nós da árvore de falhas de uma investigação"""
+    """Busca todos os nós da árvore de falhas de uma investigação, ordenados por display_order"""
     try:
         from managers.supabase_config import get_service_role_client
         supabase = get_service_role_client()
         if not supabase:
             return []
         
-        response = supabase.table("fault_tree_nodes").select("*").eq("accident_id", accident_id).execute()
+        response = supabase.table("fault_tree_nodes").select("*").eq("accident_id", accident_id).order("display_order", desc=False).order("created_at", desc=False).execute()
         return response.data if response.data else []
     except Exception as e:
         st.error(f"Erro ao buscar nós: {str(e)}")
         return []
+
+
+def reorganize_nodes(accident_id: str, sort_by: str = "status") -> bool:
+    """
+    Reorganiza nós da árvore de falhas de forma inteligente
+    
+    Args:
+        accident_id: ID do acidente
+        sort_by: Critério de ordenação:
+            - "status": Por status (validated primeiro, depois pending, depois discarded)
+            - "type": Por tipo (root, fact, hypothesis)
+            - "alphabetical": Alfabético por label
+            - "chronological": Por data de criação
+            - "priority": Validated primeiro, depois por tipo
+    """
+    try:
+        from managers.supabase_config import get_service_role_client
+        supabase = get_service_role_client()
+        if not supabase:
+            st.error("Erro ao conectar com o banco de dados")
+            return False
+        
+        # Busca todos os nós do acidente
+        nodes = supabase.table("fault_tree_nodes").select("*").eq("accident_id", accident_id).execute()
+        if not nodes.data:
+            return True
+        
+        # Agrupa nós por parent_id para reorganizar cada nível separadamente
+        nodes_by_parent = {}
+        for node in nodes.data:
+            parent_key = str(node.get('parent_id') or 'root')
+            if parent_key not in nodes_by_parent:
+                nodes_by_parent[parent_key] = []
+            nodes_by_parent[parent_key].append(node)
+        
+        # Define função de ordenação baseada no critério
+        status_order = {'validated': 1, 'pending': 2, 'discarded': 3}
+        type_order = {'root': 1, 'fact': 2, 'hypothesis': 3}
+        
+        def get_sort_key(node):
+            if sort_by == "status":
+                return (status_order.get(node.get('status', 'pending'), 99), node.get('label', '').lower())
+            elif sort_by == "type":
+                return (type_order.get(node.get('type', 'hypothesis'), 99), node.get('label', '').lower())
+            elif sort_by == "alphabetical":
+                return node.get('label', '').lower()
+            elif sort_by == "chronological":
+                return node.get('created_at', '')
+            elif sort_by == "priority":
+                return (
+                    status_order.get(node.get('status', 'pending'), 99),
+                    type_order.get(node.get('type', 'hypothesis'), 99),
+                    node.get('label', '').lower()
+                )
+            else:
+                return node.get('display_order', 0) or 0
+        
+        # Reorganiza cada grupo de nós com o mesmo parent_id
+        updates = []
+        for parent_key, group_nodes in nodes_by_parent.items():
+            # Ordena o grupo
+            sorted_nodes = sorted(group_nodes, key=get_sort_key)
+            
+            # Atribui novos display_order
+            for idx, node in enumerate(sorted_nodes, start=1):
+                updates.append({
+                    'id': node['id'],
+                    'display_order': idx
+                })
+        
+        # Atualiza em lote
+        for update in updates:
+            supabase.table("fault_tree_nodes").update({"display_order": update['display_order']}).eq("id", update['id']).execute()
+        
+        return True
+    except Exception as e:
+        st.error(f"Erro ao reorganizar nós: {str(e)}")
+        return False
+
+
+def update_node_display_order(node_id: str, new_order: int) -> bool:
+    """Atualiza a ordem de exibição de um nó específico"""
+    try:
+        from managers.supabase_config import get_service_role_client
+        supabase = get_service_role_client()
+        if not supabase:
+            st.error("Erro ao conectar com o banco de dados")
+            return False
+        
+        response = supabase.table("fault_tree_nodes").update({"display_order": new_order}).eq("id", node_id).execute()
+        return bool(response.data)
+    except Exception as e:
+        st.error(f"Erro ao atualizar ordem: {str(e)}")
+        return False
 
 
 def update_node_status(node_id: str, status: str, justification: Optional[str] = None) -> bool:
@@ -981,8 +1088,13 @@ def build_fault_tree_json(accident_id: str) -> Optional[Dict[str, Any]]:
                 "children": []
             }
             
-            # Busca filhos (nós que têm este nó como pai)
+            # Busca filhos (nós que têm este nó como pai) e ordena por display_order
             children = [n for n in nodes if n.get('parent_id') == node_id]
+            # Ordena filhos por display_order, depois por created_at
+            children.sort(key=lambda x: (
+                x.get('display_order', 0) or 0,
+                x.get('created_at', '') or ''
+            ))
             
             # Recursivamente constrói filhos
             for child in children:
