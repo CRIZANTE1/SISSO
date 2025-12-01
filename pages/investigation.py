@@ -16,6 +16,8 @@ from services.investigation import (
     get_evidence,
     add_timeline_event,
     get_timeline,
+    update_timeline_event,
+    delete_timeline_event,
     get_root_node,
     create_root_node,
     add_fault_tree_node,
@@ -1130,15 +1132,62 @@ def main():
             timeline_df = timeline_df.sort_values('event_time')
             
             for idx, event in timeline_df.iterrows():
-                event_time = event['event_time']
-                description = event['description']
+                event_id = str(event.get('id', ''))
+                event_time_raw = event.get('event_time')
+                description_raw = event.get('description', '')
                 
-                st.markdown(f"""
-                <div style="border-left: 3px solid #1f77b4; padding-left: 15px; margin: 10px 0;">
-                    <strong>🕐 {event_time.strftime('%d/%m/%Y %H:%M')}</strong><br>
-                    {description}
-                </div>
-                """, unsafe_allow_html=True)
+                # Converte para tipos corretos
+                if isinstance(event_time_raw, pd.Timestamp):
+                    event_time = event_time_raw.to_pydatetime()
+                else:
+                    event_time = pd.to_datetime(event_time_raw).to_pydatetime()
+                
+                description = str(description_raw) if description_raw else ''
+                
+                # Expander para cada evento com opções de editar/deletar
+                event_preview = description[:50] + '...' if len(description) > 50 else description
+                with st.expander(f"🕐 {event_time.strftime('%d/%m/%Y %H:%M')} - {event_preview}", expanded=False):
+                    # Campos de edição
+                    col_date_edit, col_time_edit = st.columns(2)
+                    with col_date_edit:
+                        edit_date = st.date_input(
+                            "Data:",
+                            value=event_time.date(),
+                            key=f"edit_date_{event_id}"
+                        )
+                    with col_time_edit:
+                        edit_time = st.time_input(
+                            "Hora:",
+                            value=event_time.time(),
+                            key=f"edit_time_{event_id}"
+                        )
+                    
+                    edit_datetime = datetime.combine(edit_date, edit_time)
+                    
+                    edit_description = st.text_area(
+                        "Descrição:",
+                        value=description,
+                        key=f"edit_desc_{event_id}",
+                        height=100
+                    )
+                    
+                    # Botões de ação
+                    col_save, col_delete = st.columns([1, 1])
+                    with col_save:
+                        if st.button("💾 Salvar Alterações", key=f"save_{event_id}"):
+                            desc_clean = (edit_description or '').strip()
+                            if desc_clean:
+                                if update_timeline_event(event_id, edit_datetime, desc_clean):
+                                    st.success("✅ Evento atualizado!")
+                                    st.rerun()
+                            else:
+                                st.warning("⚠️ A descrição não pode estar vazia")
+                    
+                    with col_delete:
+                        if st.button("🗑️ Deletar", key=f"delete_{event_id}"):
+                            if delete_timeline_event(event_id):
+                                st.success("✅ Evento removido!")
+                                st.rerun()
         else:
             st.info("📭 Nenhum evento adicionado ainda. Adicione eventos na ordem cronológica.")
         

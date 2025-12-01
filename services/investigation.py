@@ -689,6 +689,43 @@ def get_timeline(accident_id: str) -> List[Dict[str, Any]]:
         return []
 
 
+def update_timeline_event(event_id: str, event_time: datetime, description: str) -> bool:
+    """Atualiza um evento da timeline"""
+    try:
+        from managers.supabase_config import get_service_role_client
+        supabase = get_service_role_client()
+        if not supabase:
+            st.error("Erro ao conectar com o banco de dados")
+            return False
+        
+        data = {
+            "event_time": event_time.isoformat(),
+            "description": description
+        }
+        
+        response = supabase.table("timeline").update(data).eq("id", event_id).execute()
+        return bool(response.data)
+    except Exception as e:
+        st.error(f"Erro ao atualizar evento: {str(e)}")
+        return False
+
+
+def delete_timeline_event(event_id: str) -> bool:
+    """Remove um evento da timeline"""
+    try:
+        from managers.supabase_config import get_service_role_client
+        supabase = get_service_role_client()
+        if not supabase:
+            st.error("Erro ao conectar com o banco de dados")
+            return False
+        
+        response = supabase.table("timeline").delete().eq("id", event_id).execute()
+        return bool(response.data)
+    except Exception as e:
+        st.error(f"Erro ao remover evento: {str(e)}")
+        return False
+
+
 def get_root_node(accident_id: str) -> Optional[Dict[str, Any]]:
     """Busca o nó raiz de uma investigação"""
     try:
