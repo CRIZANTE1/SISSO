@@ -331,28 +331,67 @@ HTML_TEMPLATE = """
         {% endif %}
     </table>
 
-    <!-- 1.4 Perfil dos Envolvidos -->
-    {% if people %}
-    {% for person in people %}
-        {% if person.get('person_type') == 'Driver' or person.get('person_type') == 'Injured' %}
-        <div class="vibra-green" style="margin-top: 10px;">1.4. Perfil do Envolvido: {{ person.get('name', 'N/A') }}</div>
-        <table class="form-table">
-            <tr>
-                <td width="20%"><span class="label">Nome</span><span class="value">{{ person.get('name', 'N/A') }}</span></td>
-                <td width="20%"><span class="label">Idade</span><span class="value">{{ person.get('age', 'N/A') }}</span></td>
-                <td width="20%"><span class="label">Função</span><span class="value">{{ person.get('job_title', 'N/A') }}</span></td>
-                <td width="20%"><span class="label">Empresa</span><span class="value">{{ person.get('company', 'N/A') }}</span></td>
-                <td width="20%"><span class="label">Matrícula/CPF</span><span class="value">{{ person.get('registration_id', 'N/A') }}</span></td>
-            </tr>
-            {% if person.get('time_in_role') %}
-            <tr>
-                <td colspan="2"><span class="label">Tempo na Função</span><span class="value">{{ person.get('time_in_role', 'N/A') }}</span></td>
-                <td colspan="3"><span class="label">Data ASO</span><span class="value">{{ person.get('aso_date', 'N/A') }}</span></td>
-            </tr>
-            {% endif %}
-        </table>
+    <!-- 1.4 Perfil dos Motoristas -->
+    {% if drivers %}
+    {% for person in drivers %}
+    <div class="vibra-green" style="margin-top: 10px;">1.4. Perfil do Motorista: {{ person.get('name', 'N/A') }}</div>
+    <table class="form-table">
+        <tr>
+            <td width="20%"><span class="label">Nome</span><span class="value">{{ person.get('name', 'N/A') }}</span></td>
+            <td width="20%"><span class="label">Idade</span><span class="value">{{ person.get('age', 'N/A') }}</span></td>
+            <td width="20%"><span class="label">Função</span><span class="value">{{ person.get('job_title', 'N/A') }}</span></td>
+            <td width="20%"><span class="label">Empresa</span><span class="value">{{ person.get('company', 'N/A') }}</span></td>
+            <td width="20%"><span class="label">Matrícula/CPF</span><span class="value">{{ person.get('registration_id', 'N/A') }}</span></td>
+        </tr>
+        {% if person.get('time_in_role') or person.get('aso_date') %}
+        <tr>
+            <td colspan="2"><span class="label">Tempo na Função</span><span class="value">{{ person.get('time_in_role', 'N/A') }}</span></td>
+            <td colspan="3"><span class="label">Data ASO</span><span class="value">{{ person.get('aso_date', 'N/A') }}</span></td>
+        </tr>
         {% endif %}
+    </table>
     {% endfor %}
+    {% endif %}
+
+    <!-- 1.7 Perfil das Vítimas/Lesionados -->
+    {% if injured %}
+    {% for person in injured %}
+    <div class="vibra-green" style="margin-top: 10px;">1.7. Perfil da Vítima/Lesionado: {{ person.get('name', 'N/A') }}</div>
+    <table class="form-table">
+        <tr>
+            <td width="20%"><span class="label">Nome</span><span class="value">{{ person.get('name', 'N/A') }}</span></td>
+            <td width="20%"><span class="label">Idade</span><span class="value">{{ person.get('age', 'N/A') }}</span></td>
+            <td width="20%"><span class="label">Função</span><span class="value">{{ person.get('job_title', 'N/A') }}</span></td>
+            <td width="20%"><span class="label">Empresa</span><span class="value">{{ person.get('company', 'N/A') }}</span></td>
+            <td width="20%"><span class="label">Matrícula/CPF</span><span class="value">{{ person.get('registration_id', 'N/A') }}</span></td>
+        </tr>
+        {% if person.get('time_in_role') or person.get('aso_date') %}
+        <tr>
+            <td colspan="2"><span class="label">Tempo na Função</span><span class="value">{{ person.get('time_in_role', 'N/A') }}</span></td>
+            <td colspan="3"><span class="label">Data ASO</span><span class="value">{{ person.get('aso_date', 'N/A') }}</span></td>
+        </tr>
+        {% endif %}
+    </table>
+    {% endfor %}
+    {% endif %}
+
+    <!-- 1.8 Testemunhas -->
+    {% if witnesses %}
+    <div class="vibra-green" style="margin-top: 10px;">1.8. Testemunhas</div>
+    <table class="form-table">
+        <tr class="vibra-green">
+            <th width="30%">Nome</th>
+            <th width="30%">Matrícula/CPF</th>
+            <th width="40%">Observações</th>
+        </tr>
+        {% for person in witnesses %}
+        <tr>
+            <td><span class="value">{{ person.get('name', 'N/A') }}</span></td>
+            <td><span class="value">{{ person.get('registration_id', 'N/A') }}</span></td>
+            <td><span class="value">{{ person.get('job_title', 'N/A') }}</span></td>
+        </tr>
+        {% endfor %}
+    </table>
     {% endif %}
 
     <!-- 1.5 Vazamentos / Segurança de Processo -->
@@ -418,6 +457,61 @@ HTML_TEMPLATE = """
     </table>
     {% else %}
     <p style="color: #999; font-style: italic;">Nenhuma causa validada e classificada ainda.</p>
+    {% endif %}
+
+    <!-- 5.2 Hipóteses Descritas e Justificadas -->
+    {% if hypotheses %}
+    <div class="section-title" style="margin-top: 30px;">5.2. Hipóteses Descritas e Justificadas</div>
+    <p style="margin-bottom: 15px; font-size: 10pt;">Abaixo são descritas todas as hipóteses levantadas durante a investigação, com suas respectivas justificativas para descarte ou consideração.</p>
+    
+    {% for hyp in hypotheses %}
+    <div style="margin-bottom: 20px; page-break-inside: avoid;">
+        <div class="vibra-green" style="margin-top: 10px; margin-bottom: 8px;">
+            Hipótese {{ loop.index }}: {{ hyp.get('label', 'N/A') }}
+        </div>
+        <table class="form-table">
+            <tr>
+                <td width="20%" style="background-color: #f0f0f0; font-weight: bold;">Status</td>
+                <td width="80%">
+                    {% if hyp.get('status') == 'discarded' %}
+                        <span style="color: #d32f2f; font-weight: bold;">✕ DESCARTADA</span>
+                    {% elif hyp.get('status') == 'validated' %}
+                        <span style="color: #2e7d32; font-weight: bold;">✓ CONSIDERADA/VALIDADA</span>
+                    {% else %}
+                        <span style="color: #666; font-weight: bold;">⏳ EM ANÁLISE</span>
+                    {% endif %}
+                </td>
+            </tr>
+            <tr>
+                <td style="background-color: #f0f0f0; font-weight: bold;">Descrição</td>
+                <td>{{ hyp.get('label', 'N/A') }}</td>
+            </tr>
+            <tr>
+                <td style="background-color: #f0f0f0; font-weight: bold;">Justificativa</td>
+                <td>
+                    {% if hyp.get('justification') %}
+                        {{ hyp.get('justification') }}
+                    {% elif hyp.get('status') == 'discarded' %}
+                        <span style="font-style: italic; color: #666;">Hipótese descartada após análise da evidência disponível.</span>
+                    {% elif hyp.get('status') == 'validated' %}
+                        <span style="font-style: italic; color: #666;">Hipótese validada com base nas evidências coletadas durante a investigação.</span>
+                    {% else %}
+                        <span style="font-style: italic; color: #666;">Hipótese em análise, aguardando validação ou descarte.</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% if hyp.get('nbr_code') %}
+            <tr>
+                <td style="background-color: #f0f0f0; font-weight: bold;">Código NBR</td>
+                <td><strong>{{ hyp.get('nbr_code', 'N/A') }}</strong> - {{ hyp.get('nbr_description', '') }}</td>
+            </tr>
+            {% endif %}
+        </table>
+    </div>
+    {% endfor %}
+    {% else %}
+    <div class="section-title" style="margin-top: 30px;">5.2. Hipóteses Descritas e Justificadas</div>
+    <p style="color: #999; font-style: italic;">Nenhuma hipótese registrada ainda.</p>
     {% endif %}
 
     <div class="page-break"></div>
@@ -555,6 +649,49 @@ def generate_fault_tree_image(tree_json: Dict[str, Any]) -> Optional[str]:
         return None
 
 
+def extract_hypotheses_from_tree(tree_json: Optional[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """
+    Extrai todas as hipóteses da árvore de falhas recursivamente.
+    Retorna lista de hipóteses com label, status, nbr_code, nbr_description.
+    """
+    if not tree_json:
+        return []
+    
+    hypotheses = []
+    
+    def extract_recursive(node: Dict[str, Any]):
+        """Função recursiva para extrair hipóteses"""
+        node_type = node.get('type', '')
+        status = node.get('status', 'pending')
+        
+        # Considera como hipótese:
+        # 1. Nós do tipo 'hypothesis'
+        # 2. Nós com status 'pending', 'discarded' ou 'validated' que não sejam root
+        # 3. Nós do tipo 'fact' com filhos (causas intermediárias)
+        is_hypothesis = (
+            node_type == 'hypothesis' or
+            (node_type != 'root' and status in ['pending', 'discarded', 'validated']) or
+            (node_type == 'fact' and node.get('children'))
+        )
+        
+        if is_hypothesis and node_type != 'root':
+            hyp_data = {
+                'label': node.get('label', 'N/A'),
+                'status': status,
+                'nbr_code': node.get('nbr_code'),
+                'nbr_description': node.get('nbr_description', ''),
+                'justification': node.get('justification', '')  # Justificativa para confirmação/descarte
+            }
+            hypotheses.append(hyp_data)
+        
+        # Processa filhos recursivamente
+        for child in node.get('children', []):
+            extract_recursive(child)
+    
+    extract_recursive(tree_json)
+    return hypotheses
+
+
 def generate_pdf_report(
     accident_data: Dict[str, Any],
     people_data: List[Dict[str, Any]],
@@ -583,8 +720,14 @@ def generate_pdf_report(
         if fault_tree_json:
             fault_tree_image = generate_fault_tree_image(fault_tree_json)
         
-        # Filtra comissão
+        # Extrai hipóteses da árvore
+        hypotheses = extract_hypotheses_from_tree(fault_tree_json)
+        
+        # Filtra pessoas por tipo
         commission = [p for p in people_data if p.get('person_type') == 'Commission_Member']
+        drivers = [p for p in people_data if p.get('person_type') == 'Driver']
+        injured = [p for p in people_data if p.get('person_type') == 'Injured']
+        witnesses = [p for p in people_data if p.get('person_type') == 'Witness']
         
         # Prepara data atual
         current_date = datetime.now().strftime('%d/%m/%Y')
@@ -602,8 +745,12 @@ def generate_pdf_report(
         rendered_html = template.render(
             accident=accident_data,
             people=people_data,
+            drivers=drivers,
+            injured=injured,
+            witnesses=witnesses,
             timeline_events=timeline_events,
             verified_causes=verified_causes,
+            hypotheses=hypotheses,
             fault_tree_image=fault_tree_image,
             evidence_images=evidence_images_b64,
             commission=commission,

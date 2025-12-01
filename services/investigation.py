@@ -718,8 +718,8 @@ def get_tree_nodes(accident_id: str) -> List[Dict[str, Any]]:
         return []
 
 
-def update_node_status(node_id: str, status: str) -> bool:
-    """Atualiza status de validação de um nó"""
+def update_node_status(node_id: str, status: str, justification: Optional[str] = None) -> bool:
+    """Atualiza status de validação de um nó, opcionalmente com justificativa"""
     try:
         from managers.supabase_config import get_service_role_client
         supabase = get_service_role_client()
@@ -727,10 +727,30 @@ def update_node_status(node_id: str, status: str) -> bool:
             st.error("Erro ao conectar com o banco de dados")
             return False
         
-        response = supabase.table("fault_tree_nodes").update({"status": status}).eq("id", node_id).execute()
+        update_data = {"status": status}
+        if justification:
+            update_data["justification"] = justification
+        
+        response = supabase.table("fault_tree_nodes").update(update_data).eq("id", node_id).execute()
         return bool(response.data)
     except Exception as e:
         st.error(f"Erro ao atualizar status: {str(e)}")
+        return False
+
+
+def update_node_label(node_id: str, label: str) -> bool:
+    """Atualiza o label (texto) de um nó da árvore de falhas"""
+    try:
+        from managers.supabase_config import get_service_role_client
+        supabase = get_service_role_client()
+        if not supabase:
+            st.error("Erro ao conectar com o banco de dados")
+            return False
+        
+        response = supabase.table("fault_tree_nodes").update({"label": label}).eq("id", node_id).execute()
+        return bool(response.data)
+    except Exception as e:
+        st.error(f"Erro ao atualizar label: {str(e)}")
         return False
 
 
@@ -799,17 +819,22 @@ def build_fault_tree_json(accident_id: str) -> Optional[Dict[str, Any]]:
         if not nodes:
             return None
         
-        # Busca padrões NBR para incluir códigos
+        # Busca padrões NBR para incluir códigos e descrições
         nbr_standards_map = {}
         try:
             from managers.supabase_config import get_service_role_client
             supabase = get_service_role_client()
             if supabase:
-                # Busca todos os padrões NBR
-                nbr_response = supabase.table("nbr_standards").select("id, code").execute()
+                # Busca todos os padrões NBR com código e descrição
+                nbr_response = supabase.table("nbr_standards").select("id, code, description").execute()
                 if nbr_response.data:
-                    # Cria mapa: nbr_standard_id (int) -> code (string)
-                    nbr_standards_map = {int(std['id']): std['code'] for std in nbr_response.data}
+                    # Cria mapa: nbr_standard_id (int) -> {code, description}
+                    nbr_standards_map = {
+                        int(std['id']): {
+                            'code': std['code'],
+                            'description': std.get('description', '')
+                        } for std in nbr_response.data
+                    }
         except Exception as e:
             # Se falhar, continua sem códigos NBR
             pass
@@ -833,14 +858,17 @@ def build_fault_tree_json(accident_id: str) -> Optional[Dict[str, Any]]:
             if not node:
                 return None
             
-            # Busca código NBR se existir
+            # Busca código NBR e descrição se existir
             nbr_code = None
+            nbr_description = None
             nbr_standard_id = node.get('nbr_standard_id')
             if nbr_standard_id is not None:
                 # Converte para int se necessário
                 nbr_standard_id_int = int(nbr_standard_id) if not isinstance(nbr_standard_id, int) else nbr_standard_id
                 if nbr_standard_id_int in nbr_standards_map:
-                    nbr_code = nbr_standards_map[nbr_standard_id_int]
+                    nbr_info = nbr_standards_map[nbr_standard_id_int]
+                    nbr_code = nbr_info.get('code')
+                    nbr_description = nbr_info.get('description')
             
             # Constrói objeto do nó
             node_json = {
@@ -849,6 +877,8 @@ def build_fault_tree_json(accident_id: str) -> Optional[Dict[str, Any]]:
                 "type": node['type'],
                 "status": node['status'],
                 "nbr_code": nbr_code,
+                "nbr_description": nbr_description,
+                "justification": node.get('justification', ''),  # Justificativa para confirmação/descarte
                 "children": []
             }
             

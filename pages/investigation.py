@@ -20,6 +20,7 @@ from services.investigation import (
     add_fault_tree_node,
     get_tree_nodes,
     update_node_status,
+    update_node_label,
     link_nbr_standard_to_node,
     get_nbr_standards,
     get_validated_nodes,
@@ -1220,30 +1221,75 @@ def main():
                     status_text = "⏳ Em Análise"
                 
                 with st.expander(f"{status_text}: {node['label'][:60]}...", expanded=False):
-                    st.markdown(f"**Hipótese:** {node['label']}")
+                    # Campo de edição do label
+                    edit_label_key = f"edit_label_{node['id']}"
+                    edited_label = st.text_area(
+                        "✏️ Editar hipótese:",
+                        value=node['label'],
+                        key=edit_label_key,
+                        help="Você pode editar o texto desta hipótese antes de validá-la.",
+                        height=80
+                    )
+                    
+                    # Botão para salvar edição do label
+                    if edited_label != node['label']:
+                        col_edit, _ = st.columns([1, 2])
+                        with col_edit:
+                            if st.button("💾 Salvar Edição", key=f"save_edit_{node['id']}"):
+                                if edited_label.strip():
+                                    if update_node_label(node['id'], edited_label.strip()):
+                                        st.success("✅ Hipótese atualizada!")
+                                        st.rerun()
+                                else:
+                                    st.warning("⚠️ O texto não pode estar vazio")
+                    
                     st.markdown(f"**Status atual:** {status_text}")
+                    
+                    # Mostra justificativa existente se houver
+                    if node.get('justification'):
+                        st.info(f"📝 **Justificativa atual:** {node['justification']}")
+                    
+                    # Campo de justificativa
+                    justification_key = f"justification_{node['id']}"
+                    justification = st.text_area(
+                        "📝 Justificativa (obrigatória para confirmar ou descartar)",
+                        value=node.get('justification', ''),
+                        key=justification_key,
+                        help="Explique o motivo da confirmação ou descarte desta hipótese. Esta justificativa aparecerá no relatório PDF.",
+                        height=100
+                    )
                     
                     col_val, col_disc, col_pend = st.columns(3)
                     
                     with col_val:
                         if st.button("✅ Confirmar/Verdadeiro", key=f"validate_{node['id']}", 
                                    help="Use quando tiver evidências que confirmam esta causa"):
-                            if update_node_status(node['id'], 'validated'):
-                                st.success("✅ Hipótese confirmada!")
-                                st.rerun()
+                            justification_clean = (justification or '').strip()
+                            if not justification_clean:
+                                st.warning("⚠️ Por favor, insira uma justificativa antes de confirmar.")
+                            else:
+                                if update_node_status(node['id'], 'validated', justification_clean):
+                                    st.success("✅ Hipótese confirmada com justificativa!")
+                                    st.rerun()
                     
                     with col_disc:
                         if st.button("❌ Descartar/Falso", key=f"discard_{node['id']}",
                                    help="Use quando tiver evidências que descartam esta causa"):
-                            if update_node_status(node['id'], 'discarded'):
-                                st.success("❌ Hipótese descartada!")
-                                st.rerun()
+                            justification_clean = (justification or '').strip()
+                            if not justification_clean:
+                                st.warning("⚠️ Por favor, insira uma justificativa antes de descartar.")
+                            else:
+                                if update_node_status(node['id'], 'discarded', justification_clean):
+                                    st.success("❌ Hipótese descartada com justificativa!")
+                                    st.rerun()
                     
                     with col_pend:
                         if current_status != 'pending':
                             if st.button("⏳ Em Análise", key=f"pending_{node['id']}",
                                        help="Voltar ao status de investigação"):
-                                if update_node_status(node['id'], 'pending'):
+                                # Ao voltar para pending, mantém a justificativa se houver
+                                justification_clean = (justification or '').strip()
+                                if update_node_status(node['id'], 'pending', justification_clean if justification_clean else None):
                                     st.success("⏳ Status alterado para em análise!")
                                     st.rerun()
         else:
