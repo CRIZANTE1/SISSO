@@ -537,6 +537,7 @@ def upload_evidence_image(accident_id: str, file_bytes: bytes, filename: str, de
         
         # Cria arquivo temporário para upload (Supabase Storage requer caminho de arquivo)
         temp_file_path = None
+        result = None
         try:
             # Cria arquivo temporário
             with tempfile.NamedTemporaryFile(delete=False, suffix=f".{file_extension}") as temp_file:
@@ -549,13 +550,16 @@ def upload_evidence_image(accident_id: str, file_bytes: bytes, filename: str, de
                 temp_file_path, 
                 file_options={"content-type": f"image/{file_extension}", "upsert": "true"}
             )
+        except Exception as upload_error:
+            st.error(f"Erro no upload do arquivo: {str(upload_error)}")
+            result = None
         finally:
             # Remove arquivo temporário após upload
             if temp_file_path and os.path.exists(temp_file_path):
                 try:
                     os.unlink(temp_file_path)
-                except:
-                    pass
+                except Exception:
+                    pass  # Ignora erros ao remover arquivo temporário
         
         if result:
             # Obtém URL pública
@@ -563,7 +567,6 @@ def upload_evidence_image(accident_id: str, file_bytes: bytes, filename: str, de
                 public_url = supabase.storage.from_(bucket).get_public_url(path)
             except:
                 # Se não conseguir URL pública, constrói manualmente
-                import os
                 url = os.environ.get("SUPABASE_URL") or st.secrets.get("supabase", {}).get("url", "")
                 public_url = f"{url}/storage/v1/object/public/{bucket}/{path}"
             
