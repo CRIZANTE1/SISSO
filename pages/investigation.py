@@ -1454,34 +1454,18 @@ def main():
         st.header("📋 Passo 4: Classificação Oficial (NBR 14280)")
         st.markdown("**O que falhou na norma?** Classifique as causas confirmadas conforme os padrões NBR 14280.")
         
-        # Busca nós validados
+        # Busca apenas causas básicas (validadas E marcadas como básicas)
         nodes = get_tree_nodes(accident_id)
-        validated_nodes = [n for n in nodes if n['status'] == 'validated']
+        basic_cause_nodes = [n for n in nodes if n['status'] == 'validated' and n.get('is_basic_cause', False) == True]
         
-        if validated_nodes:
-            st.markdown("### ✅ Causas Confirmadas para Classificação")
-            st.info(f"💡 Você tem **{len(validated_nodes)}** causa(s) confirmada(s) para classificar.")
+        if basic_cause_nodes:
+            st.markdown("### ✅ Causas Básicas para Classificação")
+            st.info(f"💡 Você tem **{len(basic_cause_nodes)}** causa(s) básica(s) confirmada(s) para classificar.")
             
-            for node in validated_nodes:
-                with st.expander(f"✅ {node['label'][:60]}...", expanded=True):
-                    st.markdown(f"**Causa confirmada:** {node['label']}")
-                    
-                    # Checkbox para marcar como causa básica
-                    from services.investigation import update_node_is_basic_cause
-                    is_basic_cause = node.get('is_basic_cause', False)
-                    basic_cause_key = f"is_basic_cause_classify_{node['id']}"
-                    new_is_basic_cause = st.checkbox(
-                        "🎯 Marcar como Causa Básica",
-                        value=is_basic_cause,
-                        key=basic_cause_key,
-                        help="Marque esta opção se esta é uma causa básica (causa raiz que não pode ser mais decomposta). Causas básicas aparecem como oval verde na árvore."
-                    )
-                    if new_is_basic_cause != is_basic_cause:
-                        if update_node_is_basic_cause(node['id'], new_is_basic_cause):
-                            st.success("✅ Causa básica atualizada!")
-                            st.rerun()
-                    
-                    st.divider()
+            for node in basic_cause_nodes:
+                with st.expander(f"🎯 {node['label'][:60]}...", expanded=True):
+                    st.markdown(f"**Causa Básica:** {node['label']}")
+                    st.info("💡 Esta é uma causa básica confirmada. Classifique-a conforme os padrões NBR 14280.")
                     
                     # Busca padrões NBR por categoria
                     categories = {
@@ -1566,7 +1550,18 @@ def main():
                     else:
                         st.warning("Nenhum padrão encontrado para esta categoria")
         else:
-            st.warning("⚠️ Nenhuma causa confirmada ainda. Volte ao passo anterior e valide pelo menos uma hipótese.")
+            # Verifica se há causas validadas mas não marcadas como básicas
+            validated_nodes = [n for n in nodes if n['status'] == 'validated']
+            if validated_nodes:
+                basic_cause_count = len([n for n in validated_nodes if n.get('is_basic_cause', False) == True])
+                if basic_cause_count == 0:
+                    st.warning("⚠️ Você tem **causas confirmadas**, mas nenhuma foi marcada como **Causa Básica**.")
+                    st.info("💡 **O que fazer:** Volte ao passo anterior (Árvore de Porquês) e marque as causas básicas usando o checkbox '🎯 Marcar como Causa Básica' na seção de validação de hipóteses.")
+                else:
+                    st.info("💡 Aguarde... recarregando a página.")
+                    st.rerun()
+            else:
+                st.warning("⚠️ Nenhuma causa confirmada ainda. Volte ao passo anterior e valide pelo menos uma hipótese.")
             if st.button("⬅️ Voltar para Árvore de Porquês"):
                 st.session_state['current_step'] = 2
                 st.rerun()
