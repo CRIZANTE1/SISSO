@@ -715,7 +715,7 @@ def render_fault_tree_html_for_pdf(tree_json: Dict[str, Any]) -> str:
     hypothesis_counter = 0
     basic_cause_counter = 0
     
-    def get_node_number(node_type: str, status: str, has_children: bool) -> str:
+    def get_node_number(node_type: str, status: str, has_children: bool, is_basic_cause: bool = False) -> str:
         """Retorna o número do nó (H1, H2, CB1, CB2, etc.)"""
         nonlocal hypothesis_counter, basic_cause_counter
         
@@ -723,8 +723,8 @@ def render_fault_tree_html_for_pdf(tree_json: Dict[str, Any]) -> str:
         if node_type == 'root':
             return ""
         
-        # Causa básica: fact validado sem filhos
-        if node_type == 'fact' and status == 'validated' and not has_children:
+        # Causa básica: marcada manualmente pelo usuário (is_basic_cause = True)
+        if is_basic_cause:
             basic_cause_counter += 1
             return f"CB{basic_cause_counter}"
         # Hipótese: qualquer hypothesis (pendente ou descartada)
@@ -746,25 +746,25 @@ def render_fault_tree_html_for_pdf(tree_json: Dict[str, Any]) -> str:
         # Sem numeração
         return ""
     
-    def get_node_shape(node_type: str, status: str, has_children: bool) -> Dict[str, str]:
+    def get_node_shape(node_type: str, status: str, has_children: bool, is_basic_cause: bool = False) -> Dict[str, str]:
         """Retorna a forma e cor do nó baseado no tipo e status"""
-        # Root ou causa intermediária validada: Retângulo arredondado amarelo
-        if node_type == 'root' or (status == 'validated' and has_children):
-            return {
-                'shape': 'rounded-rect',
-                'bg_color': '#fff9c4',
-                'border_color': '#f9a825',
-                'text_color': '#000000',
-                'border_radius': '10px'
-            }
-        # Causa básica (fact validado sem filhos): Oval verde
-        elif node_type == 'fact' and status == 'validated' and not has_children:
+        # Causa básica: marcada manualmente pelo usuário (is_basic_cause = True) - Oval verde
+        if is_basic_cause:
             return {
                 'shape': 'oval',
                 'bg_color': '#c8e6c9',
                 'border_color': '#4caf50',
                 'text_color': '#000000',
                 'border_radius': '50px'
+            }
+        # Root ou causa intermediária validada: Retângulo arredondado amarelo
+        elif node_type == 'root' or (status == 'validated' and has_children):
+            return {
+                'shape': 'rounded-rect',
+                'bg_color': '#fff9c4',
+                'border_color': '#f9a825',
+                'text_color': '#000000',
+                'border_radius': '10px'
             }
         # Hipótese descartada: Losango vermelho com X
         elif status == 'discarded':
@@ -791,14 +791,15 @@ def render_fault_tree_html_for_pdf(tree_json: Dict[str, Any]) -> str:
         node_type = node.get('type', 'hypothesis')
         label = node.get('label', '')
         nbr_code = node.get('nbr_code')
+        is_basic_cause = node.get('is_basic_cause', False)  # Campo para marcar manualmente como causa básica
         children = node.get('children', [])
         has_children = len(children) > 0
         
         # Obtém número do nó
-        node_number = get_node_number(node_type, status, has_children)
+        node_number = get_node_number(node_type, status, has_children, is_basic_cause)
         
         # Obtém forma e cores
-        shape_config = get_node_shape(node_type, status, has_children)
+        shape_config = get_node_shape(node_type, status, has_children, is_basic_cause)
         
         # Escapa HTML
         label_escaped = html.escape(label).replace('\n', '<br>')

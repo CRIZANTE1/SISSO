@@ -960,6 +960,31 @@ def update_node_label(node_id: str, label: str) -> bool:
         return False
 
 
+def update_node_is_basic_cause(node_id: str, is_basic_cause: bool) -> bool:
+    """Atualiza o campo is_basic_cause de um nó da árvore de falhas"""
+    try:
+        import logging
+        logger = logging.getLogger(__name__)
+        from managers.supabase_config import get_service_role_client
+        supabase = get_service_role_client()
+        if not supabase:
+            logger.error("[UPDATE_BASIC_CAUSE] Erro ao conectar com o banco de dados")
+            return False
+        
+        response = supabase.table("fault_tree_nodes").update({"is_basic_cause": is_basic_cause}).eq("id", node_id).execute()
+        if response.data:
+            logger.info(f"[UPDATE_BASIC_CAUSE] Nó {node_id} atualizado: is_basic_cause={is_basic_cause}")
+            return True
+        else:
+            logger.warning(f"[UPDATE_BASIC_CAUSE] Nenhum dado retornado ao atualizar nó {node_id}")
+            return False
+    except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"[UPDATE_BASIC_CAUSE] Erro ao atualizar is_basic_cause: {str(e)}", exc_info=True)
+        return False
+
+
 def link_nbr_standard_to_node(node_id: str, nbr_standard_id: int) -> bool:
     """Vincula um padrão NBR a um nó validado"""
     try:
@@ -1082,6 +1107,7 @@ def build_fault_tree_json(accident_id: str) -> Optional[Dict[str, Any]]:
                 "label": node['label'],
                 "type": node['type'],
                 "status": node['status'],
+                "is_basic_cause": node.get('is_basic_cause', False),  # Campo para marcar manualmente como causa básica
                 "nbr_code": nbr_code,
                 "nbr_description": nbr_description,
                 "justification": node.get('justification', ''),  # Justificativa para confirmação/descarte

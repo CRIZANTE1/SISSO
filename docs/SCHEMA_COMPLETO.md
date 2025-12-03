@@ -428,6 +428,7 @@ Nós da árvore de falhas (Fault Tree Analysis).
 | `label` | `text` | ❌ | - | Rótulo/descrição do nó |
 | `type` | `text` | ❌ | - | Tipo: `root`, `hypothesis`, `fact` |
 | `status` | `text` | ❌ | `'pending'` | Status: `pending`, `validated`, `discarded` |
+| `is_basic_cause` | `boolean` | ✅ | `FALSE` | Indica se o nó é uma causa básica (marcado manualmente pelo usuário) |
 | `nbr_standard_id` | `integer` | ✅ | - | **FK** → `nbr_standards.id` |
 | `created_at` | `timestamptz` | ✅ | `now()` | Data de criação |
 | `created_by` | `uuid` | ✅ | - | **FK** → `auth.users.id` |
