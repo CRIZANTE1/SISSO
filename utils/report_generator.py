@@ -611,6 +611,11 @@ HTML_TEMPLATE = """
                     {% else %}
                         <span style="font-style: italic; color: #666;">Hipótese em análise, aguardando validação ou descarte.</span>
                     {% endif %}
+                    {% if hyp.get('justification_image_b64') %}
+                        <div style="margin-top: 10px;">
+                            <img src="data:image/jpeg;base64,{{ hyp.get('justification_image_b64') }}" style="max-width: 400px; max-height: 300px; border: 1px solid #ddd; page-break-inside: avoid;" alt="Imagem da justificativa">
+                        </div>
+                    {% endif %}
                 </td>
             </tr>
             {% if hyp.get('nbr_code') %}
@@ -922,7 +927,8 @@ def extract_hypotheses_from_tree(tree_json: Optional[Dict[str, Any]]) -> List[Di
                 'status': status,
                 'nbr_code': node.get('nbr_code'),
                 'nbr_description': node.get('nbr_description', ''),
-                'justification': node.get('justification', '')  # Justificativa para confirmação/descarte
+                'justification': node.get('justification', ''),  # Justificativa para confirmação/descarte
+                'justification_image_url': node.get('justification_image_url')  # URL da imagem da justificativa
             }
             hypotheses.append(hyp_data)
         
@@ -964,6 +970,15 @@ def generate_pdf_report(
         
         # Extrai hipóteses da árvore
         hypotheses = extract_hypotheses_from_tree(fault_tree_json)
+        
+        # Converte imagens de justificativa para base64
+        for hyp in hypotheses:
+            if hyp.get('justification_image_url'):
+                img_b64 = convert_image_url_to_base64(hyp.get('justification_image_url'))
+                if img_b64:
+                    hyp['justification_image_b64'] = img_b64
+                else:
+                    hyp['justification_image_b64'] = None
         
         # Filtra pessoas por tipo
         commission = [p for p in people_data if p.get('person_type') == 'Commission_Member']

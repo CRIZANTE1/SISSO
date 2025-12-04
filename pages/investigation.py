@@ -33,7 +33,9 @@ from services.investigation import (
     upsert_involved_people,
     get_sites,
     update_node_is_basic_cause,
-    update_node_is_contributing_cause
+    update_node_is_contributing_cause,
+    upload_justification_image,
+    update_node_justification_image
 )
 from auth.auth_utils import require_login
 
@@ -1379,6 +1381,16 @@ def main():
                     if node.get('justification'):
                         st.info(f"📝 **Justificativa atual:** {node['justification']}")
                     
+                    # Mostra imagem de justificativa existente se houver
+                    justification_image_url = node.get('justification_image_url')
+                    if justification_image_url:
+                        st.image(justification_image_url, caption="📷 Imagem da justificativa", width=300)
+                        if st.button("🗑️ Remover imagem", key=f"remove_img_{node['id']}"):
+                            from services.investigation import update_node_justification_image
+                            if update_node_justification_image(node['id'], None):
+                                st.success("✅ Imagem removida!")
+                                st.rerun()
+                    
                     # Campo de justificativa
                     justification_key = f"justification_{node['id']}"
                     justification = st.text_area(
@@ -1389,6 +1401,30 @@ def main():
                         height=100
                     )
                     
+                    # Upload de imagem para justificativa
+                    st.markdown("**📷 Imagem da Justificativa (opcional):**")
+                    uploaded_justification_image = st.file_uploader(
+                        "Adicione uma foto que comprove ou descarte esta hipótese:",
+                        type=['png', 'jpg', 'jpeg'],
+                        key=f"justification_image_{node['id']}",
+                        help="Esta imagem aparecerá no relatório PDF junto com a justificativa."
+                    )
+                    
+                    if uploaded_justification_image:
+                        # Mostra preview da imagem
+                        st.image(uploaded_justification_image, caption="Preview da imagem", width=300)
+                        
+                        # Botão para fazer upload
+                        if st.button("📤 Fazer upload da imagem", key=f"upload_img_{node['id']}"):
+                            from services.investigation import upload_justification_image
+                            file_bytes = uploaded_justification_image.read()
+                            image_url = upload_justification_image(node['id'], accident_id, file_bytes, uploaded_justification_image.name)
+                            if image_url:
+                                st.success("✅ Imagem enviada com sucesso!")
+                                st.rerun()
+                            else:
+                                st.error("❌ Erro ao fazer upload da imagem")
+                    
                     col_val, col_disc, col_pend = st.columns(3)
                     
                     with col_val:
@@ -1398,7 +1434,14 @@ def main():
                             if not justification_clean:
                                 st.warning("⚠️ Por favor, insira uma justificativa antes de confirmar.")
                             else:
-                                if update_node_status(node['id'], 'validated', justification_clean):
+                                # Se houver imagem sendo enviada, faz upload primeiro
+                                justification_img_url = None
+                                if uploaded_justification_image:
+                                    from services.investigation import upload_justification_image
+                                    file_bytes = uploaded_justification_image.read()
+                                    justification_img_url = upload_justification_image(node['id'], accident_id, file_bytes, uploaded_justification_image.name)
+                                
+                                if update_node_status(node['id'], 'validated', justification_clean, justification_img_url):
                                     st.success("✅ Hipótese confirmada com justificativa!")
                                     st.rerun()
                     
@@ -1409,7 +1452,14 @@ def main():
                             if not justification_clean:
                                 st.warning("⚠️ Por favor, insira uma justificativa antes de descartar.")
                             else:
-                                if update_node_status(node['id'], 'discarded', justification_clean):
+                                # Se houver imagem sendo enviada, faz upload primeiro
+                                justification_img_url = None
+                                if uploaded_justification_image:
+                                    from services.investigation import upload_justification_image
+                                    file_bytes = uploaded_justification_image.read()
+                                    justification_img_url = upload_justification_image(node['id'], accident_id, file_bytes, uploaded_justification_image.name)
+                                
+                                if update_node_status(node['id'], 'discarded', justification_clean, justification_img_url):
                                     st.success("❌ Hipótese descartada com justificativa!")
                                     st.rerun()
                     
@@ -1419,7 +1469,7 @@ def main():
                                        help="Voltar ao status de investigação"):
                                 # Ao voltar para pending, mantém a justificativa se houver
                                 justification_clean = (justification or '').strip()
-                                if update_node_status(node['id'], 'pending', justification_clean if justification_clean else None):
+                                if update_node_status(node['id'], 'pending', justification_clean if justification_clean else None, None):
                                     st.success("⏳ Status alterado para em análise!")
                                     st.rerun()
                     

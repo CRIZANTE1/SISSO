@@ -924,8 +924,8 @@ def update_node_display_order(node_id: str, new_order: int) -> bool:
         return False
 
 
-def update_node_status(node_id: str, status: str, justification: Optional[str] = None) -> bool:
-    """Atualiza status de validação de um nó, opcionalmente com justificativa"""
+def update_node_status(node_id: str, status: str, justification: Optional[str] = None, justification_image_url: Optional[str] = None) -> bool:
+    """Atualiza status de validação de um nó, opcionalmente com justificativa e imagem"""
     try:
         from managers.supabase_config import get_service_role_client
         supabase = get_service_role_client()
@@ -934,13 +934,135 @@ def update_node_status(node_id: str, status: str, justification: Optional[str] =
             return False
         
         update_data = {"status": status}
-        if justification:
+        if justification is not None:
             update_data["justification"] = justification
+        if justification_image_url is not None:
+            update_data["justification_image_url"] = justification_image_url
         
         response = supabase.table("fault_tree_nodes").update(update_data).eq("id", node_id).execute()
         return bool(response.data)
     except Exception as e:
         st.error(f"Erro ao atualizar status: {str(e)}")
+        return False
+
+
+def upload_justification_image(node_id: str, accident_id: str, file_bytes: bytes, filename: str) -> Optional[str]:
+    """Upload de imagem de justificativa para Supabase Storage"""
+    try:
+        from managers.supabase_config import get_service_role_client
+        supabase = get_service_role_client()
+        if not supabase:
+            st.error("Erro ao conectar com o banco de dados")
+            return None
+        
+        bucket = "evidencias"
+        
+        # Gera path único
+        timestamp = int(time.time())
+        file_extension = filename.split('.')[-1] if '.' in filename else ''
+        safe_filename = f"{timestamp}_{filename}"
+        path = f"investigations/{accident_id}/justifications/{node_id}/{safe_filename}"
+        
+        # Upload do arquivo (substitui se já existir)
+        try:
+            supabase.storage.from_(bucket).remove([path])
+        except:
+            pass
+        
+        # Cria arquivo temporário para upload
+        temp_file_path = None
+        result = None
+        try:
+            with tempfile.NamedTemporaryFile(delete=False, suffix=f".{file_extension}") as temp_file:
+                temp_file.write(file_bytes)
+                temp_file_path = temp_file.name
+            
+            # Faz upload usando o caminho do arquivo temporário
+            result = supabase.storage.from_(bucket).upload(
+                path, 
+                temp_file_path, 
+                file_options={"content-type": f"image/{file_extension}", "upsert": "true"}
+            )
+        except Exception as upload_error:
+            st.error(f"Erro no upload do arquivo: {str(upload_error)}")
+            result = None
+        finally:
+            # Remove arquivo temporário após upload
+            if temp_file_path and os.path.exists(temp_file_path):
+                try:
+                    os.unlink(temp_file_path)
+                except Exception:
+                    pass
+        
+        if result:
+            # Obtém URL pública
+            try:
+                public_url_response = supabase.storage.from_(bucket).get_public_url(path)
+                if public_url_response:
+                    public_url = public_url_response
+                else:
+                    raise Exception("URL pública não retornada")
+            except Exception as url_error:
+                # Se não conseguir URL pública, constrói manualmente
+                try:
+                    url = None
+                    url = os.environ.get("SUPABASE_URL")
+                    
+                    if not url:
+                        try:
+                            url = st.secrets.get("supabase", {}).get("url", "")
+                        except:
+                            pass
+                    
+                    if not url:
+                        try:
+                            if hasattr(supabase, 'supabase_url'):
+                                url = supabase.supabase_url
+                            elif hasattr(supabase, 'url'):
+                                url = supabase.url
+                        except:
+                            pass
+                    
+                    if url:
+                        url = url.rstrip('/')
+                        public_url = f"{url}/storage/v1/object/public/{bucket}/{path}"
+                    else:
+                        st.error("Não foi possível obter URL do Supabase para gerar URL pública da imagem")
+                        return None
+                except Exception as e:
+                    st.error(f"Erro ao construir URL pública: {str(e)}")
+                    return None
+            
+            # Atualiza o nó com a URL da imagem
+            update_response = supabase.table("fault_tree_nodes").update({"justification_image_url": public_url}).eq("id", node_id).execute()
+            
+            if update_response.data:
+                return public_url
+            else:
+                st.error("Erro ao atualizar nó com URL da imagem")
+                return None
+        else:
+            st.error("Erro no upload do arquivo")
+            return None
+            
+    except Exception as e:
+        st.error(f"Erro no upload: {str(e)}")
+        return None
+
+
+def update_node_justification_image(node_id: str, image_url: Optional[str]) -> bool:
+    """Atualiza a URL da imagem de justificativa de um nó"""
+    try:
+        from managers.supabase_config import get_service_role_client
+        supabase = get_service_role_client()
+        if not supabase:
+            st.error("Erro ao conectar com o banco de dados")
+            return False
+        
+        response = supabase.table("fault_tree_nodes").update({"justification_image_url": image_url}).eq("id", node_id).execute()
+        return bool(response.data)
+    except Exception as e:
+        st.error(f"Erro ao atualizar imagem de justificativa: {str(e)}")
         return False
 
 
@@ -1137,6 +1259,7 @@ def build_fault_tree_json(accident_id: str) -> Optional[Dict[str, Any]]:
                 "nbr_code": nbr_code,
                 "nbr_description": nbr_description,
                 "justification": node.get('justification', ''),  # Justificativa para confirmação/descarte
+                "justification_image_url": node.get('justification_image_url'),  # URL da imagem da justificativa
                 "children": []
             }
             
