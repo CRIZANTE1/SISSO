@@ -714,10 +714,11 @@ def render_fault_tree_html_for_pdf(tree_json: Dict[str, Any]) -> str:
     # Contadores para numeração automática
     hypothesis_counter = 0
     basic_cause_counter = 0
+    contributing_cause_counter = 0
     
-    def get_node_number(node_type: str, status: str, has_children: bool, is_basic_cause: bool = False) -> str:
-        """Retorna o número do nó (H1, H2, CB1, CB2, etc.)"""
-        nonlocal hypothesis_counter, basic_cause_counter
+    def get_node_number(node_type: str, status: str, has_children: bool, is_basic_cause: bool = False, is_contributing_cause: bool = False) -> str:
+        """Retorna o número do nó (H1, H2, CB1, CB2, CC1, CC2, etc.)"""
+        nonlocal hypothesis_counter, basic_cause_counter, contributing_cause_counter
         
         # Root NUNCA tem numeração
         if node_type == 'root':
@@ -727,6 +728,10 @@ def render_fault_tree_html_for_pdf(tree_json: Dict[str, Any]) -> str:
         if is_basic_cause:
             basic_cause_counter += 1
             return f"CB{basic_cause_counter}"
+        # Causa contribuinte: marcada manualmente pelo usuário (is_contributing_cause = True)
+        elif is_contributing_cause:
+            contributing_cause_counter += 1
+            return f"CC{contributing_cause_counter}"
         # Hipótese: qualquer hypothesis (pendente ou descartada)
         elif node_type == 'hypothesis':
             hypothesis_counter += 1
@@ -746,7 +751,7 @@ def render_fault_tree_html_for_pdf(tree_json: Dict[str, Any]) -> str:
         # Sem numeração
         return ""
     
-    def get_node_shape(node_type: str, status: str, has_children: bool, is_basic_cause: bool = False) -> Dict[str, str]:
+    def get_node_shape(node_type: str, status: str, has_children: bool, is_basic_cause: bool = False, is_contributing_cause: bool = False) -> Dict[str, str]:
         """Retorna a forma e cor do nó baseado no tipo e status"""
         # Causa básica: marcada manualmente pelo usuário (is_basic_cause = True) - Oval verde
         if is_basic_cause:
@@ -754,6 +759,15 @@ def render_fault_tree_html_for_pdf(tree_json: Dict[str, Any]) -> str:
                 'shape': 'oval',
                 'bg_color': '#c8e6c9',
                 'border_color': '#4caf50',
+                'text_color': '#000000',
+                'border_radius': '50px'
+            }
+        # Causa contribuinte: marcada manualmente pelo usuário (is_contributing_cause = True) - Oval azul
+        elif is_contributing_cause:
+            return {
+                'shape': 'oval',
+                'bg_color': '#bbdefb',  # Azul claro
+                'border_color': '#2196f3',
                 'text_color': '#000000',
                 'border_radius': '50px'
             }
@@ -792,14 +806,15 @@ def render_fault_tree_html_for_pdf(tree_json: Dict[str, Any]) -> str:
         label = node.get('label', '')
         nbr_code = node.get('nbr_code')
         is_basic_cause = node.get('is_basic_cause', False)  # Campo para marcar manualmente como causa básica
+        is_contributing_cause = node.get('is_contributing_cause', False)  # Campo para marcar manualmente como causa contribuinte
         children = node.get('children', [])
         has_children = len(children) > 0
         
         # Obtém número do nó
-        node_number = get_node_number(node_type, status, has_children, is_basic_cause)
+        node_number = get_node_number(node_type, status, has_children, is_basic_cause, is_contributing_cause)
         
         # Obtém forma e cores
-        shape_config = get_node_shape(node_type, status, has_children, is_basic_cause)
+        shape_config = get_node_shape(node_type, status, has_children, is_basic_cause, is_contributing_cause)
         
         # Escapa HTML
         label_escaped = html.escape(label).replace('\n', '<br>')

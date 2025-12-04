@@ -103,10 +103,11 @@ def render_fault_tree_html(tree_json: Dict[str, Any]) -> str:
     # Contadores para numeração automática
     hypothesis_counter = 0
     basic_cause_counter = 0
+    contributing_cause_counter = 0
     
-    def get_node_number(node_type: str, status: str, has_children: bool, is_basic_cause: bool = False) -> str:
-        """Retorna o número do nó (H1, H2, CB1, CB2, etc.)"""
-        nonlocal hypothesis_counter, basic_cause_counter
+    def get_node_number(node_type: str, status: str, has_children: bool, is_basic_cause: bool = False, is_contributing_cause: bool = False) -> str:
+        """Retorna o número do nó (H1, H2, CB1, CB2, CC1, CC2, etc.)"""
+        nonlocal hypothesis_counter, basic_cause_counter, contributing_cause_counter
         
         # Root NUNCA tem numeração
         if node_type == 'root':
@@ -116,6 +117,10 @@ def render_fault_tree_html(tree_json: Dict[str, Any]) -> str:
         if is_basic_cause:
             basic_cause_counter += 1
             return f"CB{basic_cause_counter}"
+        # Causa contribuinte: marcada manualmente pelo usuário (is_contributing_cause = True)
+        elif is_contributing_cause:
+            contributing_cause_counter += 1
+            return f"CC{contributing_cause_counter}"
         # Hipótese: qualquer hypothesis (pendente ou descartada)
         elif node_type == 'hypothesis':
             hypothesis_counter += 1
@@ -135,7 +140,7 @@ def render_fault_tree_html(tree_json: Dict[str, Any]) -> str:
         # Sem numeração
         return ""
     
-    def get_node_shape(node_type: str, status: str, has_children: bool, is_basic_cause: bool = False) -> Dict[str, str]:
+    def get_node_shape(node_type: str, status: str, has_children: bool, is_basic_cause: bool = False, is_contributing_cause: bool = False) -> Dict[str, str]:
         """Retorna a forma e cor do nó baseado no tipo e status"""
         # Causa básica: marcada manualmente pelo usuário (is_basic_cause = True) - Oval verde
         if is_basic_cause:
@@ -143,6 +148,15 @@ def render_fault_tree_html(tree_json: Dict[str, Any]) -> str:
                 'shape': 'oval',
                 'bg_color': '#c8e6c9',  # Verde claro
                 'border_color': '#4caf50',
+                'text_color': '#000000',
+                'border_radius': '50px'
+            }
+        # Causa contribuinte: marcada manualmente pelo usuário (is_contributing_cause = True) - Oval azul
+        elif is_contributing_cause:
+            return {
+                'shape': 'oval',
+                'bg_color': '#bbdefb',  # Azul claro
+                'border_color': '#2196f3',
                 'text_color': '#000000',
                 'border_radius': '50px'
             }
@@ -181,14 +195,15 @@ def render_fault_tree_html(tree_json: Dict[str, Any]) -> str:
         label = node.get('label', '')
         nbr_code = node.get('nbr_code')
         is_basic_cause = node.get('is_basic_cause', False)  # Campo para marcar manualmente como causa básica
+        is_contributing_cause = node.get('is_contributing_cause', False)  # Campo para marcar manualmente como causa contribuinte
         children = node.get('children', [])
         has_children = len(children) > 0
         
         # Obtém número do nó
-        node_number = get_node_number(node_type, status, has_children, is_basic_cause)
+        node_number = get_node_number(node_type, status, has_children, is_basic_cause, is_contributing_cause)
         
         # Obtém forma e cores
-        shape_config = get_node_shape(node_type, status, has_children, is_basic_cause)
+        shape_config = get_node_shape(node_type, status, has_children, is_basic_cause, is_contributing_cause)
         
         # Escapa HTML
         label_escaped = html.escape(label).replace('\n', '<br>')
@@ -1406,11 +1421,13 @@ def main():
                                     st.success("⏳ Status alterado para em análise!")
                                     st.rerun()
                     
-                    # Checkbox para marcar como causa básica (apenas para nós validados)
+                    # Checkbox para marcar como causa básica ou contribuinte (apenas para nós validados)
                     if current_status == 'validated':
                         st.divider()
-                        from services.investigation import update_node_is_basic_cause
+                        from services.investigation import update_node_is_basic_cause, update_node_is_contributing_cause
                         is_basic_cause = node.get('is_basic_cause', False)
+                        is_contributing_cause = node.get('is_contributing_cause', False)
+                        
                         basic_cause_key = f"is_basic_cause_{node['id']}"
                         new_is_basic_cause = st.checkbox(
                             "🎯 Marcar como Causa Básica",
@@ -1419,8 +1436,26 @@ def main():
                             help="Marque esta opção se esta é uma causa básica (causa raiz que não pode ser mais decomposta). Causas básicas aparecem como oval verde na árvore."
                         )
                         if new_is_basic_cause != is_basic_cause:
+                            # Se marcar como causa básica, desmarca causa contribuinte
+                            if new_is_basic_cause and is_contributing_cause:
+                                update_node_is_contributing_cause(node['id'], False)
                             if update_node_is_basic_cause(node['id'], new_is_basic_cause):
                                 st.success("✅ Causa básica atualizada!")
+                                st.rerun()
+                        
+                        contributing_cause_key = f"is_contributing_cause_{node['id']}"
+                        new_is_contributing_cause = st.checkbox(
+                            "🔗 Marcar como Causa Contribuinte",
+                            value=is_contributing_cause,
+                            key=contributing_cause_key,
+                            help="Marque esta opção se esta é uma causa contribuinte (fator que contribui para o acidente mas não é uma causa básica). Causas contribuintes aparecem como oval azul na árvore."
+                        )
+                        if new_is_contributing_cause != is_contributing_cause:
+                            # Se marcar como causa contribuinte, desmarca causa básica
+                            if new_is_contributing_cause and is_basic_cause:
+                                update_node_is_basic_cause(node['id'], False)
+                            if update_node_is_contributing_cause(node['id'], new_is_contributing_cause):
+                                st.success("✅ Causa contribuinte atualizada!")
                                 st.rerun()
         else:
             st.info("📭 Nenhuma hipótese para validar ainda. Adicione hipóteses acima.")
@@ -1454,9 +1489,10 @@ def main():
         st.header("📋 Passo 4: Classificação Oficial (NBR 14280)")
         st.markdown("**O que falhou na norma?** Classifique as causas confirmadas conforme os padrões NBR 14280.")
         
-        # Busca apenas causas básicas (validadas E marcadas como básicas)
+        # Busca causas básicas e contribuintes (validadas E marcadas)
         nodes = get_tree_nodes(accident_id)
         basic_cause_nodes = [n for n in nodes if n['status'] == 'validated' and n.get('is_basic_cause', False) == True]
+        contributing_cause_nodes = [n for n in nodes if n['status'] == 'validated' and n.get('is_contributing_cause', False) == True]
         
         if basic_cause_nodes:
             st.markdown("### ✅ Causas Básicas para Classificação")
@@ -1480,83 +1516,150 @@ def main():
                         options=list(categories.keys()),
                         format_func=lambda x: categories[x],
                         help="💡 **Ato Inseguro**: Ação incorreta do trabalhador. **Condição do Ambiente**: Problema no ambiente/máquina. **Fator Pessoal**: Característica pessoal que contribuiu.",
+                        key=f"category_basic_{node['id']}"
+                    )
+                    
+                    # Busca padrões NBR filtrados
+                    search_term = st.text_input(
+                        "🔍 Buscar código NBR (opcional):",
+                        placeholder="Ex: treinamento, equipamento, proteção...",
+                        key=f"search_basic_{node['id']}"
+                    )
+                    
+                    # Filtra padrões NBR
+                    filtered_standards = [s for s in nbr_standards_list if s['category'] == selected_category]
+                    if search_term:
+                        search_lower = search_term.lower()
+                        filtered_standards = [s for s in filtered_standards if 
+                                             search_lower in s['code'].lower() or 
+                                             search_lower in s['description'].lower()]
+                    
+                    if filtered_standards:
+                        # Cria opções para selectbox
+                        standard_options = {
+                            f"{std['code']} - {std['description']}": std['id'] 
+                            for std in filtered_standards
+                        }
+                        
+                        # Verifica se já tem padrão vinculado
+                        current_standard_id = node.get('nbr_standard_id')
+                        current_standard_code = None
+                        if current_standard_id:
+                            for std in nbr_standards_list:
+                                if std['id'] == current_standard_id:
+                                    current_standard_code = f"{std['code']} - {std['description']}"
+                                    break
+                        
+                        selected_standard = st.selectbox(
+                            "Selecione o código NBR:",
+                            options=list(standard_options.keys()),
+                            index=0 if not current_standard_code else list(standard_options.keys()).index(current_standard_code) if current_standard_code in standard_options else 0,
+                            help="💡 Selecione o código NBR que melhor descreve esta causa.",
+                            key=f"standard_basic_{node['id']}"
+                        )
+                        
+                        standard_id = standard_options[selected_standard]
+                        
+                        # Exibe descrição completa do código selecionado
+                        selected_std = next((s for s in filtered_standards if s['id'] == standard_id), None)
+                        if selected_std:
+                            st.markdown(f"**📋 Descrição completa:** {selected_std['description']}")
+                        
+                        if st.button("💾 Salvar Classificação", key=f"save_basic_{node['id']}"):
+                            if link_nbr_standard_to_node(node['id'], standard_id):
+                                st.success("✅ Classificação salva!")
+                                st.rerun()
+                    else:
+                        st.warning("⚠️ Nenhum código NBR encontrado para esta categoria.")
+        
+        if contributing_cause_nodes:
+            st.markdown("### 🔗 Causas Contribuintes para Classificação")
+            st.info(f"💡 Você tem **{len(contributing_cause_nodes)}** causa(s) contribuinte(s) confirmada(s) para classificar.")
+            
+            for node in contributing_cause_nodes:
+                with st.expander(f"🔗 {node['label'][:60]}...", expanded=True):
+                    st.markdown(f"**Causa Contribuinte:** {node['label']}")
+                    st.info("💡 Esta é uma causa contribuinte confirmada. Classifique-a conforme os padrões NBR 14280.")
+                    
+                    # Busca padrões NBR por categoria
+                    categories = {
+                        'unsafe_act': 'Falha Humana (Ato Inseguro)',
+                        'unsafe_condition': 'Condição do Ambiente',
+                        'personal_factor': 'Fator Pessoal'
+                    }
+                    
+                    # Seleção de categoria
+                    selected_category = st.selectbox(
+                        "O que falhou?",
+                        options=list(categories.keys()),
+                        format_func=lambda x: categories[x],
+                        help="💡 **Ato Inseguro**: Ação incorreta do trabalhador. **Condição do Ambiente**: Problema no ambiente/máquina. **Fator Pessoal**: Característica pessoal que contribuiu.",
                         key=f"category_{node['id']}"
                     )
                     
-                    # Busca padrões da categoria
-                    nbr_standards_list = get_nbr_standards(selected_category)
+                    # Busca padrões NBR filtrados
+                    search_term = st.text_input(
+                        "🔍 Buscar código NBR (opcional):",
+                        placeholder="Ex: treinamento, equipamento, proteção...",
+                        key=f"search_contributing_{node['id']}"
+                    )
                     
-                    if nbr_standards_list:
-                        # Campo de busca inteligente
-                        search_term = st.text_input(
-                            "🔍 Buscar código NBR (digite palavras-chave):",
-                            placeholder="Ex: treinamento, conhecimento, experiência...",
-                            help="💡 Digite palavras relacionadas à causa. O sistema filtrará os códigos NBR relevantes.",
-                            key=f"search_{node['id']}"
+                    # Filtra padrões NBR
+                    filtered_standards = [s for s in nbr_standards_list if s['category'] == selected_category]
+                    if search_term:
+                        search_lower = search_term.lower()
+                        filtered_standards = [s for s in filtered_standards if 
+                                             search_lower in s['code'].lower() or 
+                                             search_lower in s['description'].lower()]
+                    
+                    if filtered_standards:
+                        # Cria opções para selectbox
+                        standard_options = {
+                            f"{std['code']} - {std['description']}": std['id'] 
+                            for std in filtered_standards
+                        }
+                        
+                        # Verifica se já tem padrão vinculado
+                        current_standard_id = node.get('nbr_standard_id')
+                        current_standard_code = None
+                        if current_standard_id:
+                            for std in nbr_standards_list:
+                                if std['id'] == current_standard_id:
+                                    current_standard_code = f"{std['code']} - {std['description']}"
+                                    break
+                        
+                        selected_standard = st.selectbox(
+                            "Selecione o código NBR:",
+                            options=list(standard_options.keys()),
+                            index=0 if not current_standard_code else list(standard_options.keys()).index(current_standard_code) if current_standard_code in standard_options else 0,
+                            help="💡 Selecione o código NBR que melhor descreve esta causa.",
+                            key=f"standard_contributing_{node['id']}"
                         )
                         
-                        # Filtra padrões baseado na busca
-                        if search_term:
-                            search_lower = search_term.lower()
-                            filtered_standards = [
-                                std for std in nbr_standards_list
-                                if search_lower in std['description'].lower() or 
-                                   search_lower in std['code'].lower()
-                            ]
-                        else:
-                            filtered_standards = nbr_standards_list
+                        standard_id = standard_options[selected_standard]
                         
-                        if filtered_standards:
-                            # Cria opções para selectbox
-                            standard_options = {f"{std['code']} - {std['description']}": std['id'] 
-                                              for std in filtered_standards}
-                            standard_options["Nenhum"] = None
-                            
-                            # Verifica se já tem padrão vinculado
-                            current_standard_id = node.get('nbr_standard_id')
-                            current_standard_code = None
-                            if current_standard_id:
-                                for std in nbr_standards_list:
-                                    if std['id'] == current_standard_id:
-                                        current_standard_code = f"{std['code']} - {std['description']}"
-                                        break
-                            
-                            selected_standard = st.selectbox(
-                                "Selecione o código NBR:",
-                                options=list(standard_options.keys()),
-                                index=0 if not current_standard_code else list(standard_options.keys()).index(current_standard_code) if current_standard_code in standard_options else 0,
-                                help="💡 Selecione o código NBR que melhor descreve esta causa.",
-                                key=f"standard_{node['id']}"
-                            )
-                            
-                            standard_id = standard_options[selected_standard]
-                            
-                            # Exibe descrição completa do código selecionado
-                            if selected_standard != "Nenhum":
-                                selected_std_obj = next((s for s in filtered_standards if s['id'] == standard_id), None)
-                                if selected_std_obj:
-                                    st.success(f"📋 **Código selecionado:** {selected_std_obj['code']}")
-                                    st.info(f"**Descrição:** {selected_std_obj['description']}")
-                            
-                            if st.button("💾 Salvar Classificação", key=f"save_{node['id']}"):
-                                if standard_id:
-                                    if link_nbr_standard_to_node(node['id'], standard_id):
-                                        st.success(f"✅ Padrão NBR vinculado: {selected_standard}")
-                                        st.rerun()
-                                else:
-                                    st.info("Nenhum padrão selecionado")
-                        else:
-                            st.warning(f"🔍 Nenhum código encontrado para '{search_term}'. Tente outras palavras-chave.")
+                        # Exibe descrição completa do código selecionado
+                        selected_std = next((s for s in filtered_standards if s['id'] == standard_id), None)
+                        if selected_std:
+                            st.markdown(f"**📋 Descrição completa:** {selected_std['description']}")
+                        
+                        if st.button("💾 Salvar Classificação", key=f"save_contributing_{node['id']}"):
+                            if link_nbr_standard_to_node(node['id'], standard_id):
+                                st.success("✅ Classificação salva!")
+                                st.rerun()
                     else:
-                        st.warning("Nenhum padrão encontrado para esta categoria")
-        else:
-            # Verifica se há causas validadas mas não marcadas como básicas
+                        st.warning("⚠️ Nenhum código NBR encontrado para esta categoria.")
+        
+        # Se não houver causas básicas nem contribuintes, mostra mensagem
+        if not basic_cause_nodes and not contributing_cause_nodes:
+            # Verifica se há causas validadas mas não marcadas como básicas ou contribuintes
             validated_nodes = [n for n in nodes if n['status'] == 'validated']
             if validated_nodes:
                 basic_cause_count = len([n for n in validated_nodes if n.get('is_basic_cause', False) == True])
-                if basic_cause_count == 0:
-                    st.warning("⚠️ Você tem **causas confirmadas**, mas nenhuma foi marcada como **Causa Básica**.")
-                    st.info("💡 **O que fazer:** Volte ao passo anterior (Árvore de Porquês) e marque as causas básicas usando o checkbox '🎯 Marcar como Causa Básica' na seção de validação de hipóteses.")
+                contributing_cause_count = len([n for n in validated_nodes if n.get('is_contributing_cause', False) == True])
+                if basic_cause_count == 0 and contributing_cause_count == 0:
+                    st.warning("⚠️ Você tem **causas confirmadas**, mas nenhuma foi marcada como **Causa Básica** ou **Causa Contribuinte**.")
+                    st.info("💡 **O que fazer:** Volte ao passo anterior (Árvore de Porquês) e marque as causas usando os checkboxes '🎯 Marcar como Causa Básica' ou '🔗 Marcar como Causa Contribuinte' na seção de validação de hipóteses.")
                 else:
                     st.info("💡 Aguarde... recarregando a página.")
                     st.rerun()
