@@ -526,13 +526,32 @@ HTML_TEMPLATE = """
     </table>
     {% endif %}
 
-    <!-- 1.6 Cronologia -->
+    <!-- 1.6 Cronologia de Eventos -->
     {% if timeline_events %}
     <div class="vibra-green" style="margin-top: 10px;">1.6. Cronologia de Eventos</div>
     {% for event in timeline_events %}
     <div class="timeline-item">
         <span class="timeline-time">{{ event.get('event_time', 'N/A') }}</span><br>
         <span class="value">{{ event.get('description', 'N/A') }}</span>
+    </div>
+    {% endfor %}
+    {% endif %}
+
+    <!-- 1.7 Cronologia de Ações da Comissão -->
+    {% if commission_actions %}
+    <div class="vibra-green" style="margin-top: 15px;">1.7. Cronologia de Ações da Comissão</div>
+    <p style="margin-bottom: 10px; font-size: 9pt; color: #666;">Abaixo são apresentadas as ações executadas pela comissão durante a investigação.</p>
+    {% for action in commission_actions %}
+    <div class="timeline-item" style="border-left-color: #2196f3;">
+        <span class="timeline-time" style="color: #2196f3;">{{ action.get('action_time', 'N/A') }}</span>
+        {% if action.get('action_type') %}
+        <span style="display: inline-block; background-color: #2196f3; color: white; padding: 2px 8px; border-radius: 3px; font-size: 8pt; margin-left: 8px; font-weight: bold;">{{ action.get('action_type') }}</span>
+        {% endif %}
+        {% if action.get('responsible_person') %}
+        <span style="font-size: 9pt; color: #666; margin-left: 8px;">👤 {{ action.get('responsible_person') }}</span>
+        {% endif %}
+        <br>
+        <span class="value">{{ action.get('description', 'N/A') }}</span>
     </div>
     {% endfor %}
     {% endif %}
@@ -1038,7 +1057,8 @@ def generate_pdf_report(
     timeline_events: List[Dict[str, Any]],
     verified_causes: List[Dict[str, Any]],
     evidence_images: List[str],
-    fault_tree_json: Optional[Dict[str, Any]] = None
+    fault_tree_json: Optional[Dict[str, Any]] = None,
+    commission_actions: Optional[List[Dict[str, Any]]] = None
 ) -> bytes:
     """
     Gera o PDF preenchendo o template com os dados.
@@ -1050,6 +1070,7 @@ def generate_pdf_report(
         verified_causes: Lista de nós validados com códigos NBR
         evidence_images: Lista de URLs ou base64 das imagens de evidência
         fault_tree_json: JSON da árvore de falhas (opcional, para gerar imagem)
+        commission_actions: Lista de ações executadas pela comissão (opcional)
     
     Returns:
         bytes: PDF gerado
@@ -1092,6 +1113,11 @@ def generate_pdf_report(
                 if img_b64:
                     evidence_images_b64.append(img_b64)
         
+        # Prepara ações da comissão (ordena por data/hora)
+        commission_actions_sorted = []
+        if commission_actions:
+            commission_actions_sorted = sorted(commission_actions, key=lambda x: x.get('action_time', ''))
+        
         # Renderiza HTML
         template = Template(HTML_TEMPLATE)
         rendered_html = template.render(
@@ -1107,7 +1133,8 @@ def generate_pdf_report(
             evidence_images=evidence_images_b64,
             commission=commission,
             current_date=current_date,
-            recommendations=recommendations
+            recommendations=recommendations,
+            commission_actions=commission_actions_sorted
         )
         
         # Gera PDF

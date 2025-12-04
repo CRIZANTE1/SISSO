@@ -18,6 +18,10 @@ from services.investigation import (
     get_timeline,
     update_timeline_event,
     delete_timeline_event,
+    add_commission_action,
+    get_commission_actions,
+    update_commission_action,
+    delete_commission_action,
     get_root_node,
     create_root_node,
     add_fault_tree_node,
@@ -1212,6 +1216,143 @@ def main():
         else:
             st.info("📭 Nenhum evento adicionado ainda. Adicione eventos na ordem cronológica.")
         
+        # Linha do tempo de ações da comissão
+        st.divider()
+        st.markdown("### 👥 Ações da Comissão")
+        st.markdown("**O que a comissão fez?** Registre as ações executadas pela comissão durante a investigação.")
+        
+        # Formulário para adicionar ação da comissão
+        with st.expander("➕ Adicionar Ação da Comissão", expanded=True):
+            col_date_action, col_time_action = st.columns(2)
+            with col_date_action:
+                action_date = st.date_input("Data da ação:", value=date.today(), key="action_date")
+            with col_time_action:
+                action_time_input = st.time_input("Hora da ação:", value=time(12, 0), key="action_time")
+            
+            action_datetime = datetime.combine(action_date, action_time_input)
+            
+            col_type, col_resp = st.columns(2)
+            with col_type:
+                action_type = st.selectbox(
+                    "Tipo de ação:",
+                    options=["", "Entrevista", "Inspeção", "Análise", "Reunião", "Coleta de Evidências", "Outro"],
+                    key="action_type",
+                    help="Selecione o tipo de ação executada"
+                )
+            with col_resp:
+                responsible_person = st.text_input(
+                    "Responsável:",
+                    placeholder="Nome da pessoa responsável",
+                    key="responsible_person",
+                    help="Nome da pessoa que executou ou coordenou a ação"
+                )
+            
+            action_description = st.text_area(
+                "O que foi feito?",
+                placeholder="Descreva a ação executada pela comissão...",
+                height=100,
+                help="📝 Descreva detalhadamente a ação: o que foi feito, quem participou, quais resultados foram obtidos?",
+                key="action_description"
+            )
+            
+            if st.button("➕ Adicionar Ação", type="primary", key="add_action_btn"):
+                if action_description:
+                    if add_commission_action(accident_id, action_datetime, action_description, action_type if action_type else None, responsible_person if responsible_person else None):
+                        st.success("✅ Ação adicionada à linha do tempo!")
+                        st.rerun()
+                else:
+                    st.warning("⚠️ Forneça uma descrição da ação")
+        
+        # Timeline visual de ações
+        st.markdown("### ⏱️ Cronologia de Ações da Comissão")
+        commission_actions = get_commission_actions(accident_id)
+        
+        if commission_actions:
+            actions_df = pd.DataFrame(commission_actions)
+            actions_df['action_time'] = pd.to_datetime(actions_df['action_time'])
+            actions_df = actions_df.sort_values('action_time')
+            
+            for idx, action in actions_df.iterrows():
+                action_id = str(action.get('id', ''))
+                action_time_raw = action.get('action_time')
+                description_raw = action.get('description', '')
+                action_type_raw = action.get('action_type', '')
+                responsible_raw = action.get('responsible_person', '')
+                
+                # Converte para tipos corretos
+                if isinstance(action_time_raw, pd.Timestamp):
+                    action_time = action_time_raw.to_pydatetime()
+                else:
+                    action_time = pd.to_datetime(action_time_raw).to_pydatetime()
+                
+                description = str(description_raw) if description_raw else ''
+                action_type = str(action_type_raw) if action_type_raw else ''
+                responsible = str(responsible_raw) if responsible_raw else ''
+                
+                # Expander para cada ação com opções de editar/deletar
+                action_preview = description[:50] + '...' if len(description) > 50 else description
+                action_type_label = f" [{action_type}]" if action_type else ""
+                responsible_label = f" - {responsible}" if responsible else ""
+                with st.expander(f"👥 {action_time.strftime('%d/%m/%Y %H:%M')}{action_type_label}{responsible_label} - {action_preview}", expanded=False):
+                    # Campos de edição
+                    col_date_edit, col_time_edit = st.columns(2)
+                    with col_date_edit:
+                        edit_date = st.date_input(
+                            "Data:",
+                            value=action_time.date(),
+                            key=f"edit_action_date_{action_id}"
+                        )
+                    with col_time_edit:
+                        edit_time = st.time_input(
+                            "Hora:",
+                            value=action_time.time(),
+                            key=f"edit_action_time_{action_id}"
+                        )
+                    
+                    edit_datetime = datetime.combine(edit_date, edit_time)
+                    
+                    col_type_edit, col_resp_edit = st.columns(2)
+                    with col_type_edit:
+                        edit_action_type = st.selectbox(
+                            "Tipo de ação:",
+                            options=["", "Entrevista", "Inspeção", "Análise", "Reunião", "Coleta de Evidências", "Outro"],
+                            index=0 if not action_type else (["", "Entrevista", "Inspeção", "Análise", "Reunião", "Coleta de Evidências", "Outro"].index(action_type) if action_type in ["", "Entrevista", "Inspeção", "Análise", "Reunião", "Coleta de Evidências", "Outro"] else 0),
+                            key=f"edit_action_type_{action_id}"
+                        )
+                    with col_resp_edit:
+                        edit_responsible = st.text_input(
+                            "Responsável:",
+                            value=responsible,
+                            key=f"edit_responsible_{action_id}"
+                        )
+                    
+                    edit_description = st.text_area(
+                        "Descrição:",
+                        value=description,
+                        key=f"edit_action_desc_{action_id}",
+                        height=100
+                    )
+                    
+                    # Botões de ação
+                    col_save, col_delete = st.columns([1, 1])
+                    with col_save:
+                        if st.button("💾 Salvar Alterações", key=f"save_action_{action_id}"):
+                            desc_clean = (edit_description or '').strip()
+                            if desc_clean:
+                                if update_commission_action(action_id, edit_datetime, desc_clean, edit_action_type if edit_action_type else None, edit_responsible if edit_responsible else None):
+                                    st.success("✅ Ação atualizada!")
+                                    st.rerun()
+                            else:
+                                st.warning("⚠️ A descrição não pode estar vazia")
+                    
+                    with col_delete:
+                        if st.button("🗑️ Deletar", key=f"delete_action_{action_id}"):
+                            if delete_commission_action(action_id):
+                                st.success("✅ Ação removida!")
+                                st.rerun()
+        else:
+            st.info("📭 Nenhuma ação registrada ainda. Adicione ações executadas pela comissão.")
+        
         # Navegação
         col_prev, col_next = st.columns([1, 1])
         with col_prev:
@@ -1827,6 +1968,9 @@ def main():
                     # 6. Busca JSON da árvore para gerar imagem
                     tree_json = build_fault_tree_json(accident_id)
                     
+                    # 6.5. Busca ações da comissão
+                    commission_actions = get_commission_actions(accident_id)
+                    
                     # 7. Gera PDF
                     pdf_bytes = generate_pdf_report(
                         accident_data=accident_full,
@@ -1834,7 +1978,8 @@ def main():
                         timeline_events=timeline_events,
                         verified_causes=verified_causes,
                         evidence_images=evidence_images,
-                        fault_tree_json=tree_json
+                        fault_tree_json=tree_json,
+                        commission_actions=commission_actions
                     )
                     
                     # 8. Botão de download

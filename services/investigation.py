@@ -726,6 +726,85 @@ def delete_timeline_event(event_id: str) -> bool:
         return False
 
 
+def add_commission_action(accident_id: str, action_time: datetime, description: str, action_type: Optional[str] = None, responsible_person: Optional[str] = None) -> bool:
+    """Adiciona ação da comissão à linha do tempo de ações"""
+    try:
+        from managers.supabase_config import get_service_role_client
+        supabase = get_service_role_client()
+        if not supabase:
+            st.error("Erro ao conectar com o banco de dados")
+            return False
+        
+        data = {
+            "accident_id": accident_id,
+            "action_time": action_time.isoformat(),
+            "description": description,
+            "action_type": action_type,
+            "responsible_person": responsible_person,
+            "created_by": None  # Campo nullable - evita erro de FK
+        }
+        
+        response = supabase.table("commission_actions").insert(data).execute()
+        return bool(response.data)
+    except Exception as e:
+        st.error(f"Erro ao adicionar ação da comissão: {str(e)}")
+        return False
+
+
+def get_commission_actions(accident_id: str) -> List[Dict[str, Any]]:
+    """Busca ações da comissão de uma investigação"""
+    try:
+        from managers.supabase_config import get_service_role_client
+        supabase = get_service_role_client()
+        if not supabase:
+            return []
+        
+        response = supabase.table("commission_actions").select("*").eq("accident_id", accident_id).order("action_time", desc=False).execute()
+        return response.data if response.data else []
+    except Exception as e:
+        st.error(f"Erro ao buscar ações da comissão: {str(e)}")
+        return []
+
+
+def update_commission_action(action_id: str, action_time: datetime, description: str, action_type: Optional[str] = None, responsible_person: Optional[str] = None) -> bool:
+    """Atualiza uma ação da comissão"""
+    try:
+        from managers.supabase_config import get_service_role_client
+        supabase = get_service_role_client()
+        if not supabase:
+            st.error("Erro ao conectar com o banco de dados")
+            return False
+        
+        data = {
+            "action_time": action_time.isoformat(),
+            "description": description,
+            "action_type": action_type,
+            "responsible_person": responsible_person
+        }
+        
+        response = supabase.table("commission_actions").update(data).eq("id", action_id).execute()
+        return bool(response.data)
+    except Exception as e:
+        st.error(f"Erro ao atualizar ação da comissão: {str(e)}")
+        return False
+
+
+def delete_commission_action(action_id: str) -> bool:
+    """Remove uma ação da comissão"""
+    try:
+        from managers.supabase_config import get_service_role_client
+        supabase = get_service_role_client()
+        if not supabase:
+            st.error("Erro ao conectar com o banco de dados")
+            return False
+        
+        response = supabase.table("commission_actions").delete().eq("id", action_id).execute()
+        return bool(response.data)
+    except Exception as e:
+        st.error(f"Erro ao remover ação da comissão: {str(e)}")
+        return False
+
+
 def get_root_node(accident_id: str) -> Optional[Dict[str, Any]]:
     """Busca o nó raiz de uma investigação"""
     try:
