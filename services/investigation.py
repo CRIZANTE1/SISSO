@@ -1066,6 +1066,22 @@ def update_node_justification_image(node_id: str, image_url: Optional[str]) -> b
         return False
 
 
+def update_node_recommendation(node_id: str, recommendation: Optional[str]) -> bool:
+    """Atualiza a recomendação de um nó (causa básica ou contribuinte)"""
+    try:
+        from managers.supabase_config import get_service_role_client
+        supabase = get_service_role_client()
+        if not supabase:
+            st.error("Erro ao conectar com o banco de dados")
+            return False
+        
+        response = supabase.table("fault_tree_nodes").update({"recommendation": recommendation}).eq("id", node_id).execute()
+        return bool(response.data)
+    except Exception as e:
+        st.error(f"Erro ao atualizar recomendação: {str(e)}")
+        return False
+
+
 def update_node_label(node_id: str, label: str) -> bool:
     """Atualiza o label (texto) de um nó da árvore de falhas"""
     try:
@@ -1260,6 +1276,7 @@ def build_fault_tree_json(accident_id: str) -> Optional[Dict[str, Any]]:
                 "nbr_description": nbr_description,
                 "justification": node.get('justification', ''),  # Justificativa para confirmação/descarte
                 "justification_image_url": node.get('justification_image_url'),  # URL da imagem da justificativa
+                "recommendation": node.get('recommendation'),  # Recomendação para prevenir/corrigir a causa
                 "children": []
             }
             

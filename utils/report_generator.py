@@ -669,6 +669,55 @@ HTML_TEMPLATE = """
     </div>
     {% endif %}
 
+    <!-- PÁGINA 7: RECOMENDAÇÕES -->
+    {% if recommendations %}
+    <div class="page-break"></div>
+    <div class="section-title">9. RECOMENDAÇÕES</div>
+    <p style="margin-bottom: 15px; font-size: 10pt;">Abaixo são apresentadas as recomendações para prevenir ou corrigir as causas básicas e contribuintes identificadas na investigação.</p>
+    
+    {% if recommendations.get('basic_causes') %}
+    <div class="vibra-green" style="margin-top: 15px; margin-bottom: 10px;">9.1. Recomendações para Causas Básicas</div>
+    {% for rec in recommendations.get('basic_causes') %}
+    <div style="margin-bottom: 20px; page-break-inside: avoid;">
+        <div style="font-weight: bold; color: #005f2f; margin-bottom: 5px; font-size: 11pt;">
+            {{ loop.index }}. {{ rec.get('label', 'N/A') }}
+        </div>
+        {% if rec.get('nbr_code') %}
+        <div style="margin-bottom: 8px; font-size: 9pt; color: #666;">
+            <strong>Código NBR:</strong> {{ rec.get('nbr_code', 'N/A') }} - {{ rec.get('nbr_description', '') }}
+        </div>
+        {% endif %}
+        <div style="padding: 10px; background-color: #f9f9f9; border-left: 4px solid #005f2f; margin-top: 5px;">
+            {{ rec.get('recommendation', 'Nenhuma recomendação fornecida.') }}
+        </div>
+    </div>
+    {% endfor %}
+    {% endif %}
+    
+    {% if recommendations.get('contributing_causes') %}
+    <div class="vibra-green" style="margin-top: 20px; margin-bottom: 10px;">9.2. Recomendações para Causas Contribuintes</div>
+    {% for rec in recommendations.get('contributing_causes') %}
+    <div style="margin-bottom: 20px; page-break-inside: avoid;">
+        <div style="font-weight: bold; color: #005f2f; margin-bottom: 5px; font-size: 11pt;">
+            {{ loop.index }}. {{ rec.get('label', 'N/A') }}
+        </div>
+        {% if rec.get('nbr_code') %}
+        <div style="margin-bottom: 8px; font-size: 9pt; color: #666;">
+            <strong>Código NBR:</strong> {{ rec.get('nbr_code', 'N/A') }} - {{ rec.get('nbr_description', '') }}
+        </div>
+        {% endif %}
+        <div style="padding: 10px; background-color: #f9f9f9; border-left: 4px solid #2196f3; margin-top: 5px;">
+            {{ rec.get('recommendation', 'Nenhuma recomendação fornecida.') }}
+        </div>
+    </div>
+    {% endfor %}
+    {% endif %}
+    
+    {% if not recommendations.get('basic_causes') and not recommendations.get('contributing_causes') %}
+    <p style="color: #999; font-style: italic;">Nenhuma recomendação registrada ainda.</p>
+    {% endif %}
+    {% endif %}
+
 </body>
 </html>
 """
@@ -940,6 +989,49 @@ def extract_hypotheses_from_tree(tree_json: Optional[Dict[str, Any]]) -> List[Di
     return hypotheses
 
 
+def extract_recommendations_from_tree(tree_json: Optional[Dict[str, Any]]) -> Dict[str, List[Dict[str, Any]]]:
+    """
+    Extrai recomendações de causas básicas e contribuintes da árvore de falhas.
+    Retorna dicionário com 'basic_causes' e 'contributing_causes'.
+    """
+    if not tree_json:
+        return {'basic_causes': [], 'contributing_causes': []}
+    
+    basic_causes = []
+    contributing_causes = []
+    
+    def extract_recursive(node: Dict[str, Any]):
+        """Função recursiva para extrair recomendações"""
+        is_basic = node.get('is_basic_cause', False)
+        is_contributing = node.get('is_contributing_cause', False)
+        status = node.get('status', 'pending')
+        recommendation = node.get('recommendation')
+        
+        # Só inclui se for causa básica ou contribuinte validada e tiver recomendação
+        if status == 'validated' and recommendation:
+            rec_data = {
+                'label': node.get('label', 'N/A'),
+                'nbr_code': node.get('nbr_code'),
+                'nbr_description': node.get('nbr_description', ''),
+                'recommendation': recommendation
+            }
+            
+            if is_basic:
+                basic_causes.append(rec_data)
+            elif is_contributing:
+                contributing_causes.append(rec_data)
+        
+        # Processa filhos recursivamente
+        for child in node.get('children', []):
+            extract_recursive(child)
+    
+    extract_recursive(tree_json)
+    return {
+        'basic_causes': basic_causes,
+        'contributing_causes': contributing_causes
+    }
+
+
 def generate_pdf_report(
     accident_data: Dict[str, Any],
     people_data: List[Dict[str, Any]],
@@ -980,6 +1072,9 @@ def generate_pdf_report(
                 else:
                     hyp['justification_image_b64'] = None
         
+        # Extrai recomendações de causas básicas e contribuintes
+        recommendations = extract_recommendations_from_tree(fault_tree_json)
+        
         # Filtra pessoas por tipo
         commission = [p for p in people_data if p.get('person_type') == 'Commission_Member']
         drivers = [p for p in people_data if p.get('person_type') == 'Driver']
@@ -1011,7 +1106,8 @@ def generate_pdf_report(
             fault_tree_html=fault_tree_html,
             evidence_images=evidence_images_b64,
             commission=commission,
-            current_date=current_date
+            current_date=current_date,
+            recommendations=recommendations
         )
         
         # Gera PDF

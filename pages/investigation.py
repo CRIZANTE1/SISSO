@@ -35,7 +35,8 @@ from services.investigation import (
     update_node_is_basic_cause,
     update_node_is_contributing_cause,
     upload_justification_image,
-    update_node_justification_image
+    update_node_justification_image,
+    update_node_recommendation
 )
 from auth.auth_utils import require_login
 
@@ -1622,6 +1623,24 @@ def main():
                                 st.rerun()
                     else:
                         st.warning("⚠️ Nenhum código NBR encontrado para esta categoria.")
+                    
+                    # Campo de recomendação
+                    st.divider()
+                    st.markdown("**💡 Recomendação para esta Causa Básica:**")
+                    recommendation_key = f"recommendation_basic_{node['id']}"
+                    recommendation = st.text_area(
+                        "Descreva as recomendações para prevenir ou corrigir esta causa básica:",
+                        value=node.get('recommendation', ''),
+                        key=recommendation_key,
+                        help="Esta recomendação aparecerá no relatório PDF ao final, na seção de recomendações.",
+                        height=120
+                    )
+                    if recommendation != node.get('recommendation', ''):
+                        if st.button("💾 Salvar Recomendação", key=f"save_recommendation_basic_{node['id']}"):
+                            from services.investigation import update_node_recommendation
+                            if update_node_recommendation(node['id'], recommendation.strip() if recommendation.strip() else None):
+                                st.success("✅ Recomendação salva!")
+                                st.rerun()
         
         if contributing_cause_nodes:
             st.markdown("### 🔗 Causas Contribuintes para Classificação")
@@ -1700,6 +1719,24 @@ def main():
                                 st.rerun()
                     else:
                         st.warning("⚠️ Nenhum código NBR encontrado para esta categoria.")
+                    
+                    # Campo de recomendação
+                    st.divider()
+                    st.markdown("**💡 Recomendação para esta Causa Contribuinte:**")
+                    recommendation_key = f"recommendation_contributing_{node['id']}"
+                    recommendation = st.text_area(
+                        "Descreva as recomendações para prevenir ou corrigir esta causa contribuinte:",
+                        value=node.get('recommendation', ''),
+                        key=recommendation_key,
+                        help="Esta recomendação aparecerá no relatório PDF ao final, na seção de recomendações.",
+                        height=120
+                    )
+                    if recommendation != node.get('recommendation', ''):
+                        if st.button("💾 Salvar Recomendação", key=f"save_recommendation_contributing_{node['id']}"):
+                            from services.investigation import update_node_recommendation
+                            if update_node_recommendation(node['id'], recommendation.strip() if recommendation.strip() else None):
+                                st.success("✅ Recomendação salva!")
+                                st.rerun()
         
         # Se não houver causas básicas nem contribuintes, mostra mensagem
         if not basic_cause_nodes and not contributing_cause_nodes:
