@@ -31,7 +31,9 @@ from services.investigation import (
     build_fault_tree_json,
     get_involved_people,
     upsert_involved_people,
-    get_sites
+    get_sites,
+    update_node_is_basic_cause,
+    update_node_is_contributing_cause
 )
 from auth.auth_utils import require_login
 
@@ -1424,7 +1426,6 @@ def main():
                     # Checkbox para marcar como causa básica ou contribuinte (apenas para nós validados)
                     if current_status == 'validated':
                         st.divider()
-                        from services.investigation import update_node_is_basic_cause, update_node_is_contributing_cause
                         is_basic_cause = node.get('is_basic_cause', False)
                         is_contributing_cause = node.get('is_contributing_cause', False)
                         
