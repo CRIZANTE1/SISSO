@@ -25,6 +25,17 @@ CSS_STYLES = """
     }
 }
 
+@page fault-tree-page {
+    size: A4 landscape;
+    margin: 1cm;
+    @bottom-center {
+        content: "Página " counter(page);
+        font-family: Arial, sans-serif;
+        font-size: 9pt;
+        color: #666;
+    }
+}
+
 body { 
     font-family: 'Arial', sans-serif; 
     font-size: 10pt; 
@@ -284,6 +295,11 @@ body {
 /* Quebra de página */
 .page-break {
     page-break-after: always;
+}
+
+/* Página da árvore em paisagem */
+.fault-tree-landscape {
+    page: fault-tree-page;
 }
 """
 
@@ -901,9 +917,10 @@ def render_fault_tree_html_for_pdf(tree_json: Dict[str, Any]) -> str:
         # Escapa HTML
         label_escaped = html.escape(label).replace('\n', '<br>')
         
-        # Determina forma CSS
+        # Determina forma CSS (mesma lógica do sistema)
         if shape_config['shape'] == 'diamond':
-            shape_style = "width: 200px; height: 200px; position: relative;"
+            # Losango: usa div externa para dimensões e interna para conteúdo
+            shape_style = "width: 220px; height: 220px; position: relative;"
             inner_style = f"position: absolute; top: 0; left: 0; width: 100%; height: 100%; clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%); background-color: {shape_config['bg_color']}; border: 2px solid {shape_config['border_color']}; box-shadow: 0 2px 6px rgba(0,0,0,0.15);"
             content_container = "position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 60%; text-align: center; z-index: 2;"
         elif shape_config['shape'] == 'oval':
@@ -915,7 +932,7 @@ def render_fault_tree_html_for_pdf(tree_json: Dict[str, Any]) -> str:
             inner_style = ""
             content_container = "z-index: 2; position: relative;"
         
-        # Estilo base do nó
+        # Estilo base do nó (wrapper)
         if shape_config['shape'] == 'diamond':
             node_style = f"{shape_style}"
             node_bg_border = inner_style
@@ -939,7 +956,7 @@ def render_fault_tree_html_for_pdf(tree_json: Dict[str, Any]) -> str:
             nbr_code_escaped = html.escape(str(nbr_code))
             nbr_html = f'<div style="margin-top: 6px; font-size: 0.7em; color: #1976d2; font-weight: 600;">NBR: {nbr_code_escaped}</div>'
         
-        # Container do conteúdo
+        # Container do conteúdo do nó
         content_html = f'<div style="{content_container}"><div style="color: {shape_config["text_color"]}; font-weight: 500; font-size: 0.85em; line-height: 1.3; word-wrap: break-word;">{label_escaped}{nbr_html}</div></div>'
         
         # Monta o nó completo
@@ -953,6 +970,8 @@ def render_fault_tree_html_for_pdf(tree_json: Dict[str, Any]) -> str:
         if children:
             children_items = [render_node(child, level + 1) for child in children]
             children_html = "".join(children_items)
+            
+            # Container dos filhos com linhas conectivas
             children_html = f'<div style="position: relative; margin-top: 20px;"><div style="position: absolute; left: 50%; top: 0; width: 2px; height: 20px; background-color: #2196f3; transform: translateX(-50%);"></div><div style="position: absolute; left: 0; right: 0; top: 20px; height: 2px; background-color: #2196f3;"></div><div style="display: flex; flex-wrap: wrap; justify-content: center; align-items: flex-start; gap: 20px; padding-top: 40px;">{children_html}</div></div>'
         
         # Linha conectora ao pai
@@ -969,8 +988,8 @@ def render_fault_tree_html_for_pdf(tree_json: Dict[str, Any]) -> str:
     # Legenda
     legend_html = '<div style="position: absolute; top: 10px; right: 10px; background: white; border: 2px solid #333; padding: 12px; border-radius: 6px; font-size: 0.8em; z-index: 1000; box-shadow: 0 2px 8px rgba(0,0,0,0.2); max-width: 220px;"><div style="font-weight: bold; margin-bottom: 10px; border-bottom: 1px solid #ccc; padding-bottom: 6px;">LEGENDA</div><div style="margin-bottom: 6px;"><strong>H:</strong> Hipótese</div><div style="margin-bottom: 6px;"><strong>CB:</strong> Causa Básica</div><div style="margin-bottom: 6px;"><strong>CC:</strong> Causa Contribuinte</div><div style="margin-bottom: 6px; display: flex; align-items: center; gap: 8px;"><div style="width: 18px; height: 18px; background: #ffcdd2; border: 2px solid #f44336; border-radius: 4px;"></div><span>Evento Topo (Root)</span></div><div style="margin-bottom: 6px; display: flex; align-items: center; gap: 8px;"><div style="width: 18px; height: 18px; clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%); background: #e0e0e0; border: 2px solid #757575;"></div><span>Hipótese</span></div><div style="margin-bottom: 6px; display: flex; align-items: center; gap: 8px;"><div style="width: 18px; height: 18px; clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%); background: #ffcdd2; border: 2px solid #f44336; position: relative;"><span style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: #d32f2f; font-size: 12px;">✕</span></div><span>Descartada</span></div><div style="margin-bottom: 6px; display: flex; align-items: center; gap: 8px;"><div style="width: 18px; height: 18px; background: #fff9c4; border: 2px solid #f9a825; border-radius: 4px;"></div><span>Intermediária</span></div><div style="margin-bottom: 6px; display: flex; align-items: center; gap: 8px;"><div style="width: 18px; height: 18px; background: #c8e6c9; border: 2px solid #4caf50; border-radius: 50%;"></div><span>Causa Básica</span></div><div style="display: flex; align-items: center; gap: 8px;"><div style="width: 18px; height: 18px; background: #bbdefb; border: 2px solid #2196f3; border-radius: 50%;"></div><span>Causa Contribuinte</span></div></div>'
     
-    # HTML completo
-    return f'<div style="position: relative; font-family: Arial, sans-serif; padding: 30px 20px; background: white; min-height: 400px; page-break-inside: avoid; border: 1px solid #e0e0e0; border-radius: 8px;"><div style="text-align: center; margin-bottom: 30px;"><h2 style="margin: 0; color: #333; font-size: 1.5em; font-weight: bold;">ÁRVORE DE FALHAS (FTA)</h2><div style="color: #666; font-size: 0.9em; margin-top: 5px;">{date.today().strftime("%d/%m/%Y")}</div></div>{legend_html}<div style="display: flex; justify-content: center; align-items: flex-start; min-height: 300px; padding: 20px 0;">{tree_html}</div></div>'
+    # HTML completo com classe para página em paisagem
+    return f'<div class="fault-tree-landscape" style="page: fault-tree-page; position: relative; font-family: Arial, sans-serif; padding: 30px 20px; background: white; min-height: 400px; page-break-inside: avoid; border: 1px solid #e0e0e0; border-radius: 8px;"><div style="text-align: center; margin-bottom: 30px;"><h2 style="margin: 0; color: #333; font-size: 1.5em; font-weight: bold;">ÁRVORE DE FALHAS (FTA)</h2><div style="color: #666; font-size: 0.9em; margin-top: 5px;">{date.today().strftime("%d/%m/%Y")}</div></div>{legend_html}<div style="display: flex; justify-content: center; align-items: flex-start; min-height: 300px; padding: 20px 0;">{tree_html}</div></div>'
 
 
 def extract_hypotheses_from_tree(tree_json: Optional[Dict[str, Any]]) -> List[Dict[str, Any]]:
