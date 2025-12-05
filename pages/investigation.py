@@ -1804,7 +1804,10 @@ def main():
                     categories = {
                         'unsafe_act': 'Falha Humana (Ato Inseguro)',
                         'unsafe_condition': 'Condição do Ambiente',
-                        'personal_factor': 'Fator Pessoal'
+                        'personal_factor': 'Fator Pessoal',
+                        'management_failure': 'Falha na Gestão',
+                        'procedure_failure': 'Falha no Procedimento',
+                        'engineering_failure': 'Falha de Engenharia'
                     }
                     
                     # Seleção de categoria
@@ -1812,7 +1815,7 @@ def main():
                         "O que falhou?",
                         options=list(categories.keys()),
                         format_func=lambda x: categories[x],
-                        help="💡 **Ato Inseguro**: Ação incorreta do trabalhador. **Condição do Ambiente**: Problema no ambiente/máquina. **Fator Pessoal**: Característica pessoal que contribuiu.",
+                        help="💡 **Ato Inseguro**: Ação incorreta do trabalhador. **Condição do Ambiente**: Problema no ambiente/máquina. **Fator Pessoal**: Característica pessoal que contribuiu. **Falha na Gestão**: Problemas na gestão/organização. **Falha no Procedimento**: Procedimento inadequado ou ausente. **Falha de Engenharia**: Problema no projeto/engenharia.",
                         key=f"category_basic_{node['id']}"
                     )
                     
@@ -1900,7 +1903,10 @@ def main():
                     categories = {
                         'unsafe_act': 'Falha Humana (Ato Inseguro)',
                         'unsafe_condition': 'Condição do Ambiente',
-                        'personal_factor': 'Fator Pessoal'
+                        'personal_factor': 'Fator Pessoal',
+                        'management_failure': 'Falha na Gestão',
+                        'procedure_failure': 'Falha no Procedimento',
+                        'engineering_failure': 'Falha de Engenharia'
                     }
                     
                     # Seleção de categoria
@@ -1908,7 +1914,7 @@ def main():
                         "O que falhou?",
                         options=list(categories.keys()),
                         format_func=lambda x: categories[x],
-                        help="💡 **Ato Inseguro**: Ação incorreta do trabalhador. **Condição do Ambiente**: Problema no ambiente/máquina. **Fator Pessoal**: Característica pessoal que contribuiu.",
+                        help="💡 **Ato Inseguro**: Ação incorreta do trabalhador. **Condição do Ambiente**: Problema no ambiente/máquina. **Fator Pessoal**: Característica pessoal que contribuiu. **Falha na Gestão**: Problemas na gestão/organização. **Falha no Procedimento**: Procedimento inadequado ou ausente. **Falha de Engenharia**: Problema no projeto/engenharia.",
                         key=f"category_{node['id']}"
                     )
                     
