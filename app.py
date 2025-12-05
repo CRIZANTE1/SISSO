@@ -12,11 +12,42 @@ st.set_page_config(
     menu_items=None  # Remove menu padrão do Streamlit
 )
 
-# CSS para garantir que menus apareçam apenas no topo
+# CSS e JavaScript para garantir que menus apareçam apenas no topo e remover completamente qualquer navegação da sidebar
 st.markdown("""
 <style>
-    /* Esconde qualquer navegação duplicada na sidebar */
-    [data-testid="stSidebar"] [data-testid="stNavigation"] {
+    /* Esconde completamente qualquer navegação na sidebar - seletores abrangentes */
+    [data-testid="stSidebar"] [data-testid="stNavigation"],
+    [data-testid="stSidebar"] nav,
+    [data-testid="stSidebar"] .stNavigation,
+    [data-testid="stSidebar"] [class*="navigation"],
+    [data-testid="stSidebar"] [class*="Navigation"],
+    [data-testid="stSidebar"] ul[role="navigation"],
+    [data-testid="stSidebar"] div[role="navigation"],
+    [data-testid="stSidebar"] [data-testid="stSidebarNav"],
+    [data-testid="stSidebar"] [class*="sidebar-nav"],
+    [data-testid="stSidebar"] [class*="page-nav"],
+    [data-testid="stSidebar"] [class*="stPageLink"],
+    [data-testid="stSidebar"] [class*="stPageLink-NavLink"],
+    [data-testid="stSidebar"] a[href*="page="],
+    [data-testid="stSidebar"] [class*="css-"]:has(a[href*="page="]) {
+        display: none !important;
+        visibility: hidden !important;
+        height: 0 !important;
+        overflow: hidden !important;
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+    
+    /* Remove todos os elementos filhos de navegação */
+    [data-testid="stSidebar"] [data-testid="stNavigation"] *,
+    [data-testid="stSidebar"] nav *,
+    [data-testid="stSidebar"] [data-testid="stSidebarNav"] * {
+        display: none !important;
+    }
+    
+    /* Remove links de páginas na sidebar */
+    [data-testid="stSidebar"] a[href*="page="],
+    [data-testid="stSidebar"] button[data-testid*="page"] {
         display: none !important;
     }
     
@@ -24,7 +55,52 @@ st.markdown("""
     [data-testid="stHeader"] {
         z-index: 999;
     }
+    
+    /* Remove qualquer lista de páginas na sidebar */
+    [data-testid="stSidebar"] ul:has(li a[href*="page="]),
+    [data-testid="stSidebar"] ol:has(li a[href*="page="]) {
+        display: none !important;
+    }
 </style>
+<script>
+    // Remove dinamicamente qualquer menu de navegação que apareça na sidebar
+    function removeSidebarNavigation() {
+        const sidebar = document.querySelector('[data-testid="stSidebar"]');
+        if (sidebar) {
+            // Remove elementos de navegação
+            const navElements = sidebar.querySelectorAll(
+                'nav, [data-testid="stNavigation"], [data-testid="stSidebarNav"], ' +
+                '[class*="navigation"], [class*="Navigation"], [class*="page-nav"], ' +
+                'a[href*="page="], [class*="stPageLink"]'
+            );
+            navElements.forEach(el => {
+                el.style.display = 'none';
+                el.remove();
+            });
+            
+            // Remove listas que contenham links de páginas
+            const lists = sidebar.querySelectorAll('ul, ol');
+            lists.forEach(list => {
+                const pageLinks = list.querySelectorAll('a[href*="page="]');
+                if (pageLinks.length > 0) {
+                    list.style.display = 'none';
+                    list.remove();
+                }
+            });
+        }
+    }
+    
+    // Executa imediatamente e após o carregamento
+    removeSidebarNavigation();
+    window.addEventListener('load', removeSidebarNavigation);
+    document.addEventListener('DOMContentLoaded', removeSidebarNavigation);
+    
+    // Observa mudanças no DOM e remove navegação se aparecer
+    const observer = new MutationObserver(removeSidebarNavigation);
+    if (document.body) {
+        observer.observe(document.body, { childList: true, subtree: true });
+    }
+</script>
 """, unsafe_allow_html=True)
 
 def main():
