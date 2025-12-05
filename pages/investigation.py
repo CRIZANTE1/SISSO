@@ -1723,6 +1723,9 @@ def main():
         st.header("📋 Passo 4: Classificação Oficial (NBR 14280)")
         st.markdown("**O que falhou na norma?** Classifique as causas confirmadas conforme os padrões NBR 14280.")
         
+        # Busca todos os padrões NBR
+        nbr_standards_list = get_nbr_standards()
+        
         # Busca causas básicas e contribuintes (validadas E marcadas)
         nodes = get_tree_nodes(accident_id)
         basic_cause_nodes = [n for n in nodes if n['status'] == 'validated' and n.get('is_basic_cause', False) == True]
