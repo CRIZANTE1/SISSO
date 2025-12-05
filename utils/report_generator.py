@@ -56,11 +56,6 @@ body {
     border-collapse: collapse;
 }
 
-.logo { 
-    height: 50px; 
-    max-width: 150px;
-}
-
 .vibra-green { 
     background-color: #d3d3d3; 
     color: #333; 
@@ -316,15 +311,10 @@ HTML_TEMPLATE = """
     <div class="header">
         <table class="header-table">
             <tr>
-                <td width="20%" style="vertical-align: middle;">
-                    <div style="background-color: #d3d3d3; color: #333; padding: 10px; text-align: center; font-weight: bold; font-size: 16pt;">
-                        VIBRA
-                    </div>
-                </td>
-                <td width="60%" style="text-align: center; font-weight: bold; font-size: 14pt; vertical-align: middle;">
+                <td width="70%" style="text-align: center; font-weight: bold; font-size: 14pt; vertical-align: middle;">
                     Relatório de Análise e Investigação de Acidente
                 </td>
-                <td width="20%" style="text-align: right; font-size: 9pt; vertical-align: middle;">
+                <td width="30%" style="text-align: right; font-size: 9pt; vertical-align: middle;">
                     Registro: {{ accident.get('registry_number', 'N/A') }}<br>
                     Data: {{ current_date }}
                 </td>

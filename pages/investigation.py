@@ -2044,10 +2044,12 @@ def main():
                     verified_causes = []
                     
                     # Processa nós validados (já vem com join de nbr_standards)
+                    # IMPORTANTE: Só inclui causas que foram validadas E classificadas com código NBR
                     for node in validated_nodes:
                         node_label = node.get('label', 'N/A')
                         nbr_info = node.get('nbr_standards')
                         
+                        # Só adiciona se tiver código NBR (foi classificado)
                         if nbr_info:
                             # nbr_standards vem do join (pode ser dict ou list)
                             if isinstance(nbr_info, dict):
@@ -2063,13 +2065,7 @@ def main():
                                     'nbr_code': nbr.get('code', 'N/A'),
                                     'nbr_description': nbr.get('description', 'N/A')
                                 })
-                        else:
-                            # Nó validado mas sem código NBR ainda
-                            verified_causes.append({
-                                'label': node_label,
-                                'nbr_code': 'Pendente',
-                                'nbr_description': 'Aguardando classificação NBR'
-                            })
+                        # Se não tiver código NBR, não adiciona à lista (foi removido o else)
                     
                     # 5. Busca evidências
                     evidence_list = get_evidence(accident_id)
