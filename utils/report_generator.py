@@ -605,7 +605,11 @@ HTML_TEMPLATE = """
     {% for hyp in hypotheses %}
     <div style="margin-bottom: 20px; page-break-inside: avoid;">
         <div class="vibra-green" style="margin-top: 10px; margin-bottom: 8px;">
-            Hipótese {{ loop.index }}: {{ hyp.get('label', 'N/A') }}
+            {% if hyp.get('node_number') %}
+                Hipótese {{ hyp.get('node_number') }}: {{ hyp.get('label', 'N/A') }}
+            {% else %}
+                Hipótese {{ loop.index }}: {{ hyp.get('label', 'N/A') }}
+            {% endif %}
         </div>
         <table class="form-table">
             <tr>
@@ -1017,16 +1021,55 @@ def extract_hypotheses_from_tree(tree_json: Optional[Dict[str, Any]]) -> List[Di
     """
     Extrai todas as hipóteses da árvore de falhas recursivamente.
     Retorna lista de hipóteses com label, status, nbr_code, nbr_description.
+    Inclui o número da hipótese (H1, H2, etc.) para corresponder à numeração da árvore.
     """
     if not tree_json:
         return []
     
     hypotheses = []
     
+    # Contadores para numeração automática (mesma lógica da renderização da árvore)
+    hypothesis_counter = 0
+    basic_cause_counter = 0
+    contributing_cause_counter = 0
+    
+    def get_node_number(node_type: str, status: str, has_children: bool, is_basic_cause: bool = False, is_contributing_cause: bool = False) -> str:
+        """Retorna o número do nó (H1, H2, CB1, CB2, CC1, CC2, etc.) - mesma lógica da árvore"""
+        nonlocal hypothesis_counter, basic_cause_counter, contributing_cause_counter
+        
+        if node_type == 'root':
+            return ""
+        
+        if is_basic_cause:
+            basic_cause_counter += 1
+            return f"CB{basic_cause_counter}"
+        elif is_contributing_cause:
+            contributing_cause_counter += 1
+            return f"CC{contributing_cause_counter}"
+        elif node_type == 'hypothesis':
+            hypothesis_counter += 1
+            return f"H{hypothesis_counter}"
+        elif node_type == 'fact' and has_children:
+            hypothesis_counter += 1
+            return f"H{hypothesis_counter}"
+        elif status == 'validated' and has_children and node_type != 'root':
+            hypothesis_counter += 1
+            return f"H{hypothesis_counter}"
+        elif status in ['pending', 'discarded'] and node_type != 'root':
+            hypothesis_counter += 1
+            return f"H{hypothesis_counter}"
+        return ""
+    
     def extract_recursive(node: Dict[str, Any]):
         """Função recursiva para extrair hipóteses"""
+        nonlocal hypothesis_counter, basic_cause_counter, contributing_cause_counter
+        
         node_type = node.get('type', '')
         status = node.get('status', 'pending')
+        children = node.get('children', [])
+        has_children = len(children) > 0
+        is_basic_cause = node.get('is_basic_cause', False)
+        is_contributing_cause = node.get('is_contributing_cause', False)
         
         # Considera como hipótese:
         # 1. Nós do tipo 'hypothesis'
@@ -1035,15 +1078,20 @@ def extract_hypotheses_from_tree(tree_json: Optional[Dict[str, Any]]) -> List[Di
         is_hypothesis = (
             node_type == 'hypothesis' or
             (node_type != 'root' and status in ['pending', 'discarded', 'validated']) or
-            (node_type == 'fact' and node.get('children'))
+            (node_type == 'fact' and has_children)
         )
         
         if is_hypothesis and node_type != 'root':
             justification = node.get('justification', '')
             
+            # Calcula o número da hipótese (mesma lógica da árvore)
+            # IMPORTANTE: Sempre calcula o número, mesmo que não vá adicionar à lista,
+            # para manter a numeração correta na árvore
+            node_number = get_node_number(node_type, status, has_children, is_basic_cause, is_contributing_cause)
+            
             # Exclui hipóteses do tipo 'fact' sem justificativa (null ou vazio)
             if node_type == 'fact' and not justification:
-                # Não adiciona à lista de hipóteses
+                # Não adiciona à lista de hipóteses, mas o contador já foi incrementado acima
                 pass
             else:
                 hyp_data = {
@@ -1052,7 +1100,8 @@ def extract_hypotheses_from_tree(tree_json: Optional[Dict[str, Any]]) -> List[Di
                     'nbr_code': node.get('nbr_code'),
                     'nbr_description': node.get('nbr_description', ''),
                     'justification': justification,  # Justificativa para confirmação/descarte
-                    'justification_image_url': node.get('justification_image_url')  # URL da imagem da justificativa
+                    'justification_image_url': node.get('justification_image_url'),  # URL da imagem da justificativa
+                    'node_number': node_number  # Número da hipótese (H1, H2, etc.) para corresponder à árvore
                 }
                 hypotheses.append(hyp_data)
         
