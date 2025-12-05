@@ -9,7 +9,7 @@ from datetime import datetime
 from typing import Dict, Any, List, Optional
 import io
 
-# --- 1. Estilos CSS (Baseado na Identidade Visual Vibra) ---
+# --- 1. Estilos CSS ---
 CSS_STYLES = """
 @page {
     size: A4;
@@ -46,7 +46,7 @@ body {
 .header { 
     position: running(header); 
     width: 100%; 
-    border-bottom: 3px solid #005f2f; 
+    border-bottom: 3px solid #d3d3d3; 
     padding-bottom: 10px; 
     margin-bottom: 20px; 
 }
@@ -62,8 +62,8 @@ body {
 }
 
 .vibra-green { 
-    background-color: #005f2f; 
-    color: white; 
+    background-color: #d3d3d3; 
+    color: #333; 
     font-weight: bold; 
     padding: 8px; 
     text-align: left;
@@ -75,8 +75,8 @@ body {
     margin-top: 20px; 
     margin-bottom: 10px; 
     text-transform: uppercase;
-    color: #005f2f;
-    border-bottom: 2px solid #005f2f;
+    color: #666;
+    border-bottom: 2px solid #d3d3d3;
     padding-bottom: 5px;
 }
 
@@ -247,7 +247,7 @@ body {
     font-size: 28pt; 
     font-weight: bold; 
     margin-top: 250px;
-    color: #005f2f;
+    color: #666;
 }
 
 .cover-subtitle { 
@@ -281,7 +281,7 @@ body {
 
 /* Timeline */
 .timeline-item {
-    border-left: 3px solid #005f2f;
+    border-left: 3px solid #d3d3d3;
     padding-left: 15px;
     margin: 10px 0;
     page-break-inside: avoid;
@@ -289,7 +289,7 @@ body {
 
 .timeline-time {
     font-weight: bold;
-    color: #005f2f;
+    color: #666;
 }
 
 /* Quebra de página */
@@ -317,7 +317,7 @@ HTML_TEMPLATE = """
         <table class="header-table">
             <tr>
                 <td width="20%" style="vertical-align: middle;">
-                    <div style="background-color: #005f2f; color: white; padding: 10px; text-align: center; font-weight: bold; font-size: 16pt;">
+                    <div style="background-color: #d3d3d3; color: #333; padding: 10px; text-align: center; font-weight: bold; font-size: 16pt;">
                         VIBRA
                     </div>
                 </td>
@@ -714,7 +714,7 @@ HTML_TEMPLATE = """
     <div class="vibra-green" style="margin-top: 15px; margin-bottom: 10px;">9.1. Recomendações para Causas Básicas</div>
     {% for rec in recommendations.get('basic_causes') %}
     <div style="margin-bottom: 20px; page-break-inside: avoid;">
-        <div style="font-weight: bold; color: #005f2f; margin-bottom: 5px; font-size: 11pt;">
+        <div style="font-weight: bold; color: #666; margin-bottom: 5px; font-size: 11pt;">
             {{ loop.index }}. {{ rec.get('label', 'N/A') }}
         </div>
         {% if rec.get('nbr_code') %}
@@ -722,7 +722,7 @@ HTML_TEMPLATE = """
             <strong>Código NBR:</strong> {{ rec.get('nbr_code', 'N/A') }} - {{ rec.get('nbr_description', '') }}
         </div>
         {% endif %}
-        <div style="padding: 10px; background-color: #f9f9f9; border-left: 4px solid #005f2f; margin-top: 5px;">
+        <div style="padding: 10px; background-color: #f9f9f9; border-left: 4px solid #d3d3d3; margin-top: 5px;">
             {{ rec.get('recommendation', 'Nenhuma recomendação fornecida.') }}
         </div>
     </div>
@@ -733,7 +733,7 @@ HTML_TEMPLATE = """
     <div class="vibra-green" style="margin-top: 20px; margin-bottom: 10px;">9.2. Recomendações para Causas Contribuintes</div>
     {% for rec in recommendations.get('contributing_causes') %}
     <div style="margin-bottom: 20px; page-break-inside: avoid;">
-        <div style="font-weight: bold; color: #005f2f; margin-bottom: 5px; font-size: 11pt;">
+        <div style="font-weight: bold; color: #666; margin-bottom: 5px; font-size: 11pt;">
             {{ loop.index }}. {{ rec.get('label', 'N/A') }}
         </div>
         {% if rec.get('nbr_code') %}
