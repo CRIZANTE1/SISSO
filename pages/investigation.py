@@ -1518,8 +1518,14 @@ def main():
                 has_children = children_count.get(node['id'], 0) > 0
                 num_children = children_count.get(node['id'], 0)
                 
+                # Verifica se é causa contribuinte
+                is_contributing = node.get('is_contributing_cause', False)
+                
                 # Determina tipo e status para exibição
-                if node_type == 'fact' and has_children:
+                if is_contributing:
+                    # Causa contribuinte - usa símbolo de mão
+                    node_type_label = "🤝 Causa Contribuinte"
+                elif node_type == 'fact' and has_children:
                     # Causa intermediária (fact validada com filhos)
                     node_type_label = "🔗 Causa Intermediária"
                 elif node_type == 'fact' and current_status == 'pending' and not has_children:
@@ -1733,7 +1739,7 @@ def main():
                         
                         contributing_cause_key = f"is_contributing_cause_{node['id']}"
                         new_is_contributing_cause = st.checkbox(
-                            "🔗 Marcar como Causa Contribuinte",
+                            "🤝 Marcar como Causa Contribuinte",
                             value=is_contributing_cause,
                             key=contributing_cause_key,
                             help="Marque esta opção se esta é uma causa contribuinte (fator que contribui para o acidente mas não é uma causa básica). Causas contribuintes aparecem como oval azul na árvore."
@@ -1882,11 +1888,11 @@ def main():
                                 st.rerun()
         
         if contributing_cause_nodes:
-            st.markdown("### 🔗 Causas Contribuintes para Classificação")
+            st.markdown("### 🤝 Causas Contribuintes para Classificação")
             st.info(f"💡 Você tem **{len(contributing_cause_nodes)}** causa(s) contribuinte(s) confirmada(s) para classificar.")
             
             for node in contributing_cause_nodes:
-                with st.expander(f"🔗 {node['label'][:60]}...", expanded=True):
+                with st.expander(f"🤝 {node['label'][:60]}...", expanded=True):
                     st.markdown(f"**Causa Contribuinte:** {node['label']}")
                     st.info("💡 Esta é uma causa contribuinte confirmada. Classifique-a conforme os padrões NBR 14280.")
                     
@@ -1986,7 +1992,7 @@ def main():
                 contributing_cause_count = len([n for n in validated_nodes if n.get('is_contributing_cause', False) == True])
                 if basic_cause_count == 0 and contributing_cause_count == 0:
                     st.warning("⚠️ Você tem **causas confirmadas**, mas nenhuma foi marcada como **Causa Básica** ou **Causa Contribuinte**.")
-                    st.info("💡 **O que fazer:** Volte ao passo anterior (Árvore de Porquês) e marque as causas usando os checkboxes '🎯 Marcar como Causa Básica' ou '🔗 Marcar como Causa Contribuinte' na seção de validação de hipóteses.")
+                    st.info("💡 **O que fazer:** Volte ao passo anterior (Árvore de Porquês) e marque as causas usando os checkboxes '🎯 Marcar como Causa Básica' ou '🤝 Marcar como Causa Contribuinte' na seção de validação de hipóteses.")
                 else:
                     st.info("💡 Aguarde... recarregando a página.")
                     st.rerun()
