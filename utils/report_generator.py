@@ -908,17 +908,22 @@ def render_fault_tree_html_for_pdf(tree_json: Dict[str, Any]) -> str:
         label_escaped = html.escape(label).replace('\n', '<br>')
         
         # Determina forma CSS (tamanhos otimizados para A4 paisagem - idêntico ao sistema)
+        # Usando SVG para losango (compatível com WeasyPrint)
         if shape_config['shape'] == 'diamond':
-            # Losango: usa div externa para dimensões e interna para conteúdo
+            # Losango: usa SVG para compatibilidade com WeasyPrint
             shape_style = "width: 140px; height: 140px; position: relative;"
-            inner_style = f"position: absolute; top: 0; left: 0; width: 100%; height: 100%; clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%); background-color: {shape_config['bg_color']}; border: 2px solid {shape_config['border_color']}; box-shadow: 0 2px 6px rgba(0,0,0,0.15);"
-            content_container = "position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 70%; text-align: center; z-index: 2;"
+            # SVG para losango (compatível com WeasyPrint)
+            diamond_svg = f'''<svg width="140" height="140" style="position: absolute; top: 0; left: 0; z-index: 1;">
+                <polygon points="70,0 140,70 70,140 0,70" fill="{shape_config['bg_color']}" stroke="{shape_config['border_color']}" stroke-width="2"/>
+            </svg>'''
+            inner_style = diamond_svg
+            content_container = "position: absolute; top: 50%; left: 50%; margin-top: -50%; margin-left: -35%; width: 70%; text-align: center; z-index: 2;"
         elif shape_config['shape'] == 'oval':
-            shape_style = "border-radius: 50%; width: 130px; min-height: 50px; display: flex; align-items: center; justify-content: center; padding: 8px 12px; position: relative;"
+            shape_style = "border-radius: 50%; width: 130px; min-height: 50px; padding: 8px 12px; position: relative; text-align: center; vertical-align: middle;"
             inner_style = ""
             content_container = "z-index: 2; position: relative;"
         else:
-            shape_style = f"border-radius: {shape_config['border_radius']}; width: 160px; min-height: 50px; display: flex; align-items: center; justify-content: center; padding: 8px 12px; position: relative;"
+            shape_style = f"border-radius: {shape_config['border_radius']}; width: 160px; min-height: 50px; padding: 8px 12px; position: relative; text-align: center; vertical-align: middle;"
             inner_style = ""
             content_container = "z-index: 2; position: relative;"
         
@@ -927,18 +932,18 @@ def render_fault_tree_html_for_pdf(tree_json: Dict[str, Any]) -> str:
             node_style = f"{shape_style}"
             node_bg_border = inner_style
         else:
-            node_style = f"{shape_style} background-color: {shape_config['bg_color']}; border: 2px solid {shape_config['border_color']}; box-shadow: 0 2px 6px rgba(0,0,0,0.15);"
+            node_style = f"{shape_style} background-color: {shape_config['bg_color']}; border: 2px solid {shape_config['border_color']};"
             node_bg_border = ""
         
-        # Número do nó
+        # Número do nó (compatível com WeasyPrint - sem flexbox)
         number_html = ""
         if node_number:
-            number_html = f'<div style="position: absolute; top: -8px; left: -8px; background-color: {shape_config["border_color"]}; color: white; width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 0.65em; box-shadow: 0 2px 4px rgba(0,0,0,0.3); z-index: 10;">{node_number}</div>'
+            number_html = f'<div style="position: absolute; top: -8px; left: -8px; background-color: {shape_config["border_color"]}; color: white; width: 22px; height: 22px; border-radius: 50%; text-align: center; line-height: 22px; font-weight: bold; font-size: 0.65em; z-index: 10;">{node_number}</div>'
         
-        # X para descartado
+        # X para descartado (compatível com WeasyPrint - sem transform)
         discard_x = ""
         if status == 'discarded':
-            discard_x = '<div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 2em; color: #d32f2f; font-weight: bold; pointer-events: none; z-index: 5; text-shadow: 1px 1px 3px rgba(255,255,255,0.9);">✕</div>'
+            discard_x = '<div style="position: absolute; top: 50%; left: 50%; margin-top: -0.5em; margin-left: -0.3em; font-size: 2em; color: #d32f2f; font-weight: bold; pointer-events: none; z-index: 5;">✕</div>'
         
         # Código NBR
         nbr_html = ""
@@ -951,7 +956,7 @@ def render_fault_tree_html_for_pdf(tree_json: Dict[str, Any]) -> str:
         
         # Monta o nó completo
         if shape_config['shape'] == 'diamond':
-            node_html_inner = f'<div style="{node_style} margin: 6px;">{number_html}<div style="{node_bg_border}"></div>{discard_x}{content_html}</div>'
+            node_html_inner = f'<div style="{node_style} margin: 6px;">{number_html}{node_bg_border}{discard_x}{content_html}</div>'
         else:
             node_html_inner = f'<div style="{node_style} margin: 6px;">{number_html}{discard_x}{content_html}</div>'
         
@@ -961,16 +966,16 @@ def render_fault_tree_html_for_pdf(tree_json: Dict[str, Any]) -> str:
             children_items = [render_node(child, level + 1) for child in children]
             children_html = "".join(children_items)
             
-            # Container dos filhos com linhas conectivas (otimizado para A4 paisagem)
-            children_html = f'<div style="position: relative; margin-top: 12px;"><div style="position: absolute; left: 50%; top: 0; width: 2px; height: 12px; background-color: #2196f3; transform: translateX(-50%);"></div><div style="position: absolute; left: 0; right: 0; top: 12px; height: 2px; background-color: #2196f3;"></div><div style="display: flex; flex-wrap: wrap; justify-content: center; align-items: flex-start; gap: 12px; padding-top: 25px;">{children_html}</div></div>'
+            # Container dos filhos com linhas conectivas (otimizado para A4 paisagem - compatível com WeasyPrint)
+            children_html = f'<div style="position: relative; margin-top: 12px;"><div style="position: absolute; left: 50%; top: 0; width: 2px; height: 12px; background-color: #2196f3; margin-left: -1px;"></div><div style="position: absolute; left: 0; right: 0; top: 12px; height: 2px; background-color: #2196f3;"></div><div style="text-align: center; padding-top: 25px;">{children_html}</div></div>'
         
-        # Linha conectora ao pai
+        # Linha conectora ao pai (compatível com WeasyPrint - sem transform)
         connector = ""
         if level > 0:
-            connector = '<div style="position: absolute; left: 50%; top: -12px; width: 2px; height: 12px; background-color: #2196f3; transform: translateX(-50%);"></div>'
+            connector = '<div style="position: absolute; left: 50%; top: -12px; width: 2px; height: 12px; background-color: #2196f3; margin-left: -1px;"></div>'
         
-        # HTML completo do nó
-        return f'<div style="position: relative; display: inline-flex; flex-direction: column; align-items: center;">{connector}{node_html_inner}{children_html}</div>'
+        # HTML completo do nó (compatível com WeasyPrint - sem flexbox)
+        return f'<div style="position: relative; display: inline-block; text-align: center; vertical-align: top;">{connector}{node_html_inner}{children_html}</div>'
     
     # Renderiza a árvore completa
     tree_html = render_node(tree_json, level=0)
@@ -978,8 +983,8 @@ def render_fault_tree_html_for_pdf(tree_json: Dict[str, Any]) -> str:
     # Legenda (otimizada para A4 paisagem - idêntica ao sistema)
     legend_html = '<div style="position: absolute; top: 8px; right: 8px; background: white; border: 2px solid #333; padding: 8px; border-radius: 4px; font-size: 0.7em; z-index: 1000; box-shadow: 0 2px 6px rgba(0,0,0,0.2); max-width: 180px;"><div style="font-weight: bold; margin-bottom: 6px; border-bottom: 1px solid #ccc; padding-bottom: 4px; font-size: 0.9em;">LEGENDA</div><div style="margin-bottom: 4px;"><strong>H:</strong> Hipótese</div><div style="margin-bottom: 4px;"><strong>CB:</strong> Causa Básica</div><div style="margin-bottom: 4px;"><strong>CC:</strong> Causa Contribuinte</div><div style="margin-bottom: 4px; display: flex; align-items: center; gap: 6px;"><div style="width: 14px; height: 14px; background: #ffcdd2; border: 2px solid #f44336; border-radius: 3px;"></div><span>Evento Topo</span></div><div style="margin-bottom: 4px; display: flex; align-items: center; gap: 6px;"><div style="width: 14px; height: 14px; clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%); background: #e0e0e0; border: 2px solid #757575;"></div><span>Hipótese</span></div><div style="margin-bottom: 4px; display: flex; align-items: center; gap: 6px;"><div style="width: 14px; height: 14px; clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%); background: #ffcdd2; border: 2px solid #f44336; position: relative;"><span style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: #d32f2f; font-size: 10px;">✕</span></div><span>Descartada</span></div><div style="margin-bottom: 4px; display: flex; align-items: center; gap: 6px;"><div style="width: 14px; height: 14px; background: #fff9c4; border: 2px solid #f9a825; border-radius: 3px;"></div><span>Intermediária</span></div><div style="margin-bottom: 4px; display: flex; align-items: center; gap: 6px;"><div style="width: 14px; height: 14px; background: #c8e6c9; border: 2px solid #4caf50; border-radius: 50%;"></div><span>Causa Básica</span></div><div style="display: flex; align-items: center; gap: 6px;"><div style="width: 14px; height: 14px; background: #bbdefb; border: 2px solid #2196f3; border-radius: 50%;"></div><span>Causa Contribuinte</span></div></div>'
     
-    # HTML completo com classe para página em paisagem (otimizado para A4 paisagem - idêntico ao sistema)
-    return f'<div class="fault-tree-landscape" style="page: fault-tree-page; position: relative; font-family: Arial, sans-serif; padding: 15px 10px; background: white; min-height: 250px; page-break-inside: avoid; border: 1px solid #e0e0e0; border-radius: 8px;"><div style="text-align: center; margin-bottom: 15px;"><h2 style="margin: 0; color: #333; font-size: 1.2em; font-weight: bold;">ÁRVORE DE FALHAS (FTA)</h2><div style="color: #666; font-size: 0.8em; margin-top: 3px;">{date.today().strftime("%d/%m/%Y")}</div></div>{legend_html}<div style="display: flex; justify-content: center; align-items: flex-start; min-height: 180px; padding: 10px 0;">{tree_html}</div></div>'
+    # HTML completo com classe para página em paisagem (otimizado para A4 paisagem - compatível com WeasyPrint)
+    return f'<div class="fault-tree-landscape" style="page: fault-tree-page; position: relative; font-family: Arial, sans-serif; padding: 15px 10px; background: white; min-height: 250px; page-break-inside: avoid; border: 1px solid #e0e0e0; border-radius: 8px;"><div style="text-align: center; margin-bottom: 15px;"><h2 style="margin: 0; color: #333; font-size: 1.2em; font-weight: bold;">ÁRVORE DE FALHAS (FTA)</h2><div style="color: #666; font-size: 0.8em; margin-top: 3px;">{date.today().strftime("%d/%m/%Y")}</div></div>{legend_html}<div style="text-align: center; min-height: 180px; padding: 10px 0;">{tree_html}</div></div>'
 
 
 def extract_hypotheses_from_tree(tree_json: Optional[Dict[str, Any]]) -> List[Dict[str, Any]]:
