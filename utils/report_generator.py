@@ -880,48 +880,48 @@ def render_fault_tree_html_for_pdf(tree_json: Dict[str, Any]) -> str:
         node_number = get_node_number(node_type, status, has_children, is_basic_cause, is_contributing_cause)
         shape_config = get_node_shape(node_type, status, has_children, is_basic_cause, is_contributing_cause)
         
-        # Trunca label se muito longo (max 60 caracteres)
-        label_display = label[:60] + '...' if len(label) > 60 else label
+        # Trunca label se muito longo (max 50 caracteres)
+        label_display = label[:50] + '...' if len(label) > 50 else label
         label_escaped = html.escape(label_display).replace('\n', '<br>')
         
-        # Renderiza conteúdo do nó com tamanhos reduzidos para A4 paisagem
+        # Renderiza conteúdo do nó com tamanhos MUITO reduzidos para A4 paisagem
         if shape_config['shape'] == 'diamond':
-            # Losango usando SVG - REDUZIDO
+            # Losango usando SVG - MUITO REDUZIDO
             node_content = f'''
-            <div style="position: relative; width: 80px; height: 80px; margin: 0 auto;">
-                <svg width="80" height="80" style="position: absolute; top: 0; left: 0;">
-                    <polygon points="40,3 77,40 40,77 3,40" 
+            <div style="position: relative; width: 60px; height: 60px; margin: 0 auto;">
+                <svg width="60" height="60" style="position: absolute; top: 0; left: 0;">
+                    <polygon points="30,2 58,30 30,58 2,30" 
                              fill="{shape_config['bg_color']}" 
                              stroke="{shape_config['border_color']}" 
-                             stroke-width="1.5"/>
+                             stroke-width="1"/>
                 </svg>
-                <div style="position: absolute; top: 50%; left: 50%; width: 60px; margin-left: -30px; margin-top: -15px; text-align: center; font-size: 6pt; line-height: 1.1; color: {shape_config['text_color']};">
+                <div style="position: absolute; top: 50%; left: 50%; width: 50px; margin-left: -25px; margin-top: -12px; text-align: center; font-size: 5pt; line-height: 1.0; color: {shape_config['text_color']};">
                     {label_escaped}
                 </div>
-                {f'<div style="position: absolute; top: 50%; left: 50%; margin-left: -10px; margin-top: -10px; font-size: 20px; color: #d32f2f; font-weight: bold;">✕</div>' if status == 'discarded' else ''}
-                {f'<div style="position: absolute; top: -3px; left: -3px; background-color: {shape_config["border_color"]}; color: white; width: 16px; height: 16px; border-radius: 50%; text-align: center; line-height: 16px; font-weight: bold; font-size: 7pt;">{node_number}</div>' if node_number else ''}
+                {f'<div style="position: absolute; top: 50%; left: 50%; margin-left: -8px; margin-top: -8px; font-size: 16px; color: #d32f2f; font-weight: bold;">✕</div>' if status == 'discarded' else ''}
+                {f'<div style="position: absolute; top: -2px; left: -2px; background-color: {shape_config["border_color"]}; color: white; width: 14px; height: 14px; border-radius: 50%; text-align: center; line-height: 14px; font-weight: bold; font-size: 6pt;">{node_number}</div>' if node_number else ''}
             </div>
             '''
         elif shape_config['shape'] == 'oval':
-            # Oval - REDUZIDO
+            # Oval - MUITO REDUZIDO
             node_content = f'''
-            <div style="position: relative; width: 90px; min-height: 45px; margin: 0 auto; background-color: {shape_config['bg_color']}; border: 1.5px solid {shape_config['border_color']}; border-radius: 30px; padding: 6px 10px;">
-                <div style="text-align: center; font-size: 6pt; line-height: 1.1; color: {shape_config['text_color']};">
+            <div style="position: relative; width: 70px; min-height: 35px; margin: 0 auto; background-color: {shape_config['bg_color']}; border: 1px solid {shape_config['border_color']}; border-radius: 25px; padding: 4px 8px;">
+                <div style="text-align: center; font-size: 5pt; line-height: 1.0; color: {shape_config['text_color']};">
                     {label_escaped}
-                    {f'<div style="margin-top: 2px; font-size: 5.5pt; color: #1976d2; font-weight: 600;">NBR: {html.escape(str(nbr_code))}</div>' if nbr_code else ''}
+                    {f'<div style="margin-top: 1px; font-size: 4.5pt; color: #1976d2; font-weight: 600;">NBR: {html.escape(str(nbr_code))}</div>' if nbr_code else ''}
                 </div>
-                {f'<div style="position: absolute; top: -3px; left: -3px; background-color: {shape_config["border_color"]}; color: white; width: 16px; height: 16px; border-radius: 50%; text-align: center; line-height: 16px; font-weight: bold; font-size: 7pt;">{node_number}</div>' if node_number else ''}
+                {f'<div style="position: absolute; top: -2px; left: -2px; background-color: {shape_config["border_color"]}; color: white; width: 14px; height: 14px; border-radius: 50%; text-align: center; line-height: 14px; font-weight: bold; font-size: 6pt;">{node_number}</div>' if node_number else ''}
             </div>
             '''
         else:
-            # Retângulo arredondado - REDUZIDO
+            # Retângulo arredondado - MUITO REDUZIDO
             node_content = f'''
-            <div style="position: relative; width: 100px; min-height: 45px; margin: 0 auto; background-color: {shape_config['bg_color']}; border: 1.5px solid {shape_config['border_color']}; border-radius: 6px; padding: 6px 10px;">
-                <div style="text-align: center; font-size: 6pt; line-height: 1.1; color: {shape_config['text_color']};">
+            <div style="position: relative; width: 80px; min-height: 35px; margin: 0 auto; background-color: {shape_config['bg_color']}; border: 1px solid {shape_config['border_color']}; border-radius: 5px; padding: 4px 8px;">
+                <div style="text-align: center; font-size: 5pt; line-height: 1.0; color: {shape_config['text_color']};">
                     {label_escaped}
-                    {f'<div style="margin-top: 2px; font-size: 5.5pt; color: #1976d2; font-weight: 600;">NBR: {html.escape(str(nbr_code))}</div>' if nbr_code else ''}
+                    {f'<div style="margin-top: 1px; font-size: 4.5pt; color: #1976d2; font-weight: 600;">NBR: {html.escape(str(nbr_code))}</div>' if nbr_code else ''}
                 </div>
-                {f'<div style="position: absolute; top: -3px; left: -3px; background-color: {shape_config["border_color"]}; color: white; width: 16px; height: 16px; border-radius: 50%; text-align: center; line-height: 16px; font-weight: bold; font-size: 7pt;">{node_number}</div>' if node_number else ''}
+                {f'<div style="position: absolute; top: -2px; left: -2px; background-color: {shape_config["border_color"]}; color: white; width: 14px; height: 14px; border-radius: 50%; text-align: center; line-height: 14px; font-weight: bold; font-size: 6pt;">{node_number}</div>' if node_number else ''}
             </div>
             '''
         
@@ -929,22 +929,22 @@ def render_fault_tree_html_for_pdf(tree_json: Dict[str, Any]) -> str:
         if children:
             children_cells = []
             for child in children:
-                children_cells.append(f'<td style="vertical-align: top; padding: 0 5px;">{render_node(child, level + 1)}</td>')
+                children_cells.append(f'<td style="vertical-align: top; padding: 0 3px;">{render_node(child, level + 1)}</td>')
             
             children_row = f'<tr>{"".join(children_cells)}</tr>'
             
-            # Linha vertical conectora - REDUZIDA
-            connector_line = f'<div style="width: 1.5px; height: 12px; background-color: #2196f3; margin: 0 auto;"></div>'
+            # Linha vertical conectora - MUITO REDUZIDA
+            connector_line = f'<div style="width: 1px; height: 8px; background-color: #2196f3; margin: 0 auto;"></div>'
             
-            # Linha horizontal (se múltiplos filhos) - REDUZIDA
+            # Linha horizontal (se múltiplos filhos) - MUITO REDUZIDA
             horizontal_line = ''
             if len(children) > 1:
-                horizontal_line = f'<div style="height: 1.5px; background-color: #2196f3; margin: 0 auto; width: 95%;"></div>'
+                horizontal_line = f'<div style="height: 1px; background-color: #2196f3; margin: 0 auto; width: 95%;"></div>'
             
             return f'''
             <table style="border-collapse: collapse; margin: 0 auto;">
                 <tr>
-                    <td colspan="{len(children)}" style="text-align: center; padding-bottom: 3px;">
+                    <td colspan="{len(children)}" style="text-align: center; padding-bottom: 2px;">
                         {node_content}
                         {connector_line}
                         {horizontal_line}
@@ -956,27 +956,40 @@ def render_fault_tree_html_for_pdf(tree_json: Dict[str, Any]) -> str:
         else:
             # Nó folha - sem filhos
             if level > 0:
-                connector_line = f'<div style="width: 1.5px; height: 12px; background-color: #2196f3; margin: 0 auto; margin-bottom: 3px;"></div>'
+                connector_line = f'<div style="width: 1px; height: 8px; background-color: #2196f3; margin: 0 auto; margin-bottom: 2px;"></div>'
                 return f'{connector_line}{node_content}'
             return node_content
     
     # Renderiza a árvore completa
     tree_html = render_node(tree_json, level=0)
     
-    # Legenda compacta para A4 paisagem
+    # Legenda corrigida para A4 paisagem (igual ao sistema)
     legend_html = '''
-    <div style="position: absolute; top: 5px; right: 5px; background: white; border: 1.5px solid #333; padding: 5px; border-radius: 3px; font-size: 6pt; width: 130px;">
-        <div style="font-weight: bold; margin-bottom: 4px; border-bottom: 1px solid #ccc; padding-bottom: 2px;">LEGENDA</div>
+    <div style="position: absolute; top: 5px; right: 5px; background: white; border: 1.5px solid #333; padding: 5px; border-radius: 3px; font-size: 5.5pt; width: 120px;">
+        <div style="font-weight: bold; margin-bottom: 3px; border-bottom: 1px solid #ccc; padding-bottom: 2px; font-size: 6pt;">LEGENDA</div>
         <div style="margin-bottom: 2px;"><strong>H:</strong> Hipótese</div>
         <div style="margin-bottom: 2px;"><strong>CB:</strong> Causa Básica</div>
         <div style="margin-bottom: 2px;"><strong>CC:</strong> Causa Contribuinte</div>
-        <div style="margin-top: 4px; margin-bottom: 2px;">
-            <span style="display: inline-block; width: 10px; height: 10px; background: #ffcdd2; border: 1px solid #f44336; vertical-align: middle;"></span>
+        <div style="margin-top: 3px; margin-bottom: 2px;">
+            <span style="display: inline-block; width: 10px; height: 10px; background: #ffcdd2; border: 1px solid #f44336; border-radius: 2px; vertical-align: middle;"></span>
             <span style="margin-left: 3px;">Evento Topo</span>
         </div>
         <div style="margin-bottom: 2px;">
-            <span style="display: inline-block; width: 10px; height: 10px; background: #e0e0e0; border: 1px solid #757575; vertical-align: middle;"></span>
+            <svg width="10" height="10" style="display: inline-block; vertical-align: middle; margin-right: 3px;">
+                <polygon points="5,1 9,5 5,9 1,5" fill="#e0e0e0" stroke="#757575" stroke-width="1"/>
+            </svg>
             <span style="margin-left: 3px;">Hipótese</span>
+        </div>
+        <div style="margin-bottom: 2px;">
+            <svg width="10" height="10" style="display: inline-block; vertical-align: middle; margin-right: 3px;">
+                <polygon points="5,1 9,5 5,9 1,5" fill="#ffcdd2" stroke="#f44336" stroke-width="1"/>
+                <text x="5" y="7" text-anchor="middle" font-size="8" fill="#d32f2f" font-weight="bold">✕</text>
+            </svg>
+            <span style="margin-left: 3px;">Descartada</span>
+        </div>
+        <div style="margin-bottom: 2px;">
+            <span style="display: inline-block; width: 10px; height: 10px; background: #fff9c4; border: 1px solid #f9a825; border-radius: 2px; vertical-align: middle;"></span>
+            <span style="margin-left: 3px;">Intermediária</span>
         </div>
         <div style="margin-bottom: 2px;">
             <span style="display: inline-block; width: 10px; height: 10px; background: #c8e6c9; border: 1px solid #4caf50; border-radius: 50%; vertical-align: middle;"></span>
@@ -984,20 +997,16 @@ def render_fault_tree_html_for_pdf(tree_json: Dict[str, Any]) -> str:
         </div>
         <div>
             <span style="display: inline-block; width: 10px; height: 10px; background: #bbdefb; border: 1px solid #2196f3; border-radius: 50%; vertical-align: middle;"></span>
-            <span style="margin-left: 3px;">Causa Contrib.</span>
+            <span style="margin-left: 3px;">Causa Contribuinte</span>
         </div>
     </div>
     '''
     
-    # HTML completo otimizado para A4 paisagem (margens de 1cm)
+    # HTML completo otimizado para A4 paisagem (sem cabeçalho)
     return f'''
-    <div class="fault-tree-landscape" style="position: relative; padding: 10px; background: white; min-height: 180mm; page-break-inside: avoid; border: 1px solid #e0e0e0;">
-        <div style="text-align: center; margin-bottom: 10px;">
-            <h2 style="margin: 0; color: #333; font-size: 11pt; font-weight: bold;">ÁRVORE DE FALHAS (FTA)</h2>
-            <div style="color: #666; font-size: 7pt; margin-top: 3px;">{date.today().strftime("%d/%m/%Y")}</div>
-        </div>
+    <div class="fault-tree-landscape" style="position: relative; padding: 5px; background: white; min-height: 190mm; page-break-inside: avoid; border: 1px solid #e0e0e0;">
         {legend_html}
-        <div style="margin-top: 15px; overflow: hidden;">
+        <div style="margin-top: 5px; overflow: hidden;">
             {tree_html}
         </div>
     </div>
