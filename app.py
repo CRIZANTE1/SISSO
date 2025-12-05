@@ -8,8 +8,24 @@ st.set_page_config(
     page_title="Sistema SSO - Monitoramento",
     page_icon="🛡️",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="expanded",
+    menu_items=None  # Remove menu padrão do Streamlit
 )
+
+# CSS para garantir que menus apareçam apenas no topo
+st.markdown("""
+<style>
+    /* Esconde qualquer navegação duplicada na sidebar */
+    [data-testid="stSidebar"] [data-testid="stNavigation"] {
+        display: none !important;
+    }
+    
+    /* Garante que a navegação no topo seja visível */
+    [data-testid="stHeader"] {
+        z-index: 999;
+    }
+</style>
+""", unsafe_allow_html=True)
 
 def main():
     logger = get_logger()
@@ -37,15 +53,15 @@ def main():
         with st.popover("❓ Ajuda"):
             st.markdown(
                 "**Como navegar e analisar**\n\n"
-                "- Use o menu superior para acessar: Visão Geral, Acidentes, Quase-Acidentes, N/C, KPIs.\n"
-                "- Use a barra lateral para aplicar filtros (usuários, período, datas, causas).\n"
+                "- Use o **menu superior** para acessar todas as páginas: Visão Geral, Acidentes, Quase-Acidentes, N/C, KPIs.\n"
+                "- Use a **barra lateral** para aplicar filtros de período e datas quando necessário.\n"
                 "- Em cada página, clique em '❓ Ajuda' para instruções específicas.\n\n"
                 "**Dicas rápidas**\n\n"
-                "- Se não aparecerem dados, reduza filtros ou amplie o período.\n"
+                "- Se não aparecerem dados, ajuste os filtros de período na barra lateral.\n"
                 "- Evidências: acesse a aba '📎 Evidências' em cada módulo.\n"
                 "- Para registrar, use as abas '➕ Novo ...' das páginas.\n\n"
                 "**📝 Feedback e Sugestões**\n\n"
-                "- Encontrou um erro ou tem uma sugestão? Acesse **Conta → Feedbacks** no menu.\n"
+                "- Encontrou um erro ou tem uma sugestão? Acesse **Conta → Feedbacks** no menu superior.\n"
                 "- Lá você pode reportar bugs, sugerir melhorias ou compartilhar ideias.\n"
                 "- Seu feedback é muito importante para melhorarmos o sistema!"
             )

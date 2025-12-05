@@ -164,36 +164,30 @@ def period_filter(key_prefix: str = "") -> str:
     return period_options[selected_period]
 
 def create_filter_sidebar() -> Dict[str, Any]:
-    """Cria sidebar com todos os filtros"""
+    """Cria sidebar com filtros essenciais apenas"""
     with st.sidebar:
         st.header("🔍 Filtros")
+        st.caption("Use os filtros para ajustar o período de análise")
         
-        # Usuários
-        selected_users = user_filter()
-        
-        # Período
+        # Período (últimos N meses) - filtro principal
         months_back = period_filter()
         
-        # Data específica
+        # Data específica (opcional)
         start_date, end_date = date_range_filter()
         
-        # Severidade
-        selected_severities = severity_filter()
-        
-        # Tipo de evento
-        selected_event_types = event_type_filter()
-        
-        # Causa raiz
-        selected_root_causes = root_cause_filter()
+        # Usuários (opcional, útil para administradores)
+        st.markdown("---")
+        st.caption("**Filtros Opcionais**")
+        selected_users = user_filter()
         
         return {
             "users": selected_users,
             "months_back": months_back,
             "start_date": start_date,
             "end_date": end_date,
-            "severities": selected_severities,
-            "event_types": selected_event_types,
-            "root_causes": selected_root_causes
+            "severities": [],  # Removido - cada página gerencia sua própria severidade
+            "event_types": [],  # Removido - redundante com páginas específicas
+            "root_causes": []  # Removido - muito específico, não usado em todas as páginas
         }
 
 def apply_filters_to_df(df: pd.DataFrame, filters: Dict[str, Any]) -> pd.DataFrame:
