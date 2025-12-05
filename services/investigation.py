@@ -1243,6 +1243,59 @@ def link_nbr_standard_to_node(node_id: str, nbr_standard_id: int) -> bool:
         return False
 
 
+def delete_fault_tree_node(node_id: str) -> bool:
+    """
+    Deleta um nó da árvore de falhas e todos os seus filhos recursivamente.
+    Não permite deletar o nó raiz (parent_id is NULL).
+    
+    Args:
+        node_id: ID do nó a ser deletado
+        
+    Returns:
+        True se deletado com sucesso, False caso contrário
+    """
+    try:
+        from managers.supabase_config import get_service_role_client
+        supabase = get_service_role_client()
+        if not supabase:
+            st.error("Erro ao conectar com o banco de dados")
+            return False
+        
+        # Verifica se o nó existe e se é raiz
+        node_response = supabase.table("fault_tree_nodes").select("id, parent_id, type").eq("id", node_id).execute()
+        if not node_response.data:
+            st.error("Nó não encontrado")
+            return False
+        
+        node = node_response.data[0]
+        
+        # Não permite deletar o nó raiz
+        if node.get('parent_id') is None:
+            st.error("⚠️ Não é possível deletar o nó raiz da árvore de falhas")
+            return False
+        
+        # Função recursiva para deletar filhos primeiro
+        def delete_children_recursive(parent_id: str):
+            """Deleta todos os filhos de um nó recursivamente"""
+            children_response = supabase.table("fault_tree_nodes").select("id").eq("parent_id", parent_id).execute()
+            if children_response.data:
+                for child in children_response.data:
+                    # Deleta os filhos deste filho primeiro (recursivo)
+                    delete_children_recursive(child['id'])
+                    # Depois deleta o filho
+                    supabase.table("fault_tree_nodes").delete().eq("id", child['id']).execute()
+        
+        # Deleta todos os filhos primeiro
+        delete_children_recursive(node_id)
+        
+        # Agora deleta o nó
+        delete_response = supabase.table("fault_tree_nodes").delete().eq("id", node_id).execute()
+        return bool(delete_response.data)
+    except Exception as e:
+        st.error(f"Erro ao deletar nó: {str(e)}")
+        return False
+
+
 def get_nbr_standards(category: Optional[str] = None) -> List[Dict[str, Any]]:
     """Busca padrões NBR, opcionalmente filtrados por categoria"""
     try:

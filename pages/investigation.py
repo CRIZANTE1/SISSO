@@ -40,7 +40,8 @@ from services.investigation import (
     update_node_is_contributing_cause,
     upload_justification_image,
     update_node_justification_image,
-    update_node_recommendation
+    update_node_recommendation,
+    delete_fault_tree_node
 )
 from auth.auth_utils import require_login
 
@@ -1614,6 +1615,46 @@ def main():
                                 if update_node_status(node['id'], 'pending', justification_clean if justification_clean else None, None):
                                     st.success("⏳ Status alterado para em análise!")
                                     st.rerun()
+                    
+                    # Botão para excluir hipótese
+                    st.divider()
+                    st.markdown("**🗑️ Excluir Hipótese:**")
+                    st.warning("⚠️ **Atenção:** Ao excluir esta hipótese, todos os nós filhos também serão excluídos permanentemente. Esta ação não pode ser desfeita.")
+                    
+                    # Verifica se o nó tem filhos
+                    tree_json = build_fault_tree_json(accident_id)
+                    has_children = False
+                    if tree_json:
+                        def check_children(node_data: Dict[str, Any], target_id: str) -> bool:
+                            """Verifica recursivamente se um nó tem filhos"""
+                            if node_data.get('id') == target_id:
+                                return len(node_data.get('children', [])) > 0
+                            for child in node_data.get('children', []):
+                                if check_children(child, target_id):
+                                    return True
+                            return False
+                        has_children = check_children(tree_json, node['id'])
+                    
+                    if has_children:
+                        st.info(f"⚠️ Esta hipótese possui nós filhos. Todos serão excluídos junto com ela.")
+                    
+                    delete_confirm_key = f"delete_confirm_{node['id']}"
+                    delete_confirm = st.checkbox(
+                        "Confirmo que desejo excluir esta hipótese",
+                        key=delete_confirm_key,
+                        help="Marque esta opção para habilitar o botão de exclusão"
+                    )
+                    
+                    if delete_confirm:
+                        if st.button("🗑️ Excluir Hipótese Permanentemente", 
+                                   key=f"delete_{node['id']}",
+                                   type="primary",
+                                   help="Exclui esta hipótese e todos os seus nós filhos"):
+                            if delete_fault_tree_node(node['id']):
+                                st.success("✅ Hipótese excluída com sucesso!")
+                                st.rerun()
+                            else:
+                                st.error("❌ Erro ao excluir hipótese. Verifique se ela não é o nó raiz.")
                     
                     # Checkbox para marcar como causa básica ou contribuinte (apenas para nós validados)
                     if current_status == 'validated':
