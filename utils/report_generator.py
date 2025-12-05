@@ -48,6 +48,7 @@ body {
     width: 100%; 
     border-bottom: 3px solid #d3d3d3; 
     padding-bottom: 10px; 
+    padding-top: 1.5cm;
     margin-bottom: 20px; 
 }
 
