@@ -13,7 +13,7 @@ import io
 CSS_STYLES = """
 @page {
     size: A4;
-    margin: 1.5cm;
+    margin: 3cm 1.5cm 1.5cm 1.5cm;  /* Aumenta margem superior para 3cm */
     @top-center {
         content: element(header);
     }
@@ -46,7 +46,7 @@ body {
 }
 
 .content-wrapper {
-    margin-top: 1.5cm;
+    margin-top: 0;
     padding-top: 0;
 }
 
@@ -55,7 +55,6 @@ body {
     width: 100%; 
     border-bottom: 3px solid #d3d3d3; 
     padding-bottom: 10px; 
-    padding-top: 1.5cm;
     margin-bottom: 20px; 
 }
 
@@ -574,7 +573,7 @@ HTML_TEMPLATE = """
     <div class="page-break"></div>
 
     <!-- PÁGINA 4: ÁRVORE DE FALHAS -->
-    <div class="section-title" style="margin-top: 1cm;">5. ANÁLISE DAS CAUSAS (ÁRVORE DE FALHAS)</div>
+    <div class="section-title">5. ANÁLISE DAS CAUSAS (ÁRVORE DE FALHAS)</div>
     
     <p style="margin-bottom: 15px;">Abaixo a representação gráfica da Árvore de Falhas gerada durante a investigação.</p>
     
