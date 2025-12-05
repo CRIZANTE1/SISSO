@@ -1478,7 +1478,8 @@ def main():
         st.markdown("### ✅ Validar Hipóteses")
         st.markdown("**Revise cada hipótese e confirme se é verdadeira ou falsa:**")
         
-        hypothesis_nodes = [n for n in nodes if n['type'] == 'hypothesis']
+        # Inclui tanto hipóteses quanto fatos confirmados (todos os nós que não são root)
+        hypothesis_nodes = [n for n in nodes if n['type'] in ['hypothesis', 'fact'] and n.get('type') != 'root']
         
         if hypothesis_nodes:
             for node in hypothesis_nodes:
