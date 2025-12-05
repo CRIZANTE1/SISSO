@@ -1039,15 +1039,22 @@ def extract_hypotheses_from_tree(tree_json: Optional[Dict[str, Any]]) -> List[Di
         )
         
         if is_hypothesis and node_type != 'root':
-            hyp_data = {
-                'label': node.get('label', 'N/A'),
-                'status': status,
-                'nbr_code': node.get('nbr_code'),
-                'nbr_description': node.get('nbr_description', ''),
-                'justification': node.get('justification', ''),  # Justificativa para confirmação/descarte
-                'justification_image_url': node.get('justification_image_url')  # URL da imagem da justificativa
-            }
-            hypotheses.append(hyp_data)
+            justification = node.get('justification', '')
+            
+            # Exclui hipóteses do tipo 'fact' sem justificativa (null ou vazio)
+            if node_type == 'fact' and not justification:
+                # Não adiciona à lista de hipóteses
+                pass
+            else:
+                hyp_data = {
+                    'label': node.get('label', 'N/A'),
+                    'status': status,
+                    'nbr_code': node.get('nbr_code'),
+                    'nbr_description': node.get('nbr_description', ''),
+                    'justification': justification,  # Justificativa para confirmação/descarte
+                    'justification_image_url': node.get('justification_image_url')  # URL da imagem da justificativa
+                }
+                hypotheses.append(hyp_data)
         
         # Processa filhos recursivamente
         for child in node.get('children', []):
