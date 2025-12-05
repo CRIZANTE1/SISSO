@@ -41,7 +41,13 @@ body {
     font-size: 10pt; 
     color: #000; 
     line-height: 1.4;
-    padding-top: 1.5cm;
+    margin: 0;
+    padding: 0;
+}
+
+.content-wrapper {
+    margin-top: 1.5cm;
+    padding-top: 0;
 }
 
 .header { 
@@ -324,6 +330,7 @@ HTML_TEMPLATE = """
         </table>
     </div>
 
+    <div class="content-wrapper">
     <!-- PÁGINA 1: CAPA -->
     <div class="cover-title">RELATÓRIO FINAL</div>
     <div class="cover-subtitle">Investigação de Acidente</div>
@@ -748,6 +755,7 @@ HTML_TEMPLATE = """
     <p style="color: #999; font-style: italic;">Nenhuma recomendação registrada ainda.</p>
     {% endif %}
     {% endif %}
+    </div>
 
 </body>
 </html>
