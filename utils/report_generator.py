@@ -844,8 +844,17 @@ def render_fault_tree_html_for_pdf(tree_json: Dict[str, Any]) -> str:
                 'text_color': '#000000',
                 'border_radius': '50px'
             }
-        # Root ou causa intermediária validada: Retângulo arredondado amarelo
-        elif node_type == 'root' or (status == 'validated' and has_children):
+        # Root: Retângulo arredondado vermelho
+        elif node_type == 'root':
+            return {
+                'shape': 'rounded-rect',
+                'bg_color': '#ffcdd2',  # Vermelho claro
+                'border_color': '#f44336',
+                'text_color': '#000000',
+                'border_radius': '10px'
+            }
+        # Causa intermediária validada: Retângulo arredondado amarelo
+        elif status == 'validated' and has_children:
             return {
                 'shape': 'rounded-rect',
                 'bg_color': '#fff9c4',
@@ -958,7 +967,7 @@ def render_fault_tree_html_for_pdf(tree_json: Dict[str, Any]) -> str:
     tree_html = render_node(tree_json, level=0)
     
     # Legenda
-    legend_html = '<div style="position: absolute; top: 10px; right: 10px; background: white; border: 2px solid #333; padding: 12px; border-radius: 6px; font-size: 0.8em; z-index: 1000; box-shadow: 0 2px 8px rgba(0,0,0,0.2); max-width: 220px;"><div style="font-weight: bold; margin-bottom: 10px; border-bottom: 1px solid #ccc; padding-bottom: 6px;">LEGENDA</div><div style="margin-bottom: 6px;"><strong>H:</strong> Hipótese</div><div style="margin-bottom: 6px;"><strong>CB:</strong> Causa Básica</div><div style="margin-bottom: 6px; display: flex; align-items: center; gap: 8px;"><div style="width: 18px; height: 18px; clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%); background: #e0e0e0; border: 2px solid #757575;"></div><span>Hipótese</span></div><div style="margin-bottom: 6px; display: flex; align-items: center; gap: 8px;"><div style="width: 18px; height: 18px; clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%); background: #ffcdd2; border: 2px solid #f44336; position: relative;"><span style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: #d32f2f; font-size: 12px;">✕</span></div><span>Descartada</span></div><div style="margin-bottom: 6px; display: flex; align-items: center; gap: 8px;"><div style="width: 18px; height: 18px; background: #fff9c4; border: 2px solid #f9a825; border-radius: 4px;"></div><span>Intermediária</span></div><div style="display: flex; align-items: center; gap: 8px;"><div style="width: 18px; height: 18px; background: #c8e6c9; border: 2px solid #4caf50; border-radius: 50%;"></div><span>Causa Básica</span></div></div>'
+    legend_html = '<div style="position: absolute; top: 10px; right: 10px; background: white; border: 2px solid #333; padding: 12px; border-radius: 6px; font-size: 0.8em; z-index: 1000; box-shadow: 0 2px 8px rgba(0,0,0,0.2); max-width: 220px;"><div style="font-weight: bold; margin-bottom: 10px; border-bottom: 1px solid #ccc; padding-bottom: 6px;">LEGENDA</div><div style="margin-bottom: 6px;"><strong>H:</strong> Hipótese</div><div style="margin-bottom: 6px;"><strong>CB:</strong> Causa Básica</div><div style="margin-bottom: 6px;"><strong>CC:</strong> Causa Contribuinte</div><div style="margin-bottom: 6px; display: flex; align-items: center; gap: 8px;"><div style="width: 18px; height: 18px; background: #ffcdd2; border: 2px solid #f44336; border-radius: 4px;"></div><span>Evento Topo (Root)</span></div><div style="margin-bottom: 6px; display: flex; align-items: center; gap: 8px;"><div style="width: 18px; height: 18px; clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%); background: #e0e0e0; border: 2px solid #757575;"></div><span>Hipótese</span></div><div style="margin-bottom: 6px; display: flex; align-items: center; gap: 8px;"><div style="width: 18px; height: 18px; clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%); background: #ffcdd2; border: 2px solid #f44336; position: relative;"><span style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: #d32f2f; font-size: 12px;">✕</span></div><span>Descartada</span></div><div style="margin-bottom: 6px; display: flex; align-items: center; gap: 8px;"><div style="width: 18px; height: 18px; background: #fff9c4; border: 2px solid #f9a825; border-radius: 4px;"></div><span>Intermediária</span></div><div style="margin-bottom: 6px; display: flex; align-items: center; gap: 8px;"><div style="width: 18px; height: 18px; background: #c8e6c9; border: 2px solid #4caf50; border-radius: 50%;"></div><span>Causa Básica</span></div><div style="display: flex; align-items: center; gap: 8px;"><div style="width: 18px; height: 18px; background: #bbdefb; border: 2px solid #2196f3; border-radius: 50%;"></div><span>Causa Contribuinte</span></div></div>'
     
     # HTML completo
     return f'<div style="position: relative; font-family: Arial, sans-serif; padding: 30px 20px; background: white; min-height: 400px; page-break-inside: avoid; border: 1px solid #e0e0e0; border-radius: 8px;"><div style="text-align: center; margin-bottom: 30px;"><h2 style="margin: 0; color: #333; font-size: 1.5em; font-weight: bold;">ÁRVORE DE FALHAS (FTA)</h2><div style="color: #666; font-size: 0.9em; margin-top: 5px;">{date.today().strftime("%d/%m/%Y")}</div></div>{legend_html}<div style="display: flex; justify-content: center; align-items: flex-start; min-height: 300px; padding: 20px 0;">{tree_html}</div></div>'

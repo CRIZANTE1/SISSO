@@ -170,8 +170,17 @@ def render_fault_tree_html(tree_json: Dict[str, Any]) -> str:
                 'text_color': '#000000',
                 'border_radius': '50px'
             }
-        # Root ou causa intermediária validada: Retângulo arredondado amarelo
-        elif node_type == 'root' or (status == 'validated' and has_children):
+        # Root: Retângulo arredondado vermelho
+        elif node_type == 'root':
+            return {
+                'shape': 'rounded-rect',
+                'bg_color': '#ffcdd2',  # Vermelho claro
+                'border_color': '#f44336',
+                'text_color': '#000000',
+                'border_radius': '10px'
+            }
+        # Causa intermediária validada: Retângulo arredondado amarelo
+        elif status == 'validated' and has_children:
             return {
                 'shape': 'rounded-rect',
                 'bg_color': '#fff9c4',  # Amarelo claro
@@ -287,7 +296,7 @@ def render_fault_tree_html(tree_json: Dict[str, Any]) -> str:
     tree_html = render_node(tree_json, level=0)
     
     # Legenda
-    legend_html = '<div style="position: absolute; top: 10px; right: 10px; background: white; border: 2px solid #333; padding: 12px; border-radius: 6px; font-size: 0.8em; z-index: 1000; box-shadow: 0 2px 8px rgba(0,0,0,0.2); max-width: 220px;"><div style="font-weight: bold; margin-bottom: 10px; border-bottom: 1px solid #ccc; padding-bottom: 6px;">LEGENDA</div><div style="margin-bottom: 6px;"><strong>H:</strong> Hipótese</div><div style="margin-bottom: 6px;"><strong>CB:</strong> Causa Básica</div><div style="margin-bottom: 6px;"><strong>CC:</strong> Causa Contribuinte</div><div style="margin-bottom: 6px; display: flex; align-items: center; gap: 8px;"><div style="width: 18px; height: 18px; clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%); background: #e0e0e0; border: 2px solid #757575;"></div><span>Hipótese</span></div><div style="margin-bottom: 6px; display: flex; align-items: center; gap: 8px;"><div style="width: 18px; height: 18px; clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%); background: #ffcdd2; border: 2px solid #f44336; position: relative;"><span style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: #d32f2f; font-size: 12px;">✕</span></div><span>Descartada</span></div><div style="margin-bottom: 6px; display: flex; align-items: center; gap: 8px;"><div style="width: 18px; height: 18px; background: #fff9c4; border: 2px solid #f9a825; border-radius: 4px;"></div><span>Intermediária</span></div><div style="margin-bottom: 6px; display: flex; align-items: center; gap: 8px;"><div style="width: 18px; height: 18px; background: #c8e6c9; border: 2px solid #4caf50; border-radius: 50%;"></div><span>Causa Básica</span></div><div style="display: flex; align-items: center; gap: 8px;"><div style="width: 18px; height: 18px; background: #bbdefb; border: 2px solid #2196f3; border-radius: 50%;"></div><span>Causa Contribuinte</span></div></div>'
+    legend_html = '<div style="position: absolute; top: 10px; right: 10px; background: white; border: 2px solid #333; padding: 12px; border-radius: 6px; font-size: 0.8em; z-index: 1000; box-shadow: 0 2px 8px rgba(0,0,0,0.2); max-width: 220px;"><div style="font-weight: bold; margin-bottom: 10px; border-bottom: 1px solid #ccc; padding-bottom: 6px;">LEGENDA</div><div style="margin-bottom: 6px;"><strong>H:</strong> Hipótese</div><div style="margin-bottom: 6px;"><strong>CB:</strong> Causa Básica</div><div style="margin-bottom: 6px;"><strong>CC:</strong> Causa Contribuinte</div><div style="margin-bottom: 6px; display: flex; align-items: center; gap: 8px;"><div style="width: 18px; height: 18px; background: #ffcdd2; border: 2px solid #f44336; border-radius: 4px;"></div><span>Evento Topo (Root)</span></div><div style="margin-bottom: 6px; display: flex; align-items: center; gap: 8px;"><div style="width: 18px; height: 18px; clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%); background: #e0e0e0; border: 2px solid #757575;"></div><span>Hipótese</span></div><div style="margin-bottom: 6px; display: flex; align-items: center; gap: 8px;"><div style="width: 18px; height: 18px; clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%); background: #ffcdd2; border: 2px solid #f44336; position: relative;"><span style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: #d32f2f; font-size: 12px;">✕</span></div><span>Descartada</span></div><div style="margin-bottom: 6px; display: flex; align-items: center; gap: 8px;"><div style="width: 18px; height: 18px; background: #fff9c4; border: 2px solid #f9a825; border-radius: 4px;"></div><span>Intermediária</span></div><div style="margin-bottom: 6px; display: flex; align-items: center; gap: 8px;"><div style="width: 18px; height: 18px; background: #c8e6c9; border: 2px solid #4caf50; border-radius: 50%;"></div><span>Causa Básica</span></div><div style="display: flex; align-items: center; gap: 8px;"><div style="width: 18px; height: 18px; background: #bbdefb; border: 2px solid #2196f3; border-radius: 50%;"></div><span>Causa Contribuinte</span></div></div>'
     
     # HTML completo
     return f'<div style="position: relative; font-family: Arial, sans-serif; padding: 30px 20px; background: white; min-height: 400px; overflow-x: auto; border: 1px solid #e0e0e0; border-radius: 8px;"><div style="text-align: center; margin-bottom: 30px;"><h2 style="margin: 0; color: #333; font-size: 1.5em; font-weight: bold;">ÁRVORE DE FALHAS (FTA)</h2><div style="color: #666; font-size: 0.9em; margin-top: 5px;">{date.today().strftime("%d/%m/%Y")}</div></div>{legend_html}<div style="display: flex; justify-content: center; align-items: flex-start; min-height: 300px; padding: 20px 0;">{tree_html}</div></div>'
@@ -1450,8 +1459,8 @@ def main():
         node_type = st.radio(
             "Tipo de causa:",
             options=['hypothesis', 'fact'],
-            format_func=lambda x: "Hipótese (precisa validar)" if x == 'hypothesis' else "Fato confirmado",
-            help="💡 **Hipótese**: Uma possível causa que você precisa investigar e validar. **Fato**: Uma causa já confirmada com evidências.",
+            format_func=lambda x: "Hipótese (precisa validar)" if x == 'hypothesis' else "Causa Intermediária (confirmada, pode ter subcausas)",
+            help="💡 **Hipótese**: Uma possível causa que você precisa investigar e validar. **Causa Intermediária**: Uma causa já confirmada que pode ter subcausas (ex: 'Falhas de Inspeção e Manutenção').",
             key="node_type_selector"
         )
         
@@ -1475,15 +1484,51 @@ def main():
         st.divider()
         
         # Validação de hipóteses (interface conversacional)
-        st.markdown("### ✅ Validar Hipóteses")
-        st.markdown("**Revise cada hipótese e confirme se é verdadeira ou falsa:**")
+        st.markdown("### ✅ Validar Hipóteses e Causas Intermediárias")
+        st.markdown("**Revise cada hipótese/causa e confirme se é verdadeira ou falsa. Causas intermediárias podem ter subcausas adicionadas:**")
         
-        # Inclui tanto hipóteses quanto fatos confirmados (todos os nós que não são root)
+        # Inclui:
+        # 1. Hipóteses (hypothesis) - todas
+        # 2. Causas intermediárias (fact) - todas, mesmo validadas (para poder adicionar subcausas)
+        # 3. Exclui root
         hypothesis_nodes = [n for n in nodes if n['type'] in ['hypothesis', 'fact'] and n.get('type') != 'root']
         
+        # Ordena: fact validados primeiro (causas intermediárias), depois hypothesis, depois fact pending
+        def sort_key(n):
+            if n['type'] == 'fact' and n['status'] == 'validated':
+                return (0, n.get('label', ''))
+            elif n['type'] == 'hypothesis':
+                return (1, n.get('label', ''))
+            else:
+                return (2, n.get('label', ''))
+        hypothesis_nodes.sort(key=sort_key)
+        
         if hypothesis_nodes:
+            # Verifica quais nós têm filhos
+            node_ids = {n['id'] for n in nodes}
+            children_count = {}
+            for n in nodes:
+                parent_id = n.get('parent_id')
+                if parent_id and parent_id in node_ids:
+                    children_count[parent_id] = children_count.get(parent_id, 0) + 1
+            
             for node in hypothesis_nodes:
                 current_status = node['status']
+                node_type = node['type']
+                has_children = children_count.get(node['id'], 0) > 0
+                num_children = children_count.get(node['id'], 0)
+                
+                # Determina tipo e status para exibição
+                if node_type == 'fact' and has_children:
+                    # Causa intermediária (fact validada com filhos)
+                    node_type_label = "🔗 Causa Intermediária"
+                elif node_type == 'fact' and current_status == 'pending' and not has_children:
+                    # Hipótese confirmada (fact pending sem filhos)
+                    node_type_label = "✅ Hipótese Confirmada"
+                elif node_type == 'hypothesis':
+                    node_type_label = "❓ Hipótese"
+                else:
+                    node_type_label = "📋 Causa"
                 
                 # Determina cor e texto baseado no status
                 if current_status == 'validated':
@@ -1496,14 +1541,21 @@ def main():
                     status_color = "#6c757d"
                     status_text = "⏳ Em Análise"
                 
-                with st.expander(f"{status_text}: {node['label'][:60]}...", expanded=False):
+                # Título do expander
+                if has_children:
+                    title = f"{node_type_label} ({status_text}): {node['label'][:50]}... [tem {num_children} subcausa(s)]"
+                else:
+                    title = f"{node_type_label} ({status_text}): {node['label'][:60]}..."
+                
+                with st.expander(title, expanded=False):
                     # Campo de edição do label
                     edit_label_key = f"edit_label_{node['id']}"
+                    edit_label_text = "✏️ Editar causa:" if node_type == 'fact' else "✏️ Editar hipótese:"
                     edited_label = st.text_area(
-                        "✏️ Editar hipótese:",
+                        edit_label_text,
                         value=node['label'],
                         key=edit_label_key,
-                        help="Você pode editar o texto desta hipótese antes de validá-la.",
+                        help="Você pode editar o texto desta causa/hipótese antes de validá-la.",
                         height=80
                     )
                     
@@ -1514,7 +1566,8 @@ def main():
                             if st.button("💾 Salvar Edição", key=f"save_edit_{node['id']}"):
                                 if edited_label.strip():
                                     if update_node_label(node['id'], edited_label.strip()):
-                                        st.success("✅ Hipótese atualizada!")
+                                        success_msg = "✅ Causa atualizada!" if node_type == 'fact' else "✅ Hipótese atualizada!"
+                                        st.success(success_msg)
                                         st.rerun()
                                 else:
                                     st.warning("⚠️ O texto não pode estar vazio")
