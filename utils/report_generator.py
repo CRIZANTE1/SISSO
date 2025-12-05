@@ -565,7 +565,7 @@ HTML_TEMPLATE = """
     <div class="page-break"></div>
 
     <!-- PÁGINA 4: ÁRVORE DE FALHAS -->
-    <div class="section-title">5. ANÁLISE DAS CAUSAS (ÁRVORE DE FALHAS)</div>
+    <div class="section-title" style="margin-top: 1cm;">5. ANÁLISE DAS CAUSAS (ÁRVORE DE FALHAS)</div>
     
     <p style="margin-bottom: 15px;">Abaixo a representação gráfica da Árvore de Falhas gerada durante a investigação.</p>
     
@@ -1002,11 +1002,11 @@ def render_fault_tree_html_for_pdf(tree_json: Dict[str, Any]) -> str:
     </div>
     '''
     
-    # HTML completo otimizado para A4 paisagem (sem cabeçalho)
+    # HTML completo otimizado para A4 paisagem (árvore centralizada)
     return f'''
-    <div class="fault-tree-landscape" style="position: relative; padding: 5px; background: white; min-height: 190mm; page-break-inside: avoid; border: 1px solid #e0e0e0;">
+    <div class="fault-tree-landscape" style="position: relative; padding: 5px; padding-top: 6cm; background: white; min-height: 190mm; page-break-inside: avoid; border: 1px solid #e0e0e0;">
         {legend_html}
-        <div style="margin-top: 5px; overflow: hidden;">
+        <div style="overflow: hidden;">
             {tree_html}
         </div>
     </div>
