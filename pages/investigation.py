@@ -1649,7 +1649,34 @@ def main():
                     # Mostra imagem de justificativa existente se houver
                     justification_image_url = node.get('justification_image_url')
                     if justification_image_url:
-                        st.image(justification_image_url, caption="📷 Imagem da justificativa", width=300)
+                        # Valida se a URL não está vazia
+                        if justification_image_url and isinstance(justification_image_url, str) and justification_image_url.strip():
+                            st.markdown("**📷 Imagem da justificativa:**")
+                            
+                            # Tenta exibir a imagem usando st.image primeiro
+                            try:
+                                st.image(justification_image_url, caption="", width=300, use_container_width=False)
+                            except Exception as e:
+                                # Se st.image falhar, tenta usar HTML como fallback
+                                try:
+                                    import html
+                                    escaped_url = html.escape(justification_image_url)
+                                    st.markdown(
+                                        f'''
+                                        <div style="margin: 10px 0;">
+                                            <img src="{escaped_url}" alt="Imagem da justificativa" 
+                                                 style="max-width: 300px; max-height: 300px; border: 1px solid #ddd; border-radius: 4px; display: block;">
+                                        </div>
+                                        ''',
+                                        unsafe_allow_html=True
+                                    )
+                                except Exception as e2:
+                                    # Se tudo falhar, mostra mensagem de erro e link
+                                    st.warning("⚠️ Não foi possível exibir a imagem automaticamente.")
+                                    st.markdown(f"**URL da imagem:** `{justification_image_url}`")
+                                    st.markdown(f"🔗 [Abrir imagem em nova aba]({justification_image_url})")
+                                    st.info("💡 A imagem pode estar temporariamente indisponível. Verifique se o bucket do Supabase Storage está configurado como público.")
+                        
                         if st.button("🗑️ Remover imagem", key=f"remove_img_{node['id']}"):
                             from services.investigation import update_node_justification_image
                             if update_node_justification_image(node['id'], None):
