@@ -655,37 +655,50 @@ def main():
                 
                 col_class1, col_class2 = st.columns(2)
                 with col_class1:
+                    # Garante que o valor seja sempre booleano (não None)
+                    class_injury_val = investigation.get('class_injury')
                     class_injury = st.checkbox(
                         "Com Lesão",
-                        value=investigation.get('class_injury', False),
-                        help="Acidente com lesão física"
+                        value=bool(class_injury_val) if class_injury_val is not None else False,
+                        help="Acidente com lesão física",
+                        key="class_injury_checkbox"
                     )
+                    class_environment_val = investigation.get('class_environment')
                     class_environment = st.checkbox(
                         "Meio Ambiente",
-                        value=investigation.get('class_environment', False),
-                        help="Impacto ambiental"
+                        value=bool(class_environment_val) if class_environment_val is not None else False,
+                        help="Impacto ambiental",
+                        key="class_environment_checkbox"
                     )
+                    class_process_safety_val = investigation.get('class_process_safety')
                     class_process_safety = st.checkbox(
                         "Segurança de Processo",
-                        value=investigation.get('class_process_safety', False),
-                        help="Relacionado à segurança de processo"
+                        value=bool(class_process_safety_val) if class_process_safety_val is not None else False,
+                        help="Relacionado à segurança de processo",
+                        key="class_process_safety_checkbox"
                     )
                 
                 with col_class2:
+                    class_asset_damage_val = investigation.get('class_asset_damage')
                     class_asset_damage = st.checkbox(
                         "Dano ao Patrimônio",
-                        value=investigation.get('class_asset_damage', False),
-                        help="Danos materiais/patrimoniais"
+                        value=bool(class_asset_damage_val) if class_asset_damage_val is not None else False,
+                        help="Danos materiais/patrimoniais",
+                        key="class_asset_damage_checkbox"
                     )
+                    class_community_val = investigation.get('class_community')
                     class_community = st.checkbox(
                         "Impacto na Comunidade",
-                        value=investigation.get('class_community', False),
-                        help="Impacto na comunidade local"
+                        value=bool(class_community_val) if class_community_val is not None else False,
+                        help="Impacto na comunidade local",
+                        key="class_community_checkbox"
                     )
+                    class_near_miss_val = investigation.get('class_near_miss')
                     class_near_miss = st.checkbox(
                         "Quase-Acidente",
-                        value=investigation.get('class_near_miss', False),
-                        help="Evento de quase-acidente"
+                        value=bool(class_near_miss_val) if class_near_miss_val is not None else False,
+                        help="Evento de quase-acidente",
+                        key="class_near_miss_checkbox"
                     )
                 
                 # Mapeamento entre português (interface) e inglês (banco)
@@ -934,6 +947,7 @@ def main():
             with col_save:
                 if st.form_submit_button("💾 Salvar Dados e Continuar", type="primary", width='stretch'):
                     # Atualiza dados do acidente - TODOS os campos válidos
+                    # Garante que valores booleanos sejam sempre True ou False (nunca None)
                     update_data = {
                         'title': title if title else investigation.get('title', 'Acidente sem título'),
                         'description': description if description else None,
@@ -941,12 +955,12 @@ def main():
                         'base_location': base_location if base_location else None,
                         'site_id': selected_site_id,
                         'occurrence_date': occurrence_datetime.isoformat() if occurrence_datetime else None,
-                        'class_injury': class_injury,
-                        'class_community': class_community,
-                        'class_environment': class_environment,
-                        'class_process_safety': class_process_safety,
-                        'class_asset_damage': class_asset_damage,
-                        'class_near_miss': class_near_miss,
+                        'class_injury': bool(class_injury),
+                        'class_community': bool(class_community),
+                        'class_environment': bool(class_environment),
+                        'class_process_safety': bool(class_process_safety),
+                        'class_asset_damage': bool(class_asset_damage),
+                        'class_near_miss': bool(class_near_miss),
                         'severity_level': severity_level if severity_level else None,
                         'estimated_loss_value': estimated_loss_value if estimated_loss_value > 0 else None
                     }
