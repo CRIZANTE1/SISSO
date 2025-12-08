@@ -1595,11 +1595,16 @@ def main():
                     
                     # Campo de justificativa
                     justification_key = f"justification_{node['id']}"
+                    justification_label = "📝 Justificativa (obrigatória para confirmar ou descartar)"
+                    justification_help = "Explique o motivo da confirmação ou descarte desta hipótese. Esta justificativa aparecerá no relatório PDF."
+                    if node_type == 'fact':
+                        justification_help = "Explique o motivo da confirmação ou descarte desta causa intermediária. Facts também precisam de justificativa ao serem descartados. Esta justificativa aparecerá no relatório PDF."
+                    
                     justification = st.text_area(
-                        "📝 Justificativa (obrigatória para confirmar ou descartar)",
+                        justification_label,
                         value=node.get('justification', ''),
                         key=justification_key,
-                        help="Explique o motivo da confirmação ou descarte desta hipótese. Esta justificativa aparecerá no relatório PDF.",
+                        help=justification_help,
                         height=100
                     )
                     
@@ -1648,12 +1653,21 @@ def main():
                                     st.rerun()
                     
                     with col_disc:
+                        # Ajuda específica para facts vs hipóteses
+                        discard_help = "Use quando tiver evidências que descartam esta causa. Facts (causas intermediárias) também podem ser descartados com justificativa."
+                        if node_type == 'fact':
+                            discard_help = "Use quando tiver evidências que descartam esta causa intermediária. Facts podem ser descartados mesmo que já tenham sido confirmados anteriormente."
+                        
                         if st.button("❌ Descartar/Falso", key=f"discard_{node['id']}",
-                                   help="Use quando tiver evidências que descartam esta causa"):
+                                   help=discard_help):
                             justification_clean = (justification or '').strip()
                             if not justification_clean:
                                 st.warning("⚠️ Por favor, insira uma justificativa antes de descartar.")
                             else:
+                                # Aviso especial se for fact com filhos
+                                if node_type == 'fact' and has_children:
+                                    st.info("ℹ️ Você está descartando uma causa intermediária que possui subcausas. As subcausas permanecerão na árvore, mas esta causa será marcada como descartada.")
+                                
                                 # Se houver imagem sendo enviada, faz upload primeiro
                                 justification_img_url = None
                                 if uploaded_justification_image:
@@ -1662,7 +1676,8 @@ def main():
                                     justification_img_url = upload_justification_image(node['id'], accident_id, file_bytes, uploaded_justification_image.name)
                                 
                                 if update_node_status(node['id'], 'discarded', justification_clean, justification_img_url):
-                                    st.success("❌ Hipótese descartada com justificativa!")
+                                    success_msg = "❌ Causa descartada com justificativa!" if node_type == 'fact' else "❌ Hipótese descartada com justificativa!"
+                                    st.success(success_msg)
                                     st.rerun()
                     
                     with col_pend:
