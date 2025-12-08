@@ -531,12 +531,12 @@ HTML_TEMPLATE = """
                 {% set class_process_safety_val = accident.get('class_process_safety') %}
                 {% set class_asset_damage_val = accident.get('class_asset_damage') %}
                 {% set class_near_miss_val = accident.get('class_near_miss') %}
-                <span class="checkbox">{{ '☑' if (class_injury_val == True or (class_injury_val is not none and str(class_injury_val).lower() in ['true', '1', 'yes'])) else '☐' }}</span> Acidente Com Lesão na Força de Trabalho<br>
-                <span class="checkbox">{{ '☑' if (class_community_val == True or (class_community_val is not none and str(class_community_val).lower() in ['true', '1', 'yes'])) else '☐' }}</span> Acidente Com Lesão na Comunidade<br>
-                <span class="checkbox">{{ '☑' if (class_environment_val == True or (class_environment_val is not none and str(class_environment_val).lower() in ['true', '1', 'yes'])) else '☐' }}</span> Impacto ao Meio Ambiente<br>
-                <span class="checkbox">{{ '☑' if (class_process_safety_val == True or (class_process_safety_val is not none and str(class_process_safety_val).lower() in ['true', '1', 'yes'])) else '☐' }}</span> Segurança de Processo<br>
-                <span class="checkbox">{{ '☑' if (class_asset_damage_val == True or (class_asset_damage_val is not none and str(class_asset_damage_val).lower() in ['true', '1', 'yes'])) else '☐' }}</span> Dano ao Patrimônio<br>
-                <span class="checkbox">{{ '☑' if (class_near_miss_val == True or (class_near_miss_val is not none and str(class_near_miss_val).lower() in ['true', '1', 'yes'])) else '☐' }}</span> Quase-Acidente
+                <span class="checkbox">{{ '☑' if (class_injury_val == True or (class_injury_val is not none and (class_injury_val|string|lower) in ['true', '1', 'yes'])) else '☐' }}</span> Acidente Com Lesão na Força de Trabalho<br>
+                <span class="checkbox">{{ '☑' if (class_community_val == True or (class_community_val is not none and (class_community_val|string|lower) in ['true', '1', 'yes'])) else '☐' }}</span> Acidente Com Lesão na Comunidade<br>
+                <span class="checkbox">{{ '☑' if (class_environment_val == True or (class_environment_val is not none and (class_environment_val|string|lower) in ['true', '1', 'yes'])) else '☐' }}</span> Impacto ao Meio Ambiente<br>
+                <span class="checkbox">{{ '☑' if (class_process_safety_val == True or (class_process_safety_val is not none and (class_process_safety_val|string|lower) in ['true', '1', 'yes'])) else '☐' }}</span> Segurança de Processo<br>
+                <span class="checkbox">{{ '☑' if (class_asset_damage_val == True or (class_asset_damage_val is not none and (class_asset_damage_val|string|lower) in ['true', '1', 'yes'])) else '☐' }}</span> Dano ao Patrimônio<br>
+                <span class="checkbox">{{ '☑' if (class_near_miss_val == True or (class_near_miss_val is not none and (class_near_miss_val|string|lower) in ['true', '1', 'yes'])) else '☐' }}</span> Quase-Acidente
             </td>
             <td width="50%">
                 <span class="label">Gravidade Real/Potencial</span>
