@@ -1503,6 +1503,61 @@ def main():
         hypothesis_nodes.sort(key=sort_key)
         
         if hypothesis_nodes:
+            # Constrói a árvore JSON para calcular números corretamente
+            tree_json = build_fault_tree_json(accident_id)
+            
+            # Função para calcular números dos nós (mesma lógica da árvore)
+            node_number_map = {}  # Mapeia node_id -> número (H1, H2, CB1, etc.)
+            hypothesis_counter = 0
+            basic_cause_counter = 0
+            contributing_cause_counter = 0
+            
+            def calculate_node_numbers(node_data: Dict[str, Any]):
+                """Calcula números dos nós recursivamente (mesma lógica da renderização)"""
+                nonlocal hypothesis_counter, basic_cause_counter, contributing_cause_counter
+                
+                node_id = node_data.get('id')
+                node_type = node_data.get('type', 'hypothesis')
+                status = node_data.get('status', 'pending')
+                children = node_data.get('children', [])
+                has_children = len(children) > 0
+                is_basic_cause = node_data.get('is_basic_cause', False)
+                is_contributing_cause = node_data.get('is_contributing_cause', False)
+                
+                # Calcula número do nó (mesma lógica da função get_node_number)
+                node_number = ""
+                if node_type != 'root':
+                    if is_basic_cause:
+                        basic_cause_counter += 1
+                        node_number = f"CB{basic_cause_counter}"
+                    elif is_contributing_cause:
+                        contributing_cause_counter += 1
+                        node_number = f"CC{contributing_cause_counter}"
+                    elif node_type == 'hypothesis':
+                        hypothesis_counter += 1
+                        node_number = f"H{hypothesis_counter}"
+                    elif node_type == 'fact' and has_children:
+                        hypothesis_counter += 1
+                        node_number = f"H{hypothesis_counter}"
+                    elif status == 'validated' and has_children and node_type != 'root':
+                        hypothesis_counter += 1
+                        node_number = f"H{hypothesis_counter}"
+                    elif status in ['pending', 'discarded'] and node_type != 'root':
+                        hypothesis_counter += 1
+                        node_number = f"H{hypothesis_counter}"
+                
+                # Armazena o número no mapeamento
+                if node_number:
+                    node_number_map[node_id] = node_number
+                
+                # Processa filhos recursivamente
+                for child in children:
+                    calculate_node_numbers(child)
+            
+            # Calcula números se houver árvore
+            if tree_json:
+                calculate_node_numbers(tree_json)
+            
             # Verifica quais nós têm filhos
             node_ids = {n['id'] for n in nodes}
             children_count = {}
@@ -1519,9 +1574,17 @@ def main():
                 
                 # Verifica se é causa contribuinte
                 is_contributing = node.get('is_contributing_cause', False)
+                is_basic = node.get('is_basic_cause', False)
+                
+                # Obtém o número do nó (H1, H2, CB1, CC1, etc.)
+                node_number = node_number_map.get(node['id'], '')
+                number_prefix = f"{node_number}: " if node_number else ""
                 
                 # Determina tipo e status para exibição
-                if is_contributing:
+                if is_basic:
+                    # Causa básica
+                    node_type_label = "🔵 Causa Básica"
+                elif is_contributing:
                     # Causa contribuinte - usa símbolo de mão
                     node_type_label = "🤝 Causa Contribuinte"
                 elif node_type == 'fact' and has_children:
@@ -1546,11 +1609,11 @@ def main():
                     status_color = "#6c757d"
                     status_text = "⏳ Em Análise"
                 
-                # Título do expander
+                # Título do expander com numeração
                 if has_children:
-                    title = f"{node_type_label} ({status_text}): {node['label'][:50]}... [tem {num_children} subcausa(s)]"
+                    title = f"{number_prefix}{node_type_label} ({status_text}): {node['label'][:50]}... [tem {num_children} subcausa(s)]"
                 else:
-                    title = f"{node_type_label} ({status_text}): {node['label'][:60]}..."
+                    title = f"{number_prefix}{node_type_label} ({status_text}): {node['label'][:60]}..."
                 
                 with st.expander(title, expanded=False):
                     # Campo de edição do label
