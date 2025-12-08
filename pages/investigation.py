@@ -1675,7 +1675,7 @@ def main():
                                         if image_bytes:
                                             st.image(
                                                 image_bytes, 
-                                                use_container_width=True, 
+                                                width=150, 
                                                 caption="Imagem da justificativa"
                                             )
                                             image_loaded = True
@@ -1688,7 +1688,7 @@ def main():
                                 try:
                                     st.image(
                                         justification_image_url, 
-                                        use_container_width=True, 
+                                        width=150, 
                                         caption="Imagem da justificativa"
                                     )
                                     image_loaded = True
@@ -1699,7 +1699,7 @@ def main():
                                         if response.status_code == 200:
                                             st.image(
                                                 response.content, 
-                                                use_container_width=True, 
+                                                width=150, 
                                                 caption="Imagem da justificativa"
                                             )
                                             image_loaded = True
@@ -1745,7 +1745,7 @@ def main():
                     
                     if uploaded_justification_image:
                         # Mostra preview da imagem
-                        st.image(uploaded_justification_image, caption="Preview da imagem", width=300)
+                        st.image(uploaded_justification_image, caption="Preview da imagem", width=60)
                         
                         # Botão para fazer upload
                         if st.button("📤 Fazer upload da imagem", key=f"upload_img_{node['id']}"):
