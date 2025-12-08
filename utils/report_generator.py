@@ -781,6 +781,7 @@ def convert_image_url_to_base64(image_url: str) -> Optional[str]:
         import requests
         from io import BytesIO
         from PIL import Image
+        from urllib.parse import quote, urlparse, urlunparse
         
         # Se já for base64, retorna direto
         if image_url.startswith('data:image'):
@@ -790,14 +791,33 @@ def convert_image_url_to_base64(image_url: str) -> Optional[str]:
             print(f"[CONVERT_IMAGE] URL inválida: {image_url}")
             return None
         
+        # URL-encode corretamente (preserva a estrutura da URL mas codifica caracteres especiais)
+        try:
+            parsed = urlparse(image_url)
+            # Codifica apenas o path, preservando o resto da URL
+            encoded_path = quote(parsed.path, safe='/')
+            encoded_url = urlunparse((
+                parsed.scheme,
+                parsed.netloc,
+                encoded_path,
+                parsed.params,
+                parsed.query,
+                parsed.fragment
+            ))
+            print(f"[CONVERT_IMAGE] URL original: {image_url}")
+            print(f"[CONVERT_IMAGE] URL codificada: {encoded_url}")
+        except Exception as e:
+            print(f"[CONVERT_IMAGE] Erro ao codificar URL: {str(e)}")
+            encoded_url = image_url
+        
         # Tenta fazer download da imagem
         headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
         }
         
         try:
-            print(f"[CONVERT_IMAGE] Baixando imagem de: {image_url}")
-            response = requests.get(image_url, timeout=30, headers=headers, stream=True, verify=True)
+            print(f"[CONVERT_IMAGE] Baixando imagem de: {encoded_url}")
+            response = requests.get(encoded_url, timeout=30, headers=headers, stream=True, verify=True)
             
             if response.status_code == 200:
                 img_bytes = response.content
@@ -845,15 +865,21 @@ def convert_image_url_to_base64(image_url: str) -> Optional[str]:
                 return result
                 
             else:
-                print(f"[CONVERT_IMAGE] Erro HTTP {response.status_code} ao baixar {image_url}")
+                print(f"[CONVERT_IMAGE] Erro HTTP {response.status_code} ao baixar {encoded_url}")
                 print(f"[CONVERT_IMAGE] Response headers: {response.headers}")
+                # Tenta ler o corpo da resposta para ver o erro
+                try:
+                    error_body = response.text
+                    print(f"[CONVERT_IMAGE] Response body: {error_body}")
+                except:
+                    pass
                 return None
                 
         except requests.exceptions.Timeout:
-            print(f"[CONVERT_IMAGE] Timeout ao baixar {image_url}")
+            print(f"[CONVERT_IMAGE] Timeout ao baixar {encoded_url}")
             return None
         except requests.exceptions.RequestException as e:
-            print(f"[CONVERT_IMAGE] Erro de requisição ao baixar {image_url}: {str(e)}")
+            print(f"[CONVERT_IMAGE] Erro de requisição ao baixar {encoded_url}: {str(e)}")
             return None
         
     except Exception as e:
