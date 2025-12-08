@@ -775,10 +775,12 @@ def convert_image_url_to_base64(image_url: str) -> Optional[str]:
     """
     Converte URL de imagem para base64 (para embutir no PDF)
     Suporta URLs do Supabase Storage e outras URLs públicas
+    Usa PIL para validar e processar imagens corretamente
     """
     try:
         import requests
         from io import BytesIO
+        from PIL import Image
         
         # Se já for base64, retorna direto
         if image_url.startswith('data:image'):
@@ -794,7 +796,9 @@ def convert_image_url_to_base64(image_url: str) -> Optional[str]:
         }
         
         try:
-            response = requests.get(image_url, timeout=15, headers=headers, stream=True)
+            print(f"[CONVERT_IMAGE] Baixando imagem de: {image_url}")
+            response = requests.get(image_url, timeout=30, headers=headers, stream=True, verify=True)
+            
             if response.status_code == 200:
                 img_bytes = response.content
                 
@@ -803,32 +807,48 @@ def convert_image_url_to_base64(image_url: str) -> Optional[str]:
                     print(f"[CONVERT_IMAGE] Imagem vazia: {image_url}")
                     return None
                 
-                img_b64 = base64.b64encode(img_bytes).decode('utf-8')
+                print(f"[CONVERT_IMAGE] Imagem baixada: {len(img_bytes)} bytes")
                 
-                # Detecta tipo de imagem pelo Content-Type ou extensão
-                content_type = response.headers.get('Content-Type', '').lower()
-                if 'image/png' in content_type or image_url.lower().endswith('.png'):
-                    return f"data:image/png;base64,{img_b64}"
-                elif 'image/jpeg' in content_type or 'image/jpg' in content_type or image_url.lower().endswith(('.jpg', '.jpeg')):
-                    return f"data:image/jpeg;base64,{img_b64}"
-                elif 'image/gif' in content_type or image_url.lower().endswith('.gif'):
-                    return f"data:image/gif;base64,{img_b64}"
-                elif 'image/webp' in content_type or image_url.lower().endswith('.webp'):
-                    return f"data:image/webp;base64,{img_b64}"
-                else:
-                    # Tenta detectar pelo magic number (primeiros bytes)
-                    if img_bytes[:4] == b'\x89PNG':
-                        return f"data:image/png;base64,{img_b64}"
-                    elif img_bytes[:2] == b'\xff\xd8':
-                        return f"data:image/jpeg;base64,{img_b64}"
-                    elif img_bytes[:6] in (b'GIF87a', b'GIF89a'):
-                        return f"data:image/gif;base64,{img_b64}"
-                    else:
-                        # Default para JPEG
-                        return f"data:image/jpeg;base64,{img_b64}"
+                # Tenta abrir com PIL para validar e converter se necessário
+                try:
+                    img = Image.open(BytesIO(img_bytes))
+                    
+                    # Converte para RGB se necessário (remove canal alpha)
+                    if img.mode in ('RGBA', 'LA', 'P'):
+                        background = Image.new('RGB', img.size, (255, 255, 255))
+                        if img.mode == 'P':
+                            img = img.convert('RGBA')
+                        background.paste(img, mask=img.split()[-1] if img.mode in ('RGBA', 'LA') else None)
+                        img = background
+                    elif img.mode != 'RGB':
+                        img = img.convert('RGB')
+                    
+                    # Redimensiona se muito grande (otimização para PDF)
+                    max_size = 1920
+                    if img.width > max_size or img.height > max_size:
+                        img.thumbnail((max_size, max_size), Image.Resampling.LANCZOS)
+                        print(f"[CONVERT_IMAGE] Imagem redimensionada para: {img.size}")
+                    
+                    # Salva como JPEG com qualidade otimizada
+                    output = BytesIO()
+                    img.save(output, format='JPEG', quality=85, optimize=True)
+                    img_bytes = output.getvalue()
+                    print(f"[CONVERT_IMAGE] Imagem processada: {len(img_bytes)} bytes")
+                    
+                except Exception as e:
+                    print(f"[CONVERT_IMAGE] Erro ao processar imagem com PIL: {str(e)}")
+                    # Continua com os bytes originais
+                
+                img_b64 = base64.b64encode(img_bytes).decode('utf-8')
+                result = f"data:image/jpeg;base64,{img_b64}"
+                print(f"[CONVERT_IMAGE] ✓ Conversão bem-sucedida: {len(result)} caracteres")
+                return result
+                
             else:
                 print(f"[CONVERT_IMAGE] Erro HTTP {response.status_code} ao baixar {image_url}")
+                print(f"[CONVERT_IMAGE] Response headers: {response.headers}")
                 return None
+                
         except requests.exceptions.Timeout:
             print(f"[CONVERT_IMAGE] Timeout ao baixar {image_url}")
             return None
@@ -1242,6 +1262,9 @@ def generate_pdf_report(
         bytes: PDF gerado
     """
     try:
+        print(f"[PDF_GENERATION] Iniciando geração do PDF")
+        print(f"[PDF_GENERATION] Total de imagens de evidência recebidas: {len(evidence_images)}")
+        
         # Gera HTML da árvore se JSON fornecido (idêntica à visualização)
         fault_tree_html = None
         if fault_tree_json:
@@ -1249,27 +1272,26 @@ def generate_pdf_report(
         
         # Extrai hipóteses da árvore
         hypotheses = extract_hypotheses_from_tree(fault_tree_json)
+        print(f"[PDF_GENERATION] Total de hipóteses extraídas: {len(hypotheses)}")
         
         # Converte imagens de justificativa para base64
-        for hyp in hypotheses:
+        for i, hyp in enumerate(hypotheses):
             justification_image_url = hyp.get('justification_image_url')
             if justification_image_url and isinstance(justification_image_url, str) and justification_image_url.strip():
                 try:
-                    print(f"[PDF_GENERATION] Processando imagem de justificativa para hipótese '{hyp.get('label', 'N/A')[:50]}...': {justification_image_url}")
+                    print(f"[PDF_GENERATION] [{i+1}/{len(hypotheses)}] Processando imagem de justificativa: {justification_image_url[:100]}...")
                     img_b64 = convert_image_url_to_base64(justification_image_url.strip())
                     if img_b64:
                         hyp['justification_image_b64'] = img_b64
-                        print(f"[PDF_GENERATION] ✓ Imagem convertida com sucesso (tamanho base64: {len(img_b64)} caracteres)")
+                        print(f"[PDF_GENERATION] ✓ Imagem {i+1} convertida com sucesso")
                     else:
                         hyp['justification_image_b64'] = None
-                        print(f"[PDF_GENERATION] ✗ Falha ao converter imagem: {justification_image_url}")
+                        print(f"[PDF_GENERATION] ✗ Falha ao converter imagem {i+1}")
                 except Exception as e:
                     hyp['justification_image_b64'] = None
-                    print(f"[PDF_GENERATION] ✗ Exceção ao processar imagem {justification_image_url}: {str(e)}")
+                    print(f"[PDF_GENERATION] ✗ Exceção ao processar imagem {i+1}: {str(e)}")
             else:
                 hyp['justification_image_b64'] = None
-                if justification_image_url:
-                    print(f"[PDF_GENERATION] URL de imagem inválida para hipótese '{hyp.get('label', 'N/A')[:50]}...': {justification_image_url}")
         
         # Extrai recomendações de causas básicas e contribuintes
         recommendations = extract_recommendations_from_tree(fault_tree_json)
@@ -1284,12 +1306,19 @@ def generate_pdf_report(
         current_date = datetime.now().strftime('%d/%m/%Y')
         
         # Converte URLs de evidências para base64 (para embutir no PDF)
+        print(f"[PDF_GENERATION] Convertendo imagens de evidência...")
         evidence_images_b64 = []
-        for img_url in evidence_images:
+        for i, img_url in enumerate(evidence_images):
             if img_url:
+                print(f"[PDF_GENERATION] [{i+1}/{len(evidence_images)}] Convertendo: {img_url[:100]}...")
                 img_b64 = convert_image_url_to_base64(img_url)
                 if img_b64:
                     evidence_images_b64.append(img_b64)
+                    print(f"[PDF_GENERATION] ✓ Evidência {i+1} convertida")
+                else:
+                    print(f"[PDF_GENERATION] ✗ Falha ao converter evidência {i+1}")
+        
+        print(f"[PDF_GENERATION] Total de imagens convertidas: {len(evidence_images_b64)}/{len(evidence_images)}")
         
         # Prepara ações da comissão (ordena por data/hora)
         commission_actions_sorted = []
@@ -1297,6 +1326,7 @@ def generate_pdf_report(
             commission_actions_sorted = sorted(commission_actions, key=lambda x: x.get('action_time', ''))
         
         # Renderiza HTML
+        print(f"[PDF_GENERATION] Renderizando template HTML...")
         template = Template(HTML_TEMPLATE)
         rendered_html = template.render(
             accident=accident_data,
@@ -1315,13 +1345,21 @@ def generate_pdf_report(
             commission_actions=commission_actions_sorted
         )
         
+        print(f"[PDF_GENERATION] Gerando PDF com WeasyPrint...")
         # Gera PDF
         pdf_bytes = HTML(string=rendered_html).write_pdf(
             stylesheets=[CSS(string=CSS_STYLES)]
         )
         
-        return pdf_bytes
+        if pdf_bytes:
+            print(f"[PDF_GENERATION] ✓ PDF gerado com sucesso: {len(pdf_bytes)} bytes")
+            return pdf_bytes
+        else:
+            raise Exception("Falha ao gerar PDF: retorno vazio do WeasyPrint")
         
     except Exception as e:
+        print(f"[PDF_GENERATION] ✗ Erro ao gerar PDF: {str(e)}")
+        import traceback
+        traceback.print_exc()
         raise Exception(f"Erro ao gerar PDF: {str(e)}")
 

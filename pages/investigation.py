@@ -1696,7 +1696,7 @@ def main():
                                     # Se falhar, tenta baixar via HTTP
                                     try:
                                         response = requests.get(justification_image_url, timeout=10)
-                                        if response.status_code == 400:
+                                        if response.status_code == 200:
                                             st.image(
                                                 response.content, 
                                                 width=300, 
