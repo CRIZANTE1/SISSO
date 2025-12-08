@@ -1675,7 +1675,7 @@ def main():
                                         if image_bytes:
                                             st.image(
                                                 image_bytes, 
-                                                width=150, 
+                                                width=300, 
                                                 caption="Imagem da justificativa"
                                             )
                                             image_loaded = True
@@ -1688,7 +1688,7 @@ def main():
                                 try:
                                     st.image(
                                         justification_image_url, 
-                                        width=150, 
+                                        width=300, 
                                         caption="Imagem da justificativa"
                                     )
                                     image_loaded = True
@@ -1696,10 +1696,10 @@ def main():
                                     # Se falhar, tenta baixar via HTTP
                                     try:
                                         response = requests.get(justification_image_url, timeout=10)
-                                        if response.status_code == 200:
+                                        if response.status_code == 400:
                                             st.image(
                                                 response.content, 
-                                                width=150, 
+                                                width=300, 
                                                 caption="Imagem da justificativa"
                                             )
                                             image_loaded = True
