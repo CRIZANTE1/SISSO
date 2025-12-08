@@ -781,7 +781,6 @@ def convert_image_url_to_base64(image_url: str) -> Optional[str]:
         import requests
         from io import BytesIO
         from PIL import Image
-        from urllib.parse import quote, urlparse, urlunparse
         
         # Se já for base64, retorna direto
         if image_url.startswith('data:image'):
@@ -791,24 +790,13 @@ def convert_image_url_to_base64(image_url: str) -> Optional[str]:
             print(f"[CONVERT_IMAGE] URL inválida: {image_url}")
             return None
         
-        # URL-encode corretamente (preserva a estrutura da URL mas codifica caracteres especiais)
-        try:
-            parsed = urlparse(image_url)
-            # Codifica apenas o path, preservando o resto da URL
-            encoded_path = quote(parsed.path, safe='/')
-            encoded_url = urlunparse((
-                parsed.scheme,
-                parsed.netloc,
-                encoded_path,
-                parsed.params,
-                parsed.query,
-                parsed.fragment
-            ))
-            print(f"[CONVERT_IMAGE] URL original: {image_url}")
-            print(f"[CONVERT_IMAGE] URL codificada: {encoded_url}")
-        except Exception as e:
-            print(f"[CONVERT_IMAGE] Erro ao codificar URL: {str(e)}")
-            encoded_url = image_url
+        # Remove espaços em branco no início/fim
+        image_url = image_url.strip()
+        
+        print(f"[CONVERT_IMAGE] URL recebida: {image_url}")
+        
+        # Para Supabase, a URL já vem corretamente codificada
+        # Não precisamos recodificar, apenas usar diretamente
         
         # Tenta fazer download da imagem
         headers = {
@@ -816,15 +804,15 @@ def convert_image_url_to_base64(image_url: str) -> Optional[str]:
         }
         
         try:
-            print(f"[CONVERT_IMAGE] Baixando imagem de: {encoded_url}")
-            response = requests.get(encoded_url, timeout=30, headers=headers, stream=True, verify=True)
+            print(f"[CONVERT_IMAGE] Baixando imagem...")
+            response = requests.get(image_url, timeout=30, headers=headers, stream=True, verify=True)
             
             if response.status_code == 200:
                 img_bytes = response.content
                 
                 # Verifica se realmente é uma imagem
                 if len(img_bytes) == 0:
-                    print(f"[CONVERT_IMAGE] Imagem vazia: {image_url}")
+                    print(f"[CONVERT_IMAGE] Imagem vazia")
                     return None
                 
                 print(f"[CONVERT_IMAGE] Imagem baixada: {len(img_bytes)} bytes")
@@ -832,6 +820,7 @@ def convert_image_url_to_base64(image_url: str) -> Optional[str]:
                 # Tenta abrir com PIL para validar e converter se necessário
                 try:
                     img = Image.open(BytesIO(img_bytes))
+                    print(f"[CONVERT_IMAGE] Imagem carregada: {img.format} {img.size} {img.mode}")
                     
                     # Converte para RGB se necessário (remove canal alpha)
                     if img.mode in ('RGBA', 'LA', 'P'):
@@ -840,14 +829,17 @@ def convert_image_url_to_base64(image_url: str) -> Optional[str]:
                             img = img.convert('RGBA')
                         background.paste(img, mask=img.split()[-1] if img.mode in ('RGBA', 'LA') else None)
                         img = background
+                        print(f"[CONVERT_IMAGE] Convertido para RGB")
                     elif img.mode != 'RGB':
                         img = img.convert('RGB')
+                        print(f"[CONVERT_IMAGE] Convertido de {img.mode} para RGB")
                     
                     # Redimensiona se muito grande (otimização para PDF)
                     max_size = 1920
                     if img.width > max_size or img.height > max_size:
+                        original_size = img.size
                         img.thumbnail((max_size, max_size), Image.Resampling.LANCZOS)
-                        print(f"[CONVERT_IMAGE] Imagem redimensionada para: {img.size}")
+                        print(f"[CONVERT_IMAGE] Imagem redimensionada de {original_size} para {img.size}")
                     
                     # Salva como JPEG com qualidade otimizada
                     output = BytesIO()
@@ -857,6 +849,7 @@ def convert_image_url_to_base64(image_url: str) -> Optional[str]:
                     
                 except Exception as e:
                     print(f"[CONVERT_IMAGE] Erro ao processar imagem com PIL: {str(e)}")
+                    print(f"[CONVERT_IMAGE] Continuando com bytes originais")
                     # Continua com os bytes originais
                 
                 img_b64 = base64.b64encode(img_bytes).decode('utf-8')
@@ -865,8 +858,8 @@ def convert_image_url_to_base64(image_url: str) -> Optional[str]:
                 return result
                 
             else:
-                print(f"[CONVERT_IMAGE] Erro HTTP {response.status_code} ao baixar {encoded_url}")
-                print(f"[CONVERT_IMAGE] Response headers: {response.headers}")
+                print(f"[CONVERT_IMAGE] ✗ Erro HTTP {response.status_code}")
+                print(f"[CONVERT_IMAGE] Response headers: {dict(response.headers)}")
                 # Tenta ler o corpo da resposta para ver o erro
                 try:
                     error_body = response.text
@@ -876,10 +869,10 @@ def convert_image_url_to_base64(image_url: str) -> Optional[str]:
                 return None
                 
         except requests.exceptions.Timeout:
-            print(f"[CONVERT_IMAGE] Timeout ao baixar {encoded_url}")
+            print(f"[CONVERT_IMAGE] ✗ Timeout ao baixar")
             return None
         except requests.exceptions.RequestException as e:
-            print(f"[CONVERT_IMAGE] Erro de requisição ao baixar {encoded_url}: {str(e)}")
+            print(f"[CONVERT_IMAGE] ✗ Erro de requisição: {str(e)}")
             return None
         
     except Exception as e:
