@@ -1745,7 +1745,7 @@ def main():
                     
                     if uploaded_justification_image:
                         # Mostra preview da imagem
-                        st.image(uploaded_justification_image, caption="Preview da imagem", width=60)
+                        st.image(uploaded_justification_image, caption="Preview da imagem", width=120)
                         
                         # Botão para fazer upload
                         if st.button("📤 Fazer upload da imagem", key=f"upload_img_{node['id']}"):
