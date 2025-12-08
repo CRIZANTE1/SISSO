@@ -2211,13 +2211,128 @@ def main():
                     evidence_list = get_evidence(accident_id)
                     evidence_images = [e.get('image_url', '') for e in evidence_list if e.get('image_url')]
                     
+                    # 5.5. Pré-carrega imagens no session state (mesma lógica da galeria)
+                    # Isso garante que as imagens sejam baixadas corretamente antes de gerar o PDF
+                    cache_key = f"pdf_images_cache_{accident_id}"
+                    if cache_key not in st.session_state:
+                        st.session_state[cache_key] = {}
+                    
+                    # Pré-carrega imagens de evidência
+                    for i, img_url in enumerate(evidence_images):
+                        if img_url and img_url not in st.session_state[cache_key]:
+                            try:
+                                # Extrai o path da URL
+                                path = None
+                                if '/storage/v1/object/public/evidencias/' in img_url:
+                                    path = img_url.split('/storage/v1/object/public/evidencias/')[1]
+                                elif '/evidencias/' in img_url:
+                                    parts = img_url.split('/evidencias/')
+                                    if len(parts) > 1:
+                                        path = parts[1]
+                                
+                                # Tenta baixar do Supabase Storage
+                                if path:
+                                    from managers.supabase_config import get_service_role_client
+                                    supabase = get_service_role_client()
+                                    if supabase:
+                                        # Decodifica o path para usar no download
+                                        from urllib.parse import unquote
+                                        decoded_path = unquote(path)
+                                        try:
+                                            image_bytes = supabase.storage.from_('evidencias').download(decoded_path)
+                                            if image_bytes:
+                                                # Converte para base64 e armazena
+                                                import base64
+                                                img_b64 = base64.b64encode(image_bytes).decode('utf-8')
+                                                st.session_state[cache_key][img_url] = f"data:image/jpeg;base64,{img_b64}"
+                                                print(f"[PDF_PRELOAD] Imagem de evidência {i+1} pré-carregada")
+                                        except Exception as e:
+                                            # Se falhar com path decodificado, tenta com path original
+                                            try:
+                                                image_bytes = supabase.storage.from_('evidencias').download(path)
+                                                if image_bytes:
+                                                    import base64
+                                                    img_b64 = base64.b64encode(image_bytes).decode('utf-8')
+                                                    st.session_state[cache_key][img_url] = f"data:image/jpeg;base64,{img_b64}"
+                                                    print(f"[PDF_PRELOAD] Imagem de evidência {i+1} pré-carregada (path original)")
+                                            except:
+                                                pass
+                            except Exception as e:
+                                print(f"[PDF_PRELOAD] Erro ao pré-carregar evidência {i+1}: {str(e)}")
+                    
+                    # Substitui URLs por versões em cache se disponíveis
+                    evidence_images_cached = []
+                    for img_url in evidence_images:
+                        if img_url in st.session_state[cache_key]:
+                            evidence_images_cached.append(st.session_state[cache_key][img_url])
+                        else:
+                            evidence_images_cached.append(img_url)
+                    evidence_images = evidence_images_cached
+                    
                     # 6. Busca JSON da árvore para gerar imagem
                     tree_json = build_fault_tree_json(accident_id)
+                    
+                    # 6.3. Pré-carrega imagens de justificativa das hipóteses
+                    if tree_json:
+                        def extract_justification_images(node):
+                            """Extrai URLs de imagens de justificativa recursivamente"""
+                            images = []
+                            justification_url = node.get('justification_image_url')
+                            if justification_url:
+                                images.append(justification_url)
+                            for child in node.get('children', []):
+                                images.extend(extract_justification_images(child))
+                            return images
+                        
+                        justification_image_urls = extract_justification_images(tree_json)
+                        
+                        # Pré-carrega cada imagem de justificativa
+                        for i, img_url in enumerate(justification_image_urls):
+                            if img_url and img_url not in st.session_state[cache_key]:
+                                try:
+                                    # Extrai o path da URL
+                                    path = None
+                                    if '/storage/v1/object/public/evidencias/' in img_url:
+                                        path = img_url.split('/storage/v1/object/public/evidencias/')[1]
+                                    elif '/evidencias/' in img_url:
+                                        parts = img_url.split('/evidencias/')
+                                        if len(parts) > 1:
+                                            path = parts[1]
+                                    
+                                    # Tenta baixar do Supabase Storage
+                                    if path:
+                                        from managers.supabase_config import get_service_role_client
+                                        supabase = get_service_role_client()
+                                        if supabase:
+                                            # Decodifica o path para usar no download
+                                            from urllib.parse import unquote
+                                            decoded_path = unquote(path)
+                                            try:
+                                                image_bytes = supabase.storage.from_('evidencias').download(decoded_path)
+                                                if image_bytes:
+                                                    # Converte para base64 e armazena
+                                                    import base64
+                                                    img_b64 = base64.b64encode(image_bytes).decode('utf-8')
+                                                    st.session_state[cache_key][img_url] = f"data:image/jpeg;base64,{img_b64}"
+                                                    print(f"[PDF_PRELOAD] Imagem de justificativa {i+1} pré-carregada")
+                                            except Exception as e:
+                                                # Se falhar com path decodificado, tenta com path original
+                                                try:
+                                                    image_bytes = supabase.storage.from_('evidencias').download(path)
+                                                    if image_bytes:
+                                                        import base64
+                                                        img_b64 = base64.b64encode(image_bytes).decode('utf-8')
+                                                        st.session_state[cache_key][img_url] = f"data:image/jpeg;base64,{img_b64}"
+                                                        print(f"[PDF_PRELOAD] Imagem de justificativa {i+1} pré-carregada (path original)")
+                                                except:
+                                                    pass
+                                except Exception as e:
+                                    print(f"[PDF_PRELOAD] Erro ao pré-carregar justificativa {i+1}: {str(e)}")
                     
                     # 6.5. Busca ações da comissão
                     commission_actions = get_commission_actions(accident_id)
                     
-                    # 7. Gera PDF
+                    # 7. Gera PDF (passa o cache de imagens)
                     pdf_bytes = generate_pdf_report(
                         accident_data=accident_full,
                         people_data=all_people,
@@ -2225,7 +2340,8 @@ def main():
                         verified_causes=verified_causes,
                         evidence_images=evidence_images,
                         fault_tree_json=tree_json,
-                        commission_actions=commission_actions
+                        commission_actions=commission_actions,
+                        image_cache=st.session_state.get(cache_key, {})
                     )
                     
                     # 8. Botão de download

@@ -771,16 +771,18 @@ HTML_TEMPLATE = """
 """
 
 
-def convert_image_url_to_base64(image_url: str) -> Optional[str]:
+def convert_image_url_to_base64(image_url: str, image_cache: Optional[Dict[str, str]] = None) -> Optional[str]:
     """
     Converte URL de imagem para base64 (para embutir no PDF)
     Suporta URLs do Supabase Storage e outras URLs públicas
     Usa PIL para validar e processar imagens corretamente
+    Tenta URL decodificada e original para resolver problemas de encoding
     """
     try:
         import requests
         from io import BytesIO
         from PIL import Image
+        from urllib.parse import unquote
         
         # Se já for base64, retorna direto
         if image_url.startswith('data:image'):
@@ -793,87 +795,108 @@ def convert_image_url_to_base64(image_url: str) -> Optional[str]:
         # Remove espaços em branco no início/fim
         image_url = image_url.strip()
         
-        print(f"[CONVERT_IMAGE] URL recebida: {image_url}")
+        # Verifica se a imagem está no cache primeiro
+        if image_cache and image_url in image_cache:
+            cached_image = image_cache[image_url]
+            print(f"[CONVERT_IMAGE] ✓ Imagem encontrada no cache")
+            return cached_image
         
-        # Para Supabase, a URL já vem corretamente codificada
-        # Não precisamos recodificar, apenas usar diretamente
+        print(f"[CONVERT_IMAGE] URL original: {image_url}")
         
-        # Tenta fazer download da imagem
+        # Para URLs do Supabase que já vêm com %20, vamos tentar DECODIFICAR
+        # pois o servidor pode esperar os caracteres reais
+        try:
+            # Decodifica a URL (transforma %20 em espaço, etc.)
+            decoded_url = unquote(image_url)
+            print(f"[CONVERT_IMAGE] URL decodificada: {decoded_url}")
+            
+            # Se a URL decodificada for diferente, tenta primeiro a decodificada
+            urls_to_try = [decoded_url, image_url] if decoded_url != image_url else [image_url]
+        except Exception as e:
+            print(f"[CONVERT_IMAGE] Erro ao decodificar URL: {str(e)}")
+            urls_to_try = [image_url]
+        
+        # Tenta fazer download da imagem (tenta URLs decodificada e original)
         headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
         }
         
-        try:
-            print(f"[CONVERT_IMAGE] Baixando imagem...")
-            response = requests.get(image_url, timeout=30, headers=headers, stream=True, verify=True)
+        last_error = None
+        for attempt, url_to_use in enumerate(urls_to_try, 1):
+            try:
+                print(f"[CONVERT_IMAGE] Tentativa {attempt}/{len(urls_to_try)}: Baixando de {url_to_use[:120]}...")
+                response = requests.get(url_to_use, timeout=30, headers=headers, stream=True, verify=True)
             
-            if response.status_code == 200:
-                img_bytes = response.content
-                
-                # Verifica se realmente é uma imagem
-                if len(img_bytes) == 0:
-                    print(f"[CONVERT_IMAGE] Imagem vazia")
-                    return None
-                
-                print(f"[CONVERT_IMAGE] Imagem baixada: {len(img_bytes)} bytes")
-                
-                # Tenta abrir com PIL para validar e converter se necessário
-                try:
-                    img = Image.open(BytesIO(img_bytes))
-                    print(f"[CONVERT_IMAGE] Imagem carregada: {img.format} {img.size} {img.mode}")
+                if response.status_code == 200:
+                    img_bytes = response.content
                     
-                    # Converte para RGB se necessário (remove canal alpha)
-                    if img.mode in ('RGBA', 'LA', 'P'):
-                        background = Image.new('RGB', img.size, (255, 255, 255))
-                        if img.mode == 'P':
-                            img = img.convert('RGBA')
-                        background.paste(img, mask=img.split()[-1] if img.mode in ('RGBA', 'LA') else None)
-                        img = background
-                        print(f"[CONVERT_IMAGE] Convertido para RGB")
-                    elif img.mode != 'RGB':
-                        img = img.convert('RGB')
-                        print(f"[CONVERT_IMAGE] Convertido de {img.mode} para RGB")
+                    # Verifica se realmente é uma imagem
+                    if len(img_bytes) == 0:
+                        print(f"[CONVERT_IMAGE] Imagem vazia na tentativa {attempt}")
+                        continue
                     
-                    # Redimensiona se muito grande (otimização para PDF)
-                    max_size = 1920
-                    if img.width > max_size or img.height > max_size:
-                        original_size = img.size
-                        img.thumbnail((max_size, max_size), Image.Resampling.LANCZOS)
-                        print(f"[CONVERT_IMAGE] Imagem redimensionada de {original_size} para {img.size}")
+                    print(f"[CONVERT_IMAGE] ✓ Imagem baixada na tentativa {attempt}: {len(img_bytes)} bytes")
                     
-                    # Salva como JPEG com qualidade otimizada
-                    output = BytesIO()
-                    img.save(output, format='JPEG', quality=85, optimize=True)
-                    img_bytes = output.getvalue()
-                    print(f"[CONVERT_IMAGE] Imagem processada: {len(img_bytes)} bytes")
+                    # Tenta abrir com PIL para validar e converter se necessário
+                    try:
+                        img = Image.open(BytesIO(img_bytes))
+                        print(f"[CONVERT_IMAGE] Imagem carregada: {img.format} {img.size} {img.mode}")
+                        
+                        # Converte para RGB se necessário (remove canal alpha)
+                        if img.mode in ('RGBA', 'LA', 'P'):
+                            background = Image.new('RGB', img.size, (255, 255, 255))
+                            if img.mode == 'P':
+                                img = img.convert('RGBA')
+                            background.paste(img, mask=img.split()[-1] if img.mode in ('RGBA', 'LA') else None)
+                            img = background
+                            print(f"[CONVERT_IMAGE] Convertido para RGB")
+                        elif img.mode != 'RGB':
+                            img = img.convert('RGB')
+                            print(f"[CONVERT_IMAGE] Convertido de {img.mode} para RGB")
+                        
+                        # Redimensiona se muito grande (otimização para PDF)
+                        max_size = 1920
+                        if img.width > max_size or img.height > max_size:
+                            original_size = img.size
+                            img.thumbnail((max_size, max_size), Image.Resampling.LANCZOS)
+                            print(f"[CONVERT_IMAGE] Imagem redimensionada de {original_size} para {img.size}")
+                        
+                        # Salva como JPEG com qualidade otimizada
+                        output = BytesIO()
+                        img.save(output, format='JPEG', quality=85, optimize=True)
+                        img_bytes = output.getvalue()
+                        print(f"[CONVERT_IMAGE] Imagem processada: {len(img_bytes)} bytes")
+                        
+                    except Exception as e:
+                        print(f"[CONVERT_IMAGE] Erro ao processar com PIL: {str(e)}")
+                        print(f"[CONVERT_IMAGE] Continuando com bytes originais")
                     
-                except Exception as e:
-                    print(f"[CONVERT_IMAGE] Erro ao processar imagem com PIL: {str(e)}")
-                    print(f"[CONVERT_IMAGE] Continuando com bytes originais")
-                    # Continua com os bytes originais
-                
-                img_b64 = base64.b64encode(img_bytes).decode('utf-8')
-                result = f"data:image/jpeg;base64,{img_b64}"
-                print(f"[CONVERT_IMAGE] ✓ Conversão bem-sucedida: {len(result)} caracteres")
-                return result
-                
-            else:
-                print(f"[CONVERT_IMAGE] ✗ Erro HTTP {response.status_code}")
-                print(f"[CONVERT_IMAGE] Response headers: {dict(response.headers)}")
-                # Tenta ler o corpo da resposta para ver o erro
-                try:
-                    error_body = response.text
-                    print(f"[CONVERT_IMAGE] Response body: {error_body}")
-                except:
-                    pass
-                return None
-                
-        except requests.exceptions.Timeout:
-            print(f"[CONVERT_IMAGE] ✗ Timeout ao baixar")
-            return None
-        except requests.exceptions.RequestException as e:
-            print(f"[CONVERT_IMAGE] ✗ Erro de requisição: {str(e)}")
-            return None
+                    img_b64 = base64.b64encode(img_bytes).decode('utf-8')
+                    result = f"data:image/jpeg;base64,{img_b64}"
+                    print(f"[CONVERT_IMAGE] ✓ Conversão bem-sucedida: {len(result)} caracteres")
+                    return result
+                    
+                else:
+                    error_msg = f"Erro HTTP {response.status_code} na tentativa {attempt}"
+                    print(f"[CONVERT_IMAGE] {error_msg}")
+                    try:
+                        error_body = response.text
+                        print(f"[CONVERT_IMAGE] Response body: {error_body}")
+                    except:
+                        pass
+                    last_error = error_msg
+                    
+            except requests.exceptions.Timeout:
+                error_msg = f"Timeout na tentativa {attempt}"
+                print(f"[CONVERT_IMAGE] {error_msg}")
+                last_error = error_msg
+            except requests.exceptions.RequestException as e:
+                error_msg = f"Erro de requisição na tentativa {attempt}: {str(e)}"
+                print(f"[CONVERT_IMAGE] {error_msg}")
+                last_error = error_msg
+        
+        print(f"[CONVERT_IMAGE] ✗ Todas as tentativas falharam. Último erro: {last_error}")
+        return None
         
     except Exception as e:
         print(f"[CONVERT_IMAGE] Erro inesperado ao converter imagem {image_url}: {str(e)}")
@@ -1263,7 +1286,8 @@ def generate_pdf_report(
     verified_causes: List[Dict[str, Any]],
     evidence_images: List[str],
     fault_tree_json: Optional[Dict[str, Any]] = None,
-    commission_actions: Optional[List[Dict[str, Any]]] = None
+    commission_actions: Optional[List[Dict[str, Any]]] = None,
+    image_cache: Optional[Dict[str, str]] = None
 ) -> bytes:
     """
     Gera o PDF preenchendo o template com os dados.
@@ -1276,6 +1300,7 @@ def generate_pdf_report(
         evidence_images: Lista de URLs ou base64 das imagens de evidência
         fault_tree_json: JSON da árvore de falhas (opcional, para gerar imagem)
         commission_actions: Lista de ações executadas pela comissão (opcional)
+        image_cache: Dicionário com cache de imagens pré-carregadas (opcional)
     
     Returns:
         bytes: PDF gerado
@@ -1299,7 +1324,7 @@ def generate_pdf_report(
             if justification_image_url and isinstance(justification_image_url, str) and justification_image_url.strip():
                 try:
                     print(f"[PDF_GENERATION] [{i+1}/{len(hypotheses)}] Processando imagem de justificativa: {justification_image_url[:100]}...")
-                    img_b64 = convert_image_url_to_base64(justification_image_url.strip())
+                    img_b64 = convert_image_url_to_base64(justification_image_url.strip(), image_cache)
                     if img_b64:
                         hyp['justification_image_b64'] = img_b64
                         print(f"[PDF_GENERATION] ✓ Imagem {i+1} convertida com sucesso")
@@ -1330,7 +1355,7 @@ def generate_pdf_report(
         for i, img_url in enumerate(evidence_images):
             if img_url:
                 print(f"[PDF_GENERATION] [{i+1}/{len(evidence_images)}] Convertendo: {img_url[:100]}...")
-                img_b64 = convert_image_url_to_base64(img_url)
+                img_b64 = convert_image_url_to_base64(img_url, image_cache)
                 if img_b64:
                     evidence_images_b64.append(img_b64)
                     print(f"[PDF_GENERATION] ✓ Evidência {i+1} convertida")
