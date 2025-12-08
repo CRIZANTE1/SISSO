@@ -397,8 +397,8 @@ HTML_TEMPLATE = """
     {% if evidence_images and evidence_images|length > 0 %}
     <div style="margin-top: 15px; text-align: center; page-break-inside: avoid;">
         <div style="font-weight: bold; margin-bottom: 8px; font-size: 9pt; color: #666;">Primeira Foto da Galeria de Evidências</div>
-        <div style="width: 1.4cm; height: 1.4cm; margin: 0 auto; border: 1px solid #ddd; border-radius: 4px; display: flex; align-items: center; justify-content: center; overflow: hidden; background-color: #f9f9f9;">
-            <img src="{{ evidence_images[0] }}" style="max-width: 1.4cm; max-height: 1.4cm; width: auto; height: auto; object-fit: contain;" alt="Primeira evidência">
+        <div style="width: 6cm; height: 4.5cm; margin: 0 auto; border: 1px solid #ddd; border-radius: 4px; display: flex; align-items: center; justify-content: center; overflow: hidden; background-color: #f9f9f9;">
+            <img src="{{ evidence_images[0] }}" style="max-width: 6cm; max-height: 4.5cm; width: auto; height: auto; object-fit: contain;" alt="Primeira evidência">
         </div>
     </div>
     {% endif %}
