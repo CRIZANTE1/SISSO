@@ -469,7 +469,43 @@ HTML_TEMPLATE = """
         </tr>
         <tr>
             <td class="vibra-green">Classificação</td>
-            <td>{{ accident.get('classification', 'N/A') }}</td>
+            <td>
+                {% set class_injury_val = accident.get('class_injury') %}
+                {% set class_community_val = accident.get('class_community') %}
+                {% set class_environment_val = accident.get('class_environment') %}
+                {% set class_process_safety_val = accident.get('class_process_safety') %}
+                {% set class_asset_damage_val = accident.get('class_asset_damage') %}
+                {% set class_near_miss_val = accident.get('class_near_miss') %}
+                {% set class_str = '' %}
+                {% if class_injury_val == True or (class_injury_val is not none and (class_injury_val|string|lower) in ['true', '1', 'yes']) %}
+                    {% set class_str = class_str + 'Com Lesão' %}
+                {% endif %}
+                {% if class_community_val == True or (class_community_val is not none and (class_community_val|string|lower) in ['true', '1', 'yes']) %}
+                    {% if class_str %}{% set class_str = class_str + ', ' %}{% endif %}
+                    {% set class_str = class_str + 'Impacto na Comunidade' %}
+                {% endif %}
+                {% if class_environment_val == True or (class_environment_val is not none and (class_environment_val|string|lower) in ['true', '1', 'yes']) %}
+                    {% if class_str %}{% set class_str = class_str + ', ' %}{% endif %}
+                    {% set class_str = class_str + 'Meio Ambiente' %}
+                {% endif %}
+                {% if class_process_safety_val == True or (class_process_safety_val is not none and (class_process_safety_val|string|lower) in ['true', '1', 'yes']) %}
+                    {% if class_str %}{% set class_str = class_str + ', ' %}{% endif %}
+                    {% set class_str = class_str + 'Segurança de Processo' %}
+                {% endif %}
+                {% if class_asset_damage_val == True or (class_asset_damage_val is not none and (class_asset_damage_val|string|lower) in ['true', '1', 'yes']) %}
+                    {% if class_str %}{% set class_str = class_str + ', ' %}{% endif %}
+                    {% set class_str = class_str + 'Dano ao Patrimônio' %}
+                {% endif %}
+                {% if class_near_miss_val == True or (class_near_miss_val is not none and (class_near_miss_val|string|lower) in ['true', '1', 'yes']) %}
+                    {% if class_str %}{% set class_str = class_str + ', ' %}{% endif %}
+                    {% set class_str = class_str + 'Quase-Acidente' %}
+                {% endif %}
+                {% if class_str %}
+                    {{ class_str }}
+                {% else %}
+                    {{ accident.get('classification', 'N/A') }}
+                {% endif %}
+            </td>
         </tr>
         {% if evidence_images %}
         <tr>
@@ -698,8 +734,6 @@ HTML_TEMPLATE = """
         </tr>
         {% endfor %}
     </table>
-    {% else %}
-    <p style="color: #999; font-style: italic;">Nenhuma causa validada e classificada ainda.</p>
     {% endif %}
 
     <!-- 5.2 Hipóteses Descritas e Justificadas -->
