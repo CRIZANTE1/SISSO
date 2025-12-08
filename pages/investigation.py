@@ -932,7 +932,7 @@ def main():
             # Botão de salvar
             col_save, col_empty = st.columns([1, 1])
             with col_save:
-                if st.form_submit_button("💾 Salvar Dados e Continuar", type="primary", use_container_width=True):
+                if st.form_submit_button("💾 Salvar Dados e Continuar", type="primary", width='stretch'):
                     # Atualiza dados do acidente - TODOS os campos válidos
                     update_data = {
                         'title': title if title else investigation.get('title', 'Acidente sem título'),
@@ -1074,7 +1074,7 @@ def main():
                                             if image_bytes:
                                                 st.image(
                                                     image_bytes, 
-                                                    use_container_width=True, 
+                                                    width='stretch', 
                                                     caption=evidence.get('description', 'Sem descrição')
                                                 )
                                                 image_loaded = True
@@ -1087,7 +1087,7 @@ def main():
                                     try:
                                         st.image(
                                             image_url, 
-                                            use_container_width=True, 
+                                            width='stretch', 
                                             caption=evidence.get('description', 'Sem descrição')
                                         )
                                         image_loaded = True
@@ -1098,7 +1098,7 @@ def main():
                                             if response.status_code == 200:
                                                 st.image(
                                                     response.content, 
-                                                    use_container_width=True, 
+                                                    width='stretch', 
                                                     caption=evidence.get('description', 'Sem descrição')
                                                 )
                                                 image_loaded = True
@@ -1121,7 +1121,7 @@ def main():
         # Navegação
         col_prev, col_next = st.columns([1, 1])
         with col_next:
-            if st.button("➡️ Próximo: Linha do Tempo", type="primary", use_container_width=True):
+            if st.button("➡️ Próximo: Linha do Tempo", type="primary", width='stretch'):
                 st.session_state['current_step'] = 1
                 st.rerun()
     
@@ -1365,11 +1365,11 @@ def main():
         # Navegação
         col_prev, col_next = st.columns([1, 1])
         with col_prev:
-            if st.button("⬅️ Anterior: Fatos & Fotos", use_container_width=True):
+            if st.button("⬅️ Anterior: Fatos & Fotos", width='stretch'):
                 st.session_state['current_step'] = 0
                 st.rerun()
         with col_next:
-            if st.button("➡️ Próximo: Árvore de Porquês", type="primary", use_container_width=True):
+            if st.button("➡️ Próximo: Árvore de Porquês", type="primary", width='stretch'):
                 st.session_state['current_step'] = 2
                 st.rerun()
     
@@ -1900,12 +1900,12 @@ def main():
         # Navegação
         col_prev, col_next = st.columns([1, 1])
         with col_prev:
-            if st.button("⬅️ Anterior: Linha do Tempo", use_container_width=True):
+            if st.button("⬅️ Anterior: Linha do Tempo", width='stretch'):
                 st.session_state['current_step'] = 1
                 st.rerun()
         with col_next:
             if validated_count > 0:
-                if st.button("➡️ Próximo: Classificação", type="primary", use_container_width=True):
+                if st.button("➡️ Próximo: Classificação", type="primary", width='stretch'):
                     st.session_state['current_step'] = 3
                     st.rerun()
             else:
@@ -2151,7 +2151,7 @@ def main():
         # Navegação
         col_prev, col_next = st.columns([1, 1])
         with col_prev:
-            if st.button("⬅️ Anterior: Árvore de Porquês", use_container_width=True):
+            if st.button("⬅️ Anterior: Árvore de Porquês", width='stretch'):
                 st.session_state['current_step'] = 2
                 st.rerun()
         with col_next:
@@ -2162,7 +2162,7 @@ def main():
         st.markdown("### 📄 Relatório Final PDF")
         st.markdown("**Gere o relatório completo no padrão Vibra**")
         
-        if st.button("📥 Gerar Relatório PDF Oficial", type="primary", use_container_width=True):
+        if st.button("📥 Gerar Relatório PDF Oficial", type="primary", width='stretch'):
             with st.spinner("🔄 Gerando PDF no padrão Vibra... Isso pode levar alguns segundos."):
                 try:
                     from utils.report_generator import generate_pdf_report
@@ -2239,7 +2239,7 @@ def main():
                         file_name=filename,
                         mime="application/pdf",
                         type="primary",
-                        use_container_width=True
+                        width='stretch'
                     )
                     
                     st.info("💡 **Dica:** O relatório segue o padrão visual da Vibra com todas as seções do documento original.")
