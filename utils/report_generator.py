@@ -345,7 +345,97 @@ HTML_TEMPLATE = """
 
     <div class="page-break"></div>
 
-    <!-- PÁGINA 2: RESUMO GERENCIAL -->
+    <!-- PÁGINA 2: METODOLOGIA -->
+    <div class="section-title">2. METODOLOGIA DE INVESTIGAÇÃO</div>
+    
+    <div style="text-align: justify; line-height: 1.6; margin-bottom: 15px;">
+        <p style="margin-bottom: 12px;">
+            A investigação deste acidente foi conduzida utilizando a metodologia de <strong>Análise de Árvore de Falhas (FTA - Fault Tree Analysis)</strong>, 
+            uma técnica sistemática e estruturada para identificar e analisar as causas raiz de eventos indesejados. Esta metodologia permite uma 
+            representação gráfica hierárquica das relações causais, facilitando a compreensão dos fatores que contribuíram para a ocorrência do acidente.
+        </p>
+        
+        <p style="margin-bottom: 12px;">
+            A FTA é amplamente reconhecida na indústria como uma ferramenta eficaz para investigação de acidentes, conforme estabelecido pela 
+            <strong>NBR 14280:2019 - Cadastro de acidente do trabalho - Procedimento e classificação</strong> <sup>1</sup>, que estabelece os critérios 
+            para classificação e registro de acidentes do trabalho no Brasil. A norma define parâmetros para classificação de acidentes com e sem 
+            afastamento, além de estabelecer critérios para cálculo de indicadores de segurança.
+        </p>
+        
+        <p style="margin-bottom: 12px;">
+            A metodologia segue os princípios estabelecidos pela <strong>ISO 31010:2019 - Risk management - Risk assessment techniques</strong> <sup>2</sup>, 
+            que apresenta a Análise de Árvore de Falhas como uma técnica recomendada para análise de riscos e investigação de eventos. A norma internacional 
+            destaca a capacidade da FTA em identificar combinações de falhas que podem levar a eventos indesejados, permitindo uma análise probabilística 
+            e qualitativa dos fatores contribuintes.
+        </p>
+        
+        <p style="margin-bottom: 12px;">
+            Durante a investigação, foram aplicados os princípios da <strong>Análise de Causa Raiz (RCA - Root Cause Analysis)</strong>, conforme metodologia 
+            descrita por <strong>ABS Consulting (2005)</strong> <sup>3</sup> em "Root Cause Analysis Handbook: A Guide to Effective Incident Investigation". 
+            Esta abordagem sistemática permite identificar não apenas as causas imediatas, mas também as causas contribuintes e as causas raiz, garantindo 
+            que as ações corretivas sejam direcionadas aos fatores fundamentais que permitiram a ocorrência do evento.
+        </p>
+        
+        <p style="margin-bottom: 12px;">
+            A construção da árvore de falhas seguiu a estrutura hierárquica proposta por <strong>Vesely et al. (1981)</strong> <sup>4</sup> em "Fault Tree Handbook", 
+            onde o evento topo (acidente) é decomposto em eventos intermediários e eventos básicos, utilizando portas lógicas (AND, OR) para representar 
+            as relações causais. Esta estrutura permite uma análise sistemática de todas as hipóteses causais, facilitando a validação ou descarte de 
+            cada hipótese através de evidências coletadas durante a investigação.
+        </p>
+        
+        <p style="margin-bottom: 12px;">
+            A classificação das causas seguiu os critérios estabelecidos pela <strong>NBR 14280:2019</strong> <sup>1</sup>, que diferencia entre causas 
+            imediatas, causas contribuintes e causas básicas. As causas básicas são aquelas que, se corrigidas, podem prevenir a recorrência do acidente, 
+            enquanto as causas imediatas são os fatores que diretamente levaram à ocorrência do evento.
+        </p>
+        
+        <p style="margin-bottom: 12px;">
+            A coleta de evidências foi realizada seguindo os princípios de preservação e documentação estabelecidos por <strong>OSHA (Occupational Safety 
+            and Health Administration)</strong> <sup>5</sup> em suas diretrizes para investigação de acidentes. Todas as evidências foram documentadas, 
+            incluindo fotografias, depoimentos, documentos técnicos e registros operacionais, garantindo a rastreabilidade e a confiabilidade das 
+            informações utilizadas na análise.
+        </p>
+        
+        <p style="margin-bottom: 12px;">
+            A validação das hipóteses causais foi realizada através da análise crítica das evidências coletadas, seguindo o método científico de 
+            formulação e teste de hipóteses. Cada hipótese foi avaliada quanto à sua plausibilidade, consistência com as evidências e capacidade de 
+            explicar a sequência de eventos que levou ao acidente, conforme metodologia descrita por <strong>Reason (1997)</strong> <sup>6</sup> em 
+            "Managing the Risks of Organizational Accidents".
+        </p>
+    </div>
+    
+    <div style="margin-top: 20px; padding-top: 15px; border-top: 1px solid #ddd;">
+        <div class="vibra-green" style="margin-bottom: 10px;">REFERÊNCIAS BIBLIOGRÁFICAS</div>
+        <div style="font-size: 9pt; line-height: 1.8; text-align: left;">
+            <p style="margin-bottom: 8px;">
+                <sup>1</sup> ABNT - Associação Brasileira de Normas Técnicas. <strong>NBR 14280:2019</strong> - Cadastro de acidente do trabalho - 
+                Procedimento e classificação. Rio de Janeiro: ABNT, 2019.
+            </p>
+            <p style="margin-bottom: 8px;">
+                <sup>2</sup> ISO - International Organization for Standardization. <strong>ISO 31010:2019</strong> - Risk management - Risk assessment 
+                techniques. Geneva: ISO, 2019.
+            </p>
+            <p style="margin-bottom: 8px;">
+                <sup>3</sup> ABS Consulting. <strong>Root Cause Analysis Handbook: A Guide to Effective Incident Investigation</strong>. 3rd ed. 
+                Knoxville: ABS Group, 2005.
+            </p>
+            <p style="margin-bottom: 8px;">
+                <sup>4</sup> VESELY, W. E.; GOLDBERG, F. F.; ROBERTS, N. H.; HAASL, D. F. <strong>Fault Tree Handbook</strong>. Washington, DC: 
+                U.S. Nuclear Regulatory Commission, 1981. (NUREG-0492)
+            </p>
+            <p style="margin-bottom: 8px;">
+                <sup>5</sup> OSHA - Occupational Safety and Health Administration. <strong>Incident Investigation</strong>. In: OSHA 2254-09R 2015 - 
+                Training Requirements in OSHA Standards and Training Guidelines. Washington, DC: U.S. Department of Labor, 2015.
+            </p>
+            <p style="margin-bottom: 8px;">
+                <sup>6</sup> REASON, J. <strong>Managing the Risks of Organizational Accidents</strong>. Aldershot: Ashgate Publishing, 1997.
+            </p>
+        </div>
+    </div>
+
+    <div class="page-break"></div>
+
+    <!-- PÁGINA 3: RESUMO GERENCIAL -->
     <div class="section-title">RESUMO GERENCIAL DO RELATÓRIO FINAL</div>
     
     <table class="form-table">
@@ -395,7 +485,7 @@ HTML_TEMPLATE = """
 
     <div class="page-break"></div>
 
-    <!-- PÁGINA 3: INFORMAÇÕES DETALHADAS -->
+    <!-- PÁGINA 4: INFORMAÇÕES DETALHADAS -->
     <div class="section-title">1. INFORMAÇÕES DO EVENTO</div>
     
     <!-- 1.1 Dados Gerais -->
@@ -444,6 +534,7 @@ HTML_TEMPLATE = """
             </td>
             <td width="50%">
                 <span class="label">Gravidade Real/Potencial</span>
+                <span class="checkbox">{{ '☑' if accident.get('severity_level') == 'Very Low' or accident.get('severity_level') == 'Muito Baixa' else '☐' }}</span> Muito Baixa<br>
                 <span class="checkbox">{{ '☑' if accident.get('severity_level') == 'Low' or accident.get('severity_level') == 'Baixa' else '☐' }}</span> Baixa<br>
                 <span class="checkbox">{{ '☑' if accident.get('severity_level') == 'Medium' or accident.get('severity_level') == 'Média' else '☐' }}</span> Média<br>
                 <span class="checkbox">{{ '☑' if accident.get('severity_level') == 'High' or accident.get('severity_level') == 'Alta' else '☐' }}</span> Alta<br>
@@ -572,7 +663,7 @@ HTML_TEMPLATE = """
 
     <div class="page-break"></div>
 
-    <!-- PÁGINA 4: ÁRVORE DE FALHAS -->
+    <!-- PÁGINA 5: ÁRVORE DE FALHAS -->
     <div class="section-title">5. ANÁLISE DAS CAUSAS (ÁRVORE DE FALHAS)</div>
     
     <p style="margin-bottom: 15px;">Abaixo a representação gráfica da Árvore de Falhas gerada durante a investigação.</p>
@@ -671,7 +762,7 @@ HTML_TEMPLATE = """
 
     <div class="page-break"></div>
 
-    <!-- PÁGINA 5: COMISSÃO -->
+    <!-- PÁGINA 6: COMISSÃO -->
     <div class="section-title">7. COMISSÃO DE INVESTIGAÇÃO</div>
     
     {% if commission %}
@@ -695,7 +786,7 @@ HTML_TEMPLATE = """
     <p style="color: #999; font-style: italic;">Comissão não registrada.</p>
     {% endif %}
 
-    <!-- PÁGINA 6: EVIDÊNCIAS COMPLETAS -->
+    <!-- PÁGINA 7: EVIDÊNCIAS COMPLETAS -->
     {% if evidence_images and evidence_images|length > 3 %}
     <div class="page-break"></div>
     <div class="section-title">8. EVIDÊNCIAS COMPLETAS</div>
@@ -706,7 +797,7 @@ HTML_TEMPLATE = """
     </div>
     {% endif %}
 
-    <!-- PÁGINA 7: RECOMENDAÇÕES -->
+    <!-- PÁGINA 8: RECOMENDAÇÕES -->
     {% if recommendations %}
     <div class="page-break"></div>
     <div class="section-title">9. RECOMENDAÇÕES</div>

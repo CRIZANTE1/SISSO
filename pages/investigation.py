@@ -689,8 +689,8 @@ def main():
                     )
                 
                 # Mapeamento entre português (interface) e inglês (banco)
-                severity_options_pt = ["", "Baixa", "Média", "Alta", "Catastrófica"]
-                severity_options_en = ["", "Low", "Medium", "High", "Catastrophic"]
+                severity_options_pt = ["", "Muito Baixa", "Baixa", "Média", "Alta", "Catastrófica"]
+                severity_options_en = ["", "Very Low", "Low", "Medium", "High", "Catastrophic"]
                 
                 # Converte valor do banco (inglês) para índice em português
                 current_severity_en = investigation.get('severity_level', '') or ''
@@ -702,7 +702,7 @@ def main():
                     "Nível de Gravidade:",
                     options=severity_options_pt,
                     index=current_index,
-                    help="Gravidade do acidente: Baixa, Média, Alta ou Catastrófica"
+                    help="Gravidade do acidente: Muito Baixa, Baixa, Média, Alta ou Catastrófica"
                 )
                 
                 # Converte seleção em português para inglês (para salvar no banco)
