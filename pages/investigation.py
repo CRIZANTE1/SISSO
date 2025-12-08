@@ -1646,36 +1646,72 @@ def main():
                     if node.get('justification'):
                         st.info(f"📝 **Justificativa atual:** {node['justification']}")
                     
-                    # Mostra imagem de justificativa existente se houver
+                    # Mostra imagem de justificativa existente se houver (mesma lógica da galeria de evidências)
                     justification_image_url = node.get('justification_image_url')
                     if justification_image_url:
                         # Valida se a URL não está vazia
                         if justification_image_url and isinstance(justification_image_url, str) and justification_image_url.strip():
                             st.markdown("**📷 Imagem da justificativa:**")
                             
-                            # Tenta exibir a imagem usando st.image primeiro
-                            try:
-                                st.image(justification_image_url, caption="", width=300, use_container_width=False)
-                            except Exception as e:
-                                # Se st.image falhar, tenta usar HTML como fallback
+                            # Mesma lógica da galeria de evidências
+                            image_loaded = False
+                            
+                            # Extrai o path da URL
+                            path = None
+                            if '/storage/v1/object/public/evidencias/' in justification_image_url:
+                                path = justification_image_url.split('/storage/v1/object/public/evidencias/')[1]
+                            elif '/evidencias/' in justification_image_url:
+                                parts = justification_image_url.split('/evidencias/')
+                                if len(parts) > 1:
+                                    path = parts[1]
+                            
+                            # Tenta baixar do Supabase Storage primeiro (mais confiável)
+                            if path:
                                 try:
-                                    import html
-                                    escaped_url = html.escape(justification_image_url)
-                                    st.markdown(
-                                        f'''
-                                        <div style="margin: 10px 0;">
-                                            <img src="{escaped_url}" alt="Imagem da justificativa" 
-                                                 style="max-width: 300px; max-height: 300px; border: 1px solid #ddd; border-radius: 4px; display: block;">
-                                        </div>
-                                        ''',
-                                        unsafe_allow_html=True
+                                    from managers.supabase_config import get_service_role_client
+                                    supabase = get_service_role_client()
+                                    if supabase:
+                                        image_bytes = supabase.storage.from_('evidencias').download(path)
+                                        if image_bytes:
+                                            st.image(
+                                                image_bytes, 
+                                                use_container_width=True, 
+                                                caption="Imagem da justificativa"
+                                            )
+                                            image_loaded = True
+                                except Exception as e:
+                                    # Se falhar, continua para tentar outros métodos
+                                    pass
+                            
+                            # Se não carregou pelo download direto, tenta pela URL
+                            if not image_loaded:
+                                try:
+                                    st.image(
+                                        justification_image_url, 
+                                        use_container_width=True, 
+                                        caption="Imagem da justificativa"
                                     )
-                                except Exception as e2:
-                                    # Se tudo falhar, mostra mensagem de erro e link
-                                    st.warning("⚠️ Não foi possível exibir a imagem automaticamente.")
-                                    st.markdown(f"**URL da imagem:** `{justification_image_url}`")
-                                    st.markdown(f"🔗 [Abrir imagem em nova aba]({justification_image_url})")
-                                    st.info("💡 A imagem pode estar temporariamente indisponível. Verifique se o bucket do Supabase Storage está configurado como público.")
+                                    image_loaded = True
+                                except Exception as e:
+                                    # Se falhar, tenta baixar via HTTP
+                                    try:
+                                        response = requests.get(justification_image_url, timeout=10)
+                                        if response.status_code == 200:
+                                            st.image(
+                                                response.content, 
+                                                use_container_width=True, 
+                                                caption="Imagem da justificativa"
+                                            )
+                                            image_loaded = True
+                                    except Exception as e2:
+                                        pass
+                            
+                            # Se nada funcionou, mostra erro e link
+                            if not image_loaded:
+                                st.error("⚠️ Não foi possível carregar a imagem")
+                                st.markdown(f"**URL:** [{justification_image_url}]({justification_image_url})")
+                                if path:
+                                    st.caption(f"Path: {path}")
                         
                         if st.button("🗑️ Remover imagem", key=f"remove_img_{node['id']}"):
                             from services.investigation import update_node_justification_image
