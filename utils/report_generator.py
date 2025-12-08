@@ -650,7 +650,7 @@ HTML_TEMPLATE = """
                     {% endif %}
                     {% if hyp.get('justification_image_b64') %}
                         <div style="margin-top: 10px;">
-                            <img src="data:image/jpeg;base64,{{ hyp.get('justification_image_b64') }}" style="max-width: 400px; max-height: 300px; border: 1px solid #ddd; page-break-inside: avoid;" alt="Imagem da justificativa">
+                            <img src="{{ hyp.get('justification_image_b64') }}" style="max-width: 400px; max-height: 300px; border: 1px solid #ddd; page-break-inside: avoid;" alt="Imagem da justificativa">
                         </div>
                     {% endif %}
                 </td>
@@ -764,6 +764,7 @@ HTML_TEMPLATE = """
 def convert_image_url_to_base64(image_url: str) -> Optional[str]:
     """
     Converte URL de imagem para base64 (para embutir no PDF)
+    Suporta URLs do Supabase Storage e outras URLs públicas
     """
     try:
         import requests
@@ -773,21 +774,62 @@ def convert_image_url_to_base64(image_url: str) -> Optional[str]:
         if image_url.startswith('data:image'):
             return image_url
         
-        # Se for URL, faz download e converte
-        response = requests.get(image_url, timeout=10)
-        if response.status_code == 200:
-            img_bytes = response.content
-            img_b64 = base64.b64encode(img_bytes).decode('utf-8')
-            # Detecta tipo de imagem
-            if image_url.lower().endswith('.png'):
-                return f"data:image/png;base64,{img_b64}"
-            elif image_url.lower().endswith('.jpg') or image_url.lower().endswith('.jpeg'):
-                return f"data:image/jpeg;base64,{img_b64}"
+        if not image_url or not isinstance(image_url, str):
+            print(f"[CONVERT_IMAGE] URL inválida: {image_url}")
+            return None
+        
+        # Tenta fazer download da imagem
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        }
+        
+        try:
+            response = requests.get(image_url, timeout=15, headers=headers, stream=True)
+            if response.status_code == 200:
+                img_bytes = response.content
+                
+                # Verifica se realmente é uma imagem
+                if len(img_bytes) == 0:
+                    print(f"[CONVERT_IMAGE] Imagem vazia: {image_url}")
+                    return None
+                
+                img_b64 = base64.b64encode(img_bytes).decode('utf-8')
+                
+                # Detecta tipo de imagem pelo Content-Type ou extensão
+                content_type = response.headers.get('Content-Type', '').lower()
+                if 'image/png' in content_type or image_url.lower().endswith('.png'):
+                    return f"data:image/png;base64,{img_b64}"
+                elif 'image/jpeg' in content_type or 'image/jpg' in content_type or image_url.lower().endswith(('.jpg', '.jpeg')):
+                    return f"data:image/jpeg;base64,{img_b64}"
+                elif 'image/gif' in content_type or image_url.lower().endswith('.gif'):
+                    return f"data:image/gif;base64,{img_b64}"
+                elif 'image/webp' in content_type or image_url.lower().endswith('.webp'):
+                    return f"data:image/webp;base64,{img_b64}"
+                else:
+                    # Tenta detectar pelo magic number (primeiros bytes)
+                    if img_bytes[:4] == b'\x89PNG':
+                        return f"data:image/png;base64,{img_b64}"
+                    elif img_bytes[:2] == b'\xff\xd8':
+                        return f"data:image/jpeg;base64,{img_b64}"
+                    elif img_bytes[:6] in (b'GIF87a', b'GIF89a'):
+                        return f"data:image/gif;base64,{img_b64}"
+                    else:
+                        # Default para JPEG
+                        return f"data:image/jpeg;base64,{img_b64}"
             else:
-                return f"data:image/png;base64,{img_b64}"
-        return None
+                print(f"[CONVERT_IMAGE] Erro HTTP {response.status_code} ao baixar {image_url}")
+                return None
+        except requests.exceptions.Timeout:
+            print(f"[CONVERT_IMAGE] Timeout ao baixar {image_url}")
+            return None
+        except requests.exceptions.RequestException as e:
+            print(f"[CONVERT_IMAGE] Erro de requisição ao baixar {image_url}: {str(e)}")
+            return None
+        
     except Exception as e:
-        print(f"Erro ao converter imagem {image_url}: {str(e)}")
+        print(f"[CONVERT_IMAGE] Erro inesperado ao converter imagem {image_url}: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return None
 
 
@@ -1200,12 +1242,24 @@ def generate_pdf_report(
         
         # Converte imagens de justificativa para base64
         for hyp in hypotheses:
-            if hyp.get('justification_image_url'):
-                img_b64 = convert_image_url_to_base64(hyp.get('justification_image_url'))
-                if img_b64:
-                    hyp['justification_image_b64'] = img_b64
-                else:
+            justification_image_url = hyp.get('justification_image_url')
+            if justification_image_url and isinstance(justification_image_url, str) and justification_image_url.strip():
+                try:
+                    print(f"[PDF_GENERATION] Processando imagem de justificativa para hipótese '{hyp.get('label', 'N/A')[:50]}...': {justification_image_url}")
+                    img_b64 = convert_image_url_to_base64(justification_image_url.strip())
+                    if img_b64:
+                        hyp['justification_image_b64'] = img_b64
+                        print(f"[PDF_GENERATION] ✓ Imagem convertida com sucesso (tamanho base64: {len(img_b64)} caracteres)")
+                    else:
+                        hyp['justification_image_b64'] = None
+                        print(f"[PDF_GENERATION] ✗ Falha ao converter imagem: {justification_image_url}")
+                except Exception as e:
                     hyp['justification_image_b64'] = None
+                    print(f"[PDF_GENERATION] ✗ Exceção ao processar imagem {justification_image_url}: {str(e)}")
+            else:
+                hyp['justification_image_b64'] = None
+                if justification_image_url:
+                    print(f"[PDF_GENERATION] URL de imagem inválida para hipótese '{hyp.get('label', 'N/A')[:50]}...': {justification_image_url}")
         
         # Extrai recomendações de causas básicas e contribuintes
         recommendations = extract_recommendations_from_tree(fault_tree_json)
