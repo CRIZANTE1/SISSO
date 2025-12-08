@@ -695,7 +695,7 @@ HTML_TEMPLATE = """
         <span style="display: inline-block; background-color: #2196f3; color: white; padding: 2px 8px; border-radius: 3px; font-size: 8pt; margin-left: 8px; font-weight: bold;">{{ action.get('action_type') }}</span>
         {% endif %}
         {% if action.get('responsible_person') %}
-        <span style="font-size: 9pt; color: #666; margin-left: 8px;">👤 {{ action.get('responsible_person') }}</span>
+        <span style="font-size: 9pt; color: #666; margin-left: 8px;"> Responsável: {{ action.get('responsible_person') }}</span>
         {% endif %}
         <br>
         <span class="value">{{ action.get('description', 'N/A') }}</span>
