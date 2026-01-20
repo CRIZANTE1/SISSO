@@ -1270,6 +1270,11 @@ def extract_hypotheses_from_tree(tree_json: Optional[Dict[str, Any]]) -> List[Di
     if not tree_json:
         return []
     
+    # Valida estrutura básica da árvore
+    if not isinstance(tree_json, dict):
+        print(f"[EXTRACT_HYPOTHESES] Erro: tree_json não é um dicionário, tipo: {type(tree_json)}")
+        return []
+    
     hypotheses = []
     
     # Contadores para numeração automática (mesma lógica da renderização da árvore)
@@ -1305,15 +1310,20 @@ def extract_hypotheses_from_tree(tree_json: Optional[Dict[str, Any]]) -> List[Di
         return ""
     
     def extract_recursive(node: Dict[str, Any]):
-        """Função recursiva para extrair hipóteses"""
+        """Função recursiva para extrair hipóteses com validação"""
         nonlocal hypothesis_counter, basic_cause_counter, contributing_cause_counter
         
-        node_type = node.get('type', '')
-        status = node.get('status', 'pending')
+        # Valida estrutura do nó antes de processar
+        if not isinstance(node, dict):
+            print(f"[EXTRACT_HYPOTHESES] Aviso: nó não é um dicionário, ignorando")
+            return
+        
+        node_type = node.get('type') or ''
+        status = node.get('status') or 'pending'
         children = node.get('children', [])
-        has_children = len(children) > 0
-        is_basic_cause = node.get('is_basic_cause', False)
-        is_contributing_cause = node.get('is_contributing_cause', False)
+        has_children = isinstance(children, list) and len(children) > 0
+        is_basic_cause = bool(node.get('is_basic_cause', False))
+        is_contributing_cause = bool(node.get('is_contributing_cause', False))
         
         # Considera como hipótese:
         # 1. Nós do tipo 'hypothesis'
@@ -1339,19 +1349,24 @@ def extract_hypotheses_from_tree(tree_json: Optional[Dict[str, Any]]) -> List[Di
                 pass
             else:
                 hyp_data = {
-                    'label': node.get('label', 'N/A'),
-                    'status': status,
-                    'nbr_code': node.get('nbr_code'),
-                    'nbr_description': node.get('nbr_description', ''),
-                    'justification': justification,  # Justificativa para confirmação/descarte
-                    'justification_image_url': node.get('justification_image_url'),  # URL da imagem da justificativa
-                    'node_number': node_number  # Número da hipótese (H1, H2, etc.) para corresponder à árvore
+                    'label': node.get('label') or 'N/A',
+                    'status': status or 'pending',
+                    'nbr_code': node.get('nbr_code') or None,
+                    'nbr_description': node.get('nbr_description') or '',
+                    'justification': justification or '',  # Justificativa para confirmação/descarte
+                    'justification_image_url': node.get('justification_image_url') or None,  # URL da imagem da justificativa
+                    'node_number': node_number or ''  # Número da hipótese (H1, H2, etc.) para corresponder à árvore
                 }
                 hypotheses.append(hyp_data)
         
-        # Processa filhos recursivamente
-        for child in node.get('children', []):
-            extract_recursive(child)
+        # Processa filhos recursivamente (com validação)
+        children = node.get('children', [])
+        if isinstance(children, list):
+            for child in children:
+                if isinstance(child, dict):
+                    extract_recursive(child)
+                else:
+                    print(f"[EXTRACT_HYPOTHESES] Aviso: filho não é um dicionário, ignorando")
     
     extract_recursive(tree_json)
     return hypotheses
@@ -1369,19 +1384,22 @@ def extract_recommendations_from_tree(tree_json: Optional[Dict[str, Any]]) -> Di
     contributing_causes = []
     
     def extract_recursive(node: Dict[str, Any]):
-        """Função recursiva para extrair recomendações"""
-        is_basic = node.get('is_basic_cause', False)
-        is_contributing = node.get('is_contributing_cause', False)
-        status = node.get('status', 'pending')
-        recommendation = node.get('recommendation')
+        """Função recursiva para extrair recomendações com tratamento defensivo"""
+        if not isinstance(node, dict):
+            return
+            
+        is_basic = bool(node.get('is_basic_cause', False))
+        is_contributing = bool(node.get('is_contributing_cause', False))
+        status = node.get('status') or 'pending'
+        recommendation = node.get('recommendation') or None
         
         # Só inclui se for causa básica ou contribuinte validada e tiver recomendação
         if status == 'validated' and recommendation:
             rec_data = {
-                'label': node.get('label', 'N/A'),
-                'nbr_code': node.get('nbr_code'),
-                'nbr_description': node.get('nbr_description', ''),
-                'recommendation': recommendation
+                'label': node.get('label') or 'N/A',
+                'nbr_code': node.get('nbr_code') or None,
+                'nbr_description': node.get('nbr_description') or '',
+                'recommendation': recommendation or ''
             }
             
             if is_basic:
@@ -1389,9 +1407,12 @@ def extract_recommendations_from_tree(tree_json: Optional[Dict[str, Any]]) -> Di
             elif is_contributing:
                 contributing_causes.append(rec_data)
         
-        # Processa filhos recursivamente
-        for child in node.get('children', []):
-            extract_recursive(child)
+        # Processa filhos recursivamente (com tratamento defensivo)
+        children = node.get('children', [])
+        if isinstance(children, list):
+            for child in children:
+                if isinstance(child, dict):
+                    extract_recursive(child)
     
     extract_recursive(tree_json)
     return {
@@ -1439,9 +1460,14 @@ def generate_pdf_report(
         hypotheses = extract_hypotheses_from_tree(fault_tree_json)
         print(f"[PDF_GENERATION] Total de hipóteses extraídas: {len(hypotheses)}")
         
-        # Converte imagens de justificativa para base64
+        # Converte imagens de justificativa para base64 (com tratamento defensivo)
         for i, hyp in enumerate(hypotheses):
-            justification_image_url = hyp.get('justification_image_url')
+            # Garante que hyp é um dicionário e tem a chave justification_image_url
+            if not isinstance(hyp, dict):
+                hyp['justification_image_b64'] = None
+                continue
+                
+            justification_image_url = hyp.get('justification_image_url') or hyp.get('justification_image_url', None)
             if justification_image_url and isinstance(justification_image_url, str) and justification_image_url.strip():
                 try:
                     print(f"[PDF_GENERATION] [{i+1}/{len(hypotheses)}] Processando imagem de justificativa: {justification_image_url[:100]}...")

@@ -642,6 +642,23 @@ def main():
                     help="Título descritivo do acidente"
                 )
                 
+                # Campo: Tipo do Acidente
+                current_type = investigation.get('type', 'sem_lesao')
+                type_options = ["fatal", "lesao", "sem_lesao"]
+                type_labels = {
+                    "fatal": "Fatal",
+                    "lesao": "Com Lesão",
+                    "sem_lesao": "Sem Lesão"
+                }
+                current_type_index = type_options.index(current_type) if current_type in type_options else 2
+                accident_type = st.selectbox(
+                    "Tipo do Acidente:",
+                    options=type_options,
+                    index=current_type_index,
+                    format_func=lambda x: type_labels.get(x, x),
+                    help="Tipo do acidente: Fatal, Com Lesão ou Sem Lesão"
+                )
+                
                 description = st.text_area(
                     "Descrição Detalhada:",
                     value=investigation.get('description', ''),
@@ -955,6 +972,7 @@ def main():
                         'base_location': base_location if base_location else None,
                         'site_id': selected_site_id,
                         'occurrence_date': occurrence_datetime.isoformat() if occurrence_datetime else None,
+                        'type': accident_type,  # Tipo do acidente: fatal, lesao, sem_lesao
                         'class_injury': bool(class_injury),
                         'class_community': bool(class_community),
                         'class_environment': bool(class_environment),

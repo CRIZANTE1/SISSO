@@ -116,9 +116,10 @@ def update_accident(accident_id: str, **kwargs) -> bool:
         
         # Mantém todos os campos válidos (incluindo None para limpar campos)
         valid_columns = [
-            'title', 'description', 'occurrence_date', 'registry_number', 'base_location', 'site_id',
+            'title', 'description', 'occurrence_date', 'occurred_at', 'registry_number', 'base_location', 'site_id',
+            'type', 'classification', 'body_part', 'lost_days', 'root_cause', 'employee_id',
             'class_injury', 'class_community', 'class_environment', 'class_process_safety',
-            'class_asset_damage', 'class_near_miss', 'severity_level', 'estimated_loss_value',
+            'class_asset_damage', 'class_near_miss', 'class_occupational_safety', 'severity_level', 'estimated_loss_value',
             'product_released', 'volume_released', 'volume_recovered', 'release_duration_hours',
             'equipment_involved', 'area_affected', 'status'
         ]
@@ -657,14 +658,13 @@ def add_timeline_event(accident_id: str, event_time: datetime, description: str)
             st.error("Erro ao conectar com o banco de dados")
             return False
         
-        # Nota: created_by referencia auth.users.id, mas get_user_id() retorna profiles.id
-        # Como o campo é nullable, deixamos como NULL para evitar erro de foreign key
-        # Conforme documentado no schema: "O campo created_by é deixado como NULL para evitar erros de FK"
+        # NOTA: created_by referencia auth.users.id, mas código usa profiles.id (get_user_id())
+        # Campo nullable por design - ver comentário em add_fault_tree_node() para detalhes completos
         data = {
             "accident_id": accident_id,
             "event_time": event_time.isoformat(),
             "description": description,
-            "created_by": None  # Campo nullable - evita erro de FK (timeline.created_by -> auth.users.id)
+            "created_by": None  # NULL por design - FK aponta para auth.users.id, código usa profiles.id
         }
         
         response = supabase.table("timeline").insert(data).execute()
@@ -735,13 +735,15 @@ def add_commission_action(accident_id: str, action_time: datetime, description: 
             st.error("Erro ao conectar com o banco de dados")
             return False
         
+        # NOTA: created_by referencia auth.users.id, mas não temos acesso direto via Supabase Auth na camada Python
+        # Campo é nullable por design para evitar erros de FK. Ver comentário em add_fault_tree_node() para detalhes.
         data = {
             "accident_id": accident_id,
             "action_time": action_time.isoformat(),
             "description": description,
             "action_type": action_type,
             "responsible_person": responsible_person,
-            "created_by": None  # Campo nullable - evita erro de FK
+            "created_by": None  # NULL por design - FK aponta para auth.users.id, código usa profiles.id
         }
         
         response = supabase.table("commission_actions").insert(data).execute()
@@ -829,14 +831,14 @@ def create_root_node(accident_id: str, label: str) -> Optional[str]:
             st.error("Erro ao conectar com o banco de dados")
             return None
         
-        # Nota: created_by referencia auth.users.id, mas get_user_id() retorna profiles.id
-        # Como o campo é nullable, deixamos como NULL para evitar erro de foreign key
+        # NOTA: created_by referencia auth.users.id, mas código usa profiles.id (get_user_id())
+        # Campo nullable por design - ver comentário em add_fault_tree_node() para detalhes completos
         data = {
             "accident_id": accident_id,
             "label": label,
             "type": "root",
             "status": "pending",
-            "created_by": None  # Campo nullable - evita erro de FK (fault_tree_nodes.created_by -> auth.users.id)
+            "created_by": None  # NULL por design - FK aponta para auth.users.id, código usa profiles.id
         }
         
         response = supabase.table("fault_tree_nodes").insert(data).execute()
@@ -870,15 +872,20 @@ def add_fault_tree_node(accident_id: str, parent_id: Optional[str], label: str, 
             if existing_nodes.data:
                 max_order = max([n.get('display_order', 0) or 0 for n in existing_nodes.data], default=0)
         
-        # Nota: created_by referencia auth.users.id, mas get_user_id() retorna profiles.id
-        # Como o campo é nullable, deixamos como NULL para evitar erro de foreign key
+        # NOTA IMPORTANTE: created_by referencia auth.users.id, mas get_user_id() retorna profiles.id
+        # O sistema de autenticação Supabase cria usuários em auth.users automaticamente,
+        # mas o sistema de perfis usa profiles.id que não necessariamente corresponde ao auth.users.id.
+        # Como não temos acesso direto a auth.users.id via Supabase Auth na camada Python,
+        # e o campo created_by é nullable, deixamos como NULL para evitar erros de foreign key.
+        # Isso funciona corretamente mas perde rastreabilidade de quem criou o registro.
+        # Solução futura: Implementar mapeamento profiles.id <-> auth.users.id ou alterar FK para profiles.id
         data = {
             "accident_id": accident_id,
             "label": label,
             "type": node_type,
             "status": "pending",
             "display_order": max_order + 1,
-            "created_by": None  # Campo nullable - evita erro de FK (fault_tree_nodes.created_by -> auth.users.id)
+            "created_by": None  # NULL por design - ver comentário acima sobre FK auth.users.id vs profiles.id
         }
         
         if parent_id:
@@ -895,15 +902,31 @@ def add_fault_tree_node(accident_id: str, parent_id: Optional[str], label: str, 
 
 
 def get_tree_nodes(accident_id: str) -> List[Dict[str, Any]]:
-    """Busca todos os nós da árvore de falhas de uma investigação, ordenados por display_order"""
+    """
+    Busca todos os nós da árvore de falhas de uma investigação, ordenados por display_order.
+    Se display_order for NULL, usa created_at como fallback para garantir ordenação consistente.
+    """
     try:
         from managers.supabase_config import get_service_role_client
         supabase = get_service_role_client()
         if not supabase:
             return []
         
-        response = supabase.table("fault_tree_nodes").select("*").eq("accident_id", accident_id).order("display_order", desc=False).order("created_at", desc=False).execute()
-        return response.data if response.data else []
+        # Busca todos os nós
+        response = supabase.table("fault_tree_nodes").select("*").eq("accident_id", accident_id).execute()
+        
+        if not response.data:
+            return []
+        
+        # Ordena em Python para garantir que NULLs em display_order são tratados corretamente
+        # Ordenação: display_order (NULL trata como 0), depois created_at
+        nodes = response.data
+        nodes.sort(key=lambda x: (
+            x.get('display_order') if x.get('display_order') is not None else 0,
+            x.get('created_at') or ''
+        ))
+        
+        return nodes
     except Exception as e:
         st.error(f"Erro ao buscar nós: {str(e)}")
         return []
@@ -1339,11 +1362,30 @@ def build_fault_tree_json(accident_id: str) -> Optional[Dict[str, Any]]:
     Retorna None se não houver nó raiz, ou um dicionário com a estrutura completa.
     """
     try:
+        from utils.simple_logger import get_logger
+        logger = get_logger()
+        
         # Busca todos os nós do acidente
         nodes = get_tree_nodes(accident_id)
         
         if not nodes:
             return None
+        
+        # Valida estrutura básica dos nós
+        required_fields = ['id', 'label', 'type', 'status']
+        invalid_nodes = []
+        for node in nodes:
+            if not isinstance(node, dict):
+                invalid_nodes.append(f"nó não é dicionário")
+                continue
+            missing_fields = [field for field in required_fields if field not in node]
+            if missing_fields:
+                invalid_nodes.append(f"nó {node.get('id', 'unknown')} sem campos: {missing_fields}")
+        
+        if invalid_nodes:
+            logger.warning(f"[BUILD_TREE] Alguns nós têm estrutura incompleta: {invalid_nodes[:5]}")
+            # Remove nós inválidos
+            nodes = [node for node in nodes if isinstance(node, dict) and all(field in node for field in required_fields)]
         
         # Busca padrões NBR para incluir códigos e descrições
         nbr_standards_map = {}
@@ -1381,7 +1423,12 @@ def build_fault_tree_json(accident_id: str) -> Optional[Dict[str, Any]]:
         def build_node_json(node_id: str) -> Optional[Dict[str, Any]]:
             """Função recursiva para construir JSON de um nó e seus filhos"""
             node = nodes_dict.get(node_id)
-            if not node:
+            if not node or not isinstance(node, dict):
+                return None
+            
+            # Valida campos essenciais antes de processar
+            if 'id' not in node or 'label' not in node or 'type' not in node or 'status' not in node:
+                logger.warning(f"[BUILD_TREE] Nó {node_id} tem estrutura incompleta, ignorando")
                 return None
             
             # Busca código NBR e descrição se existir
@@ -1396,19 +1443,19 @@ def build_fault_tree_json(accident_id: str) -> Optional[Dict[str, Any]]:
                     nbr_code = nbr_info.get('code')
                     nbr_description = nbr_info.get('description')
             
-            # Constrói objeto do nó
+            # Constrói objeto do nó com valores defensivos para campos opcionais
             node_json = {
-                "id": str(node['id']),
-                "label": node['label'],
-                "type": node['type'],
-                "status": node['status'],
-                "is_basic_cause": node.get('is_basic_cause', False),  # Campo para marcar manualmente como causa básica
-                "is_contributing_cause": node.get('is_contributing_cause', False),  # Campo para marcar manualmente como causa contribuinte
-                "nbr_code": nbr_code,
-                "nbr_description": nbr_description,
-                "justification": node.get('justification', ''),  # Justificativa para confirmação/descarte
-                "justification_image_url": node.get('justification_image_url'),  # URL da imagem da justificativa
-                "recommendation": node.get('recommendation'),  # Recomendação para prevenir/corrigir a causa
+                "id": str(node.get('id', '')),
+                "label": node.get('label', ''),
+                "type": node.get('type', 'hypothesis'),
+                "status": node.get('status', 'pending'),
+                "is_basic_cause": bool(node.get('is_basic_cause', False)),  # Campo para marcar manualmente como causa básica
+                "is_contributing_cause": bool(node.get('is_contributing_cause', False)),  # Campo para marcar manualmente como causa contribuinte
+                "nbr_code": nbr_code or None,
+                "nbr_description": nbr_description or '',
+                "justification": node.get('justification') or '',  # Justificativa para confirmação/descarte
+                "justification_image_url": node.get('justification_image_url') or None,  # URL da imagem da justificativa
+                "recommendation": node.get('recommendation') or None,  # Recomendação para prevenir/corrigir a causa
                 "children": []
             }
             
