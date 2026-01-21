@@ -1379,7 +1379,10 @@ def main():
                                 injured_birth_date = st.date_input(
                                     "Nascimento:",
                                     value=birth_date_val,
-                                    key=f"injured_birth_date_{i}"
+                                    min_value=date(1900, 1, 1),
+                                    max_value=date.today(),
+                                    key=f"injured_birth_date_{i}",
+                                    help="Selecione a data de nascimento da vítima"
                                 )
                             with col_idade:
                                 injured_age_val = involved_injured[i].get('age') if i < len(involved_injured) and involved_injured[i].get('age') else 0
