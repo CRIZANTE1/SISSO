@@ -45,17 +45,6 @@ from services.investigation import (
 )
 from auth.auth_utils import require_login
 
-# Função de tradução para tipos de pessoas envolvidas
-def translate_person_type(person_type: str) -> str:
-    """Traduz o tipo de pessoa envolvida para português"""
-    translations = {
-        'Driver': 'Motorista',
-        'Injured': 'Vítima/Lesionado',
-        'Witness': 'Testemunha',
-        'Commission_Member': 'Membro da Comissão'
-    }
-    return translations.get(person_type, person_type)
-
 # Verifica disponibilidade do graphviz
 try:
     import graphviz
