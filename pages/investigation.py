@@ -1196,11 +1196,11 @@ def main():
                         )
             
             # ========== SEÇÃO 4: ENVOLVIDOS ==========
-            with st.expander("👥 Seção 4: Pessoas Envolvidas", expanded=True):
-                st.markdown("**Motoristas, Vítimas e Testemunhas**")
-                
+            with st.expander("👥 Seção 4: Dados das Pessoas Envolvidas", expanded=True):
                 # Motoristas
-                st.subheader("🚗 Motoristas")
+                st.markdown("### 🚗 Motoristas")
+                if st.session_state.get(f"num_drivers_{accident_id}", 0) == 0:
+                    st.info("ℹ️ Configure a quantidade de motoristas acima para começar a preencher os dados.")
                 drivers = []
                 # Usa o valor do session_state (definido fora do form)
                 num_drivers = st.session_state.get(f"num_drivers_{accident_id}", len(involved_drivers))
@@ -1263,17 +1263,22 @@ def main():
                                     driver_data['driver_observation'] = st.session_state[driver_key_observation] if st.session_state[driver_key_observation] else None
                             
                             drivers.append(driver_data)
-            
+                
+                st.divider()
+                
                 # Vítimas/Lesionados
-                st.subheader("🏥 Vítimas/Lesionados")
+                st.markdown("### 🏥 Vítimas/Lesionados")
                 # Usa o valor do session_state (definido fora do form)
                 num_injured = st.session_state.get(f"num_injured_{accident_id}", len(involved_injured))
                 
-                # Mostra mensagem informativa quando há 1 vítima
-                if num_injured == 1:
-                    st.success("✅ **1 vítima selecionada**: Os campos detalhados do perfil do acidentado aparecerão abaixo.")
-                elif num_injured > 1:
-                    st.info(f"ℹ️ **{num_injured} vítimas selecionadas**: Formulário simplificado para múltiplas vítimas.")
+                if num_injured == 0:
+                    st.info("ℹ️ Configure a quantidade de vítimas acima para começar a preencher os dados.")
+                else:
+                    # Mostra mensagem informativa quando há 1 vítima
+                    if num_injured == 1:
+                        st.success("✅ **1 vítima selecionada**: Os campos detalhados do perfil do acidentado aparecerão abaixo.")
+                    elif num_injured > 1:
+                        st.info(f"ℹ️ **{num_injured} vítimas selecionadas**: Formulário simplificado para múltiplas vítimas.")
                 
                 injured = []
                 for i in range(num_injured):
@@ -1504,11 +1509,17 @@ def main():
                                     'age': injured_age if injured_age else None,
                                     'aso_date': injured_aso.isoformat() if injured_aso else None
                                 })
-            
+                
+                st.divider()
+                
                 # Testemunhas
-                st.subheader("👁️ Testemunhas")
+                st.markdown("### 👁️ Testemunhas")
                 # Usa o valor do session_state (definido fora do form)
                 num_witnesses = st.session_state.get(f"num_witnesses_{accident_id}", len(involved_witnesses))
+                
+                if num_witnesses == 0:
+                    st.info("ℹ️ Configure a quantidade de testemunhas acima para começar a preencher os dados.")
+                
                 witnesses = []
                 for i in range(num_witnesses):
                     with st.container():
