@@ -1201,8 +1201,9 @@ def main():
                 
                 # Motoristas
                 st.subheader("🚗 Motoristas")
-                num_drivers = st.number_input("Quantidade de motoristas:", min_value=0, max_value=10, value=len(involved_drivers), key="num_drivers")
                 drivers = []
+                # Usa o valor do session_state (definido fora do form)
+                num_drivers = st.session_state.get(f"num_drivers_{accident_id}", len(involved_drivers))
                 for i in range(num_drivers):
                     with st.container():
                         col1, col2 = st.columns(2)
@@ -1262,10 +1263,18 @@ def main():
                                     driver_data['driver_observation'] = st.session_state[driver_key_observation] if st.session_state[driver_key_observation] else None
                             
                             drivers.append(driver_data)
-                
+            
                 # Vítimas/Lesionados
                 st.subheader("🏥 Vítimas/Lesionados")
-                num_injured = st.number_input("Quantidade de vítimas:", min_value=0, max_value=10, value=len(involved_injured), key="num_injured")
+                # Usa o valor do session_state (definido fora do form)
+                num_injured = st.session_state.get(f"num_injured_{accident_id}", len(involved_injured))
+                
+                # Mostra mensagem informativa quando há 1 vítima
+                if num_injured == 1:
+                    st.success("✅ **1 vítima selecionada**: Os campos detalhados do perfil do acidentado aparecerão abaixo.")
+                elif num_injured > 1:
+                    st.info(f"ℹ️ **{num_injured} vítimas selecionadas**: Formulário simplificado para múltiplas vítimas.")
+                
                 injured = []
                 for i in range(num_injured):
                     # Se houver apenas 1 vítima, exibe formulário completo detalhado
@@ -1495,10 +1504,11 @@ def main():
                                     'age': injured_age if injured_age else None,
                                     'aso_date': injured_aso.isoformat() if injured_aso else None
                                 })
-                
+            
                 # Testemunhas
                 st.subheader("👁️ Testemunhas")
-                num_witnesses = st.number_input("Quantidade de testemunhas:", min_value=0, max_value=10, value=len(involved_witnesses), key="num_witnesses")
+                # Usa o valor do session_state (definido fora do form)
+                num_witnesses = st.session_state.get(f"num_witnesses_{accident_id}", len(involved_witnesses))
                 witnesses = []
                 for i in range(num_witnesses):
                     with st.container():
