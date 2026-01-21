@@ -737,9 +737,119 @@ HTML_TEMPLATE = """
             <td width="25%"><span class="label">Duração</span><span class="value">{{ accident.get('release_duration_hours', 'N/A') }} horas</span></td>
         </tr>
         <tr>
-            <td colspan="2"><span class="label">Equipamento Envolvido</span><span class="value">{{ accident.get('equipment_involved', 'N/A') }}</span></td>
+            <td colspan="2"><span class="label">Equipamento onde ocorreu a perda de contenção</span><span class="value">{{ accident.get('equipment_involved', 'N/A') }}</span></td>
             <td colspan="2"><span class="label">Área Afetada</span><span class="value">{{ accident.get('area_affected', 'N/A') }}</span></td>
         </tr>
+        {% if accident.get('process_safety_observation') %}
+        <tr>
+            <td colspan="4"><span class="label">Observação</span><span class="value">{{ accident.get('process_safety_observation', 'N/A') }}</span></td>
+        </tr>
+        {% endif %}
+    </table>
+    {% endif %}
+    
+    <!-- 1.5.1 Acidentes de Segurança de Processo - Incêndio -->
+    {% if accident.get('class_process_safety') and accident.get('has_fire') %}
+    <div class="vibra-green" style="margin-top: 10px;">1.5.1. Acidentes de Segurança de Processo - Incêndio</div>
+    <table class="form-table">
+        <tr>
+            <td width="25%"><span class="label">Ocorreu incêndio</span><span class="checkbox">☑</span> Sim <span class="checkbox">☐</span> Não</td>
+            <td width="25%"><span class="label">Área afetada pelo incêndio</span><span class="value">{{ accident.get('fire_area', 'N/A') }}</span></td>
+            <td width="25%"><span class="label">Duração do incêndio</span><span class="value">{{ accident.get('fire_duration_hours', 'N/A') }} horas</span></td>
+            <td width="25%"></td>
+        </tr>
+        {% if accident.get('fire_observation') %}
+        <tr>
+            <td colspan="4"><span class="label">Observações sobre o incêndio</span><span class="value">{{ accident.get('fire_observation', 'N/A') }}</span></td>
+        </tr>
+        {% endif %}
+    </table>
+    {% endif %}
+    
+    <!-- 1.5.2 Acidentes de Segurança de Processo - Explosão -->
+    {% if accident.get('class_process_safety') and accident.get('has_explosion') %}
+    <div class="vibra-green" style="margin-top: 10px;">1.5.2. Acidentes de Segurança de Processo - Explosão</div>
+    <table class="form-table">
+        <tr>
+            <td width="25%"><span class="label">Ocorreu explosão</span><span class="checkbox">☑</span> Sim <span class="checkbox">☐</span> Não</td>
+            <td width="25%"><span class="label">Tipo de explosão</span><span class="value">{{ accident.get('explosion_type', 'N/A') }}</span></td>
+            <td width="25%"><span class="label">Área afetada pela explosão</span><span class="value">{{ accident.get('explosion_area', 'N/A') }}</span></td>
+            <td width="25%"><span class="label">Duração/efeito da explosão</span><span class="value">{{ accident.get('explosion_duration_hours', 'N/A') }} horas</span></td>
+        </tr>
+        {% if accident.get('explosion_observation') %}
+        <tr>
+            <td colspan="4"><span class="label">Observações sobre a explosão</span><span class="value">{{ accident.get('explosion_observation', 'N/A') }}</span></td>
+        </tr>
+        {% endif %}
+    </table>
+    {% endif %}
+    
+    <!-- 1.5.3 Informações da Transportadora -->
+    {% if accident.get('class_process_safety') and accident.get('transporter_name') %}
+    <div class="vibra-green" style="margin-top: 10px;">1.5.3. Acidentes no Transporte – Informações Transportadora</div>
+    <table class="form-table">
+        <tr>
+            <td width="33%"><span class="label">Transportadora</span><span class="value">{{ accident.get('transporter_name', 'N/A') }}</span></td>
+            <td width="33%"><span class="label">CNPJ</span><span class="value">{{ accident.get('transporter_cnpj', 'N/A') }}</span></td>
+            <td width="34%"><span class="label">Nº do Contrato</span><span class="value">{{ accident.get('transporter_contract_number', 'N/A') }}</span></td>
+        </tr>
+        <tr>
+            <td width="50%"><span class="label">Início</span><span class="value">
+                {% if accident.get('transporter_contract_start') %}
+                    {% set start_dt = accident.get('transporter_contract_start') %}
+                    {% if start_dt is string and '-' in start_dt %}
+                        {% set parts = start_dt[:10].split('-') %}
+                        {{ parts[2] }}/{{ parts[1] }}/{{ parts[0] }}
+                    {% else %}
+                        {{ start_dt }}
+                    {% endif %}
+                {% else %}
+                    N/A
+                {% endif %}
+            </span></td>
+            <td width="50%"><span class="label">Final</span><span class="value">
+                {% if accident.get('transporter_contract_end') %}
+                    {% set end_dt = accident.get('transporter_contract_end') %}
+                    {% if end_dt is string and '-' in end_dt %}
+                        {% set parts = end_dt[:10].split('-') %}
+                        {{ parts[2] }}/{{ parts[1] }}/{{ parts[0] }}
+                    {% else %}
+                        {{ end_dt }}
+                    {% endif %}
+                {% else %}
+                    N/A
+                {% endif %}
+            </span></td>
+        </tr>
+    </table>
+    {% endif %}
+    
+    <!-- 1.5.4 Valor Estimado das Perdas -->
+    {% if accident.get('class_process_safety') and (accident.get('loss_total') or accident.get('loss_product') or accident.get('loss_material')) %}
+    <div class="vibra-green" style="margin-top: 10px;">1.5.4. Valor Estimado das Perdas</div>
+    <table class="form-table">
+        <tr>
+            <td width="33%"><span class="label">Perda do Produto (R$)</span><span class="value">{{ "%.2f"|format(accident.get('loss_product', 0)) if accident.get('loss_product') else 'N/A' }}</span></td>
+            <td width="33%"><span class="label">Perda Material (R$)</span><span class="value">{{ "%.2f"|format(accident.get('loss_material', 0)) if accident.get('loss_material') else 'N/A' }}</span></td>
+            <td width="34%"><span class="label">Caminhão vácuo (R$)</span><span class="value">{{ "%.2f"|format(accident.get('loss_vacuum_truck', 0)) if accident.get('loss_vacuum_truck') else 'N/A' }}</span></td>
+        </tr>
+        <tr>
+            <td width="33%"><span class="label">Efetivo Indireto - empreiteira (R$)</span><span class="value">{{ "%.2f"|format(accident.get('loss_indirect_contractor', 0)) if accident.get('loss_indirect_contractor') else 'N/A' }}</span></td>
+            <td width="33%"><span class="label">Custos de Horas extras pessoal (R$)</span><span class="value">{{ "%.2f"|format(accident.get('loss_overtime_hours', 0)) if accident.get('loss_overtime_hours') else 'N/A' }}</span></td>
+            <td width="34%"><span class="label">Obras civis – empreiteira (R$)</span><span class="value">{{ "%.2f"|format(accident.get('loss_civil_works', 0)) if accident.get('loss_civil_works') else 'N/A' }}</span></td>
+        </tr>
+        <tr>
+            <td width="33%"><span class="label">Caçambas de resíduos (R$)</span><span class="value">{{ "%.2f"|format(accident.get('loss_waste_containers', 0)) if accident.get('loss_waste_containers') else 'N/A' }}</span></td>
+            <td width="33%"><span class="label">Obras mecânicas – empreiteira (R$)</span><span class="value">{{ "%.2f"|format(accident.get('loss_mechanical_works', 0)) if accident.get('loss_mechanical_works') else 'N/A' }}</span></td>
+            <td width="34%"><span class="label">Mobilização - empreiteira (R$)</span><span class="value">{{ "%.2f"|format(accident.get('loss_mobilization', 0)) if accident.get('loss_mobilization') else 'N/A' }}</span></td>
+        </tr>
+        {% if accident.get('loss_total') %}
+        <tr>
+            <td colspan="3" style="background-color: #f0f0f0; font-weight: bold; text-align: center;">
+                <span class="label">Valor Total (R$)</span><span class="value" style="font-size: 1.2em;">{{ "%.2f"|format(accident.get('loss_total', 0)) }}</span>
+            </td>
+        </tr>
+        {% endif %}
     </table>
     {% endif %}
 

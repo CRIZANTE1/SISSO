@@ -760,61 +760,440 @@ def main():
             show_process_details = class_environment or class_process_safety
             
             if show_process_details:
-                with st.expander("🔬 Seção 3: Detalhes do Vazamento/Processo", expanded=True):
-                    st.info("💡 Esta seção aparece porque você marcou 'Meio Ambiente' ou 'Segurança de Processo'")
-                    
-                    product_released = st.text_input(
-                        "Produto Liberado:",
-                        value=investigation.get('product_released', ''),
-                        placeholder="Ex: Gasolina, Etanol, Diesel...",
-                        help="Nome do produto que foi liberado/vazado"
-                    )
-                    
-                    col_vol1, col_vol2 = st.columns(2)
-                    with col_vol1:
-                        vol_released_val = investigation.get('volume_released')
-                        volume_released = st.number_input(
-                            "Volume Liberado (m³):",
-                            value=float(vol_released_val) if vol_released_val is not None else 0.0,
+                # Variáveis para armazenar valores (inicializadas antes)
+                process_safety_observation = None
+                has_fire = False
+                fire_area = None
+                fire_duration_hours = 0.0
+                fire_observation = None
+                has_explosion = False
+                explosion_type = None
+                explosion_area = None
+                explosion_duration_hours = 0.0
+                explosion_observation = None
+                transporter_name = None
+                transporter_cnpj = None
+                transporter_contract_number = None
+                transporter_contract_start = None
+                transporter_contract_end = None
+                loss_product = 0.0
+                loss_material = 0.0
+                loss_vacuum_truck = 0.0
+                loss_indirect_contractor = 0.0
+                loss_overtime_hours = 0.0
+                loss_civil_works = 0.0
+                loss_waste_containers = 0.0
+                loss_mechanical_works = 0.0
+                loss_mobilization = 0.0
+                loss_total = 0.0
+                
+                if class_process_safety:
+                    # Seção expandida para Segurança de Processo
+                    with st.expander("🔬 Seção 3: Acidentes de Segurança de Processo", expanded=True):
+                        st.info("💡 Esta seção contém campos específicos para acidentes de segurança de processo")
+                        
+                        # Subseção 1: VAZAMENTO
+                        st.markdown("### 🔵 Vazamento")
+                        product_released = st.text_input(
+                            "Produto liberado:",
+                            value=investigation.get('product_released', ''),
+                            placeholder="Ex: Gasolina, Etanol, Diesel...",
+                            key="process_product_released"
+                        )
+                        
+                        col_vol1, col_vol2 = st.columns(2)
+                        with col_vol1:
+                            vol_released_val = investigation.get('volume_released')
+                            volume_released = st.number_input(
+                                "Volume vazado (m³):",
+                                value=float(vol_released_val) if vol_released_val is not None else 0.0,
+                                min_value=0.0,
+                                step=0.1,
+                                key="process_volume_released"
+                            )
+                        
+                        with col_vol2:
+                            vol_recovered_val = investigation.get('volume_recovered')
+                            volume_recovered = st.number_input(
+                                "Volume Recuperado (m³):",
+                                value=float(vol_recovered_val) if vol_recovered_val is not None else 0.0,
+                                min_value=0.0,
+                                step=0.1,
+                                key="process_volume_recovered"
+                            )
+                        
+                        release_duration_val = investigation.get('release_duration_hours')
+                        release_duration_hours = st.number_input(
+                            "Duração vazamento (horas):",
+                            value=float(release_duration_val) if release_duration_val is not None else 0.0,
                             min_value=0.0,
                             step=0.1,
-                            help="Volume total liberado em metros cúbicos"
+                            key="process_release_duration"
                         )
-                    
-                    with col_vol2:
-                        vol_recovered_val = investigation.get('volume_recovered')
-                        volume_recovered = st.number_input(
-                            "Volume Recuperado (m³):",
-                            value=float(vol_recovered_val) if vol_recovered_val is not None else 0.0,
+                        
+                        equipment_involved = st.text_area(
+                            "Equipamento onde ocorreu a perda de contenção:",
+                            value=investigation.get('equipment_involved', ''),
+                            height=80,
+                            key="process_equipment_involved"
+                        )
+                        
+                        process_safety_observation = st.text_area(
+                            "Observação:",
+                            value=investigation.get('process_safety_observation', ''),
+                            height=100,
+                            key="process_safety_observation"
+                        )
+                        
+                        st.divider()
+                        
+                        # Subseção 2: INCÊNDIO
+                        st.markdown("### 🔥 Incêndio")
+                        has_fire = st.checkbox(
+                            "Ocorreu incêndio",
+                            value=bool(investigation.get('has_fire', False)),
+                            key="process_has_fire"
+                        )
+                        
+                        if has_fire:
+                            fire_area = st.text_input(
+                                "Área afetada pelo incêndio:",
+                                value=investigation.get('fire_area', ''),
+                                key="process_fire_area"
+                            )
+                            
+                            fire_duration_val = investigation.get('fire_duration_hours')
+                            fire_duration_hours = st.number_input(
+                                "Duração do incêndio (horas):",
+                                value=float(fire_duration_val) if fire_duration_val is not None else 0.0,
+                                min_value=0.0,
+                                step=0.1,
+                                key="process_fire_duration"
+                            )
+                            
+                            fire_observation = st.text_area(
+                                "Observações sobre o incêndio:",
+                                value=investigation.get('fire_observation', ''),
+                                height=80,
+                                key="process_fire_observation"
+                            )
+                        
+                        st.divider()
+                        
+                        # Subseção 3: EXPLOSÃO
+                        st.markdown("### 💥 Explosão")
+                        has_explosion = st.checkbox(
+                            "Ocorreu explosão",
+                            value=bool(investigation.get('has_explosion', False)),
+                            key="process_has_explosion"
+                        )
+                        
+                        if has_explosion:
+                            col_exp1, col_exp2 = st.columns(2)
+                            with col_exp1:
+                                explosion_type = st.text_input(
+                                    "Tipo de explosão:",
+                                    value=investigation.get('explosion_type', ''),
+                                    key="process_explosion_type"
+                                )
+                            
+                            with col_exp2:
+                                explosion_area = st.text_input(
+                                    "Área afetada pela explosão:",
+                                    value=investigation.get('explosion_area', ''),
+                                    key="process_explosion_area"
+                                )
+                            
+                            explosion_duration_val = investigation.get('explosion_duration_hours')
+                            explosion_duration_hours = st.number_input(
+                                "Duração/efeito da explosão (horas):",
+                                value=float(explosion_duration_val) if explosion_duration_val is not None else 0.0,
+                                min_value=0.0,
+                                step=0.1,
+                                key="process_explosion_duration"
+                            )
+                            
+                            explosion_observation = st.text_area(
+                                "Observações sobre a explosão:",
+                                value=investigation.get('explosion_observation', ''),
+                                height=80,
+                                key="process_explosion_observation"
+                            )
+                        
+                        st.divider()
+                        
+                        # Subseção 4: INFORMAÇÕES DO CONDUTOR
+                        st.markdown("### 🚗 Informações do Condutor envolvido no acidente (Transporte ou Frota Leve)")
+                        st.info("💡 Preencha os dados do condutor abaixo. Se não se aplica, deixe em branco.")
+                        
+                        # Usa os motoristas já cadastrados
+                        if len(involved_drivers) > 0:
+                            for i, driver in enumerate(involved_drivers):
+                                with st.expander(f"Condutor {i+1}: {driver.get('name', 'N/A')}", expanded=(i == 0)):
+                                    col_d1, col_d2, col_d3 = st.columns(3)
+                                    with col_d1:
+                                        driver_marital = st.selectbox(
+                                            "Estado Civil:",
+                                            options=["", "Solteiro(a)", "Casado(a)", "Divorciado(a)", "Viúvo(a)", "União Estável"],
+                                            index=0 if not driver.get('marital_status') else 
+                                                  max(0, ["", "Solteiro(a)", "Casado(a)", "Divorciado(a)", "Viúvo(a)", "União Estável"].index(driver.get('marital_status')) if driver.get('marital_status') in ["", "Solteiro(a)", "Casado(a)", "Divorciado(a)", "Viúvo(a)", "União Estável"] else 0),
+                                            key=f"driver_marital_{i}"
+                                        )
+                                    
+                                    with col_d2:
+                                        driver_children = st.number_input(
+                                            "Número de Filhos:",
+                                            min_value=0,
+                                            max_value=20,
+                                            value=int(driver.get('children_count', 0)) if driver.get('children_count') else 0,
+                                            key=f"driver_children_{i}"
+                                        )
+                                    
+                                    with col_d3:
+                                        driver_time_company = st.text_input(
+                                            "Tempo Empresa:",
+                                            value=driver.get('time_in_company', ''),
+                                            placeholder="Ex: 5 anos",
+                                            key=f"driver_time_company_{i}"
+                                        )
+                                    
+                                    col_d4, col_d5, col_d6 = st.columns(3)
+                                    with col_d4:
+                                        driver_time_role = st.text_input(
+                                            "Tempo Função:",
+                                            value=driver.get('time_in_role', ''),
+                                            placeholder="Ex: 3 anos",
+                                            key=f"driver_time_role_{i}"
+                                        )
+                                    
+                                    with col_d5:
+                                        driver_time_vehicle = st.text_input(
+                                            "Tempo Dirigindo o Tipo de Veículo:",
+                                            value=driver.get('time_driving_vehicle_type', ''),
+                                            placeholder="Ex: 2 anos",
+                                            key=f"driver_time_vehicle_{i}"
+                                        )
+                                    
+                                    with col_d6:
+                                        driver_time_license = st.text_input(
+                                            "Tempo Habilitação:",
+                                            value=driver.get('time_license', ''),
+                                            placeholder="Ex: 10 anos",
+                                            key=f"driver_time_license_{i}"
+                                        )
+                                    
+                                    driver_observation = st.text_area(
+                                        "Observação:",
+                                        value=driver.get('driver_observation', ''),
+                                        height=60,
+                                        key=f"driver_observation_{i}"
+                                    )
+                        else:
+                            st.info("ℹ️ Nenhum condutor cadastrado. Adicione na Seção 4: Pessoas Envolvidas.")
+                        
+                        st.divider()
+                        
+                        # Subseção 5: INFORMAÇÕES DA TRANSPORTADORA
+                        st.markdown("### 🚛 Acidentes no Transporte – Informações Transportadora")
+                        transporter_not_applicable = st.checkbox(
+                            "Não aplicável",
+                            value=not bool(investigation.get('transporter_name')),
+                            key="transporter_not_applicable"
+                        )
+                        
+                        if not transporter_not_applicable:
+                            transporter_name = st.text_input(
+                                "Transportadora:",
+                                value=investigation.get('transporter_name', ''),
+                                key="transporter_name"
+                            )
+                            
+                            col_t1, col_t2 = st.columns(2)
+                            with col_t1:
+                                transporter_cnpj = st.text_input(
+                                    "CNPJ:",
+                                    value=investigation.get('transporter_cnpj', ''),
+                                    placeholder="00.000.000/0000-00",
+                                    key="transporter_cnpj"
+                                )
+                            
+                            with col_t2:
+                                transporter_contract_number = st.text_input(
+                                    "Nº do Contrato:",
+                                    value=investigation.get('transporter_contract_number', ''),
+                                    key="transporter_contract_number"
+                                )
+                            
+                            col_t3, col_t4 = st.columns(2)
+                            with col_t3:
+                                transporter_start_val = investigation.get('transporter_contract_start')
+                                if transporter_start_val:
+                                    try:
+                                        transporter_start_val = pd.to_datetime(transporter_start_val).date()
+                                    except:
+                                        transporter_start_val = None
+                                transporter_contract_start = st.date_input(
+                                    "Início:",
+                                    value=transporter_start_val,
+                                    key="transporter_contract_start"
+                                )
+                            
+                            with col_t4:
+                                transporter_end_val = investigation.get('transporter_contract_end')
+                                if transporter_end_val:
+                                    try:
+                                        transporter_end_val = pd.to_datetime(transporter_end_val).date()
+                                    except:
+                                        transporter_end_val = None
+                                transporter_contract_end = st.date_input(
+                                    "Final:",
+                                    value=transporter_end_val,
+                                    key="transporter_contract_end"
+                                )
+                        
+                        st.divider()
+                        
+                        # Subseção 6: VALOR ESTIMADO DAS PERDAS
+                        st.markdown("### 💰 Valor Estimado das Perdas")
+                        st.info("💡 Preencha os valores das perdas. O valor total será calculado automaticamente.")
+                        
+                        col_l1, col_l2, col_l3 = st.columns(3)
+                        with col_l1:
+                            loss_product = st.number_input(
+                                "Perda do Produto (R$):",
+                                value=float(investigation.get('loss_product', 0) or 0),
+                                min_value=0.0,
+                                step=1000.0,
+                                key="loss_product"
+                            )
+                            loss_material = st.number_input(
+                                "Perda Material (R$):",
+                                value=float(investigation.get('loss_material', 0) or 0),
+                                min_value=0.0,
+                                step=1000.0,
+                                key="loss_material"
+                            )
+                            loss_vacuum_truck = st.number_input(
+                                "Caminhão vácuo (R$):",
+                                value=float(investigation.get('loss_vacuum_truck', 0) or 0),
+                                min_value=0.0,
+                                step=1000.0,
+                                key="loss_vacuum_truck"
+                            )
+                        
+                        with col_l2:
+                            loss_indirect_contractor = st.number_input(
+                                "Efetivo Indireto - empreiteira (R$):",
+                                value=float(investigation.get('loss_indirect_contractor', 0) or 0),
+                                min_value=0.0,
+                                step=1000.0,
+                                key="loss_indirect_contractor"
+                            )
+                            loss_overtime_hours = st.number_input(
+                                "Custos de Horas extras pessoal (R$):",
+                                value=float(investigation.get('loss_overtime_hours', 0) or 0),
+                                min_value=0.0,
+                                step=1000.0,
+                                key="loss_overtime_hours"
+                            )
+                            loss_civil_works = st.number_input(
+                                "Obras civis – empreiteira (R$):",
+                                value=float(investigation.get('loss_civil_works', 0) or 0),
+                                min_value=0.0,
+                                step=1000.0,
+                                key="loss_civil_works"
+                            )
+                        
+                        with col_l3:
+                            loss_waste_containers = st.number_input(
+                                "Caçambas de resíduos (R$):",
+                                value=float(investigation.get('loss_waste_containers', 0) or 0),
+                                min_value=0.0,
+                                step=1000.0,
+                                key="loss_waste_containers"
+                            )
+                            loss_mechanical_works = st.number_input(
+                                "Obras mecânicas – empreiteira (R$):",
+                                value=float(investigation.get('loss_mechanical_works', 0) or 0),
+                                min_value=0.0,
+                                step=1000.0,
+                                key="loss_mechanical_works"
+                            )
+                            loss_mobilization = st.number_input(
+                                "Mobilização - empreiteira (R$):",
+                                value=float(investigation.get('loss_mobilization', 0) or 0),
+                                min_value=0.0,
+                                step=1000.0,
+                                key="loss_mobilization"
+                            )
+                        
+                        # Calcula valor total
+                        loss_total = (loss_product + loss_material + loss_vacuum_truck + 
+                                     loss_indirect_contractor + loss_overtime_hours + loss_civil_works +
+                                     loss_waste_containers + loss_mechanical_works + loss_mobilization)
+                        
+                        st.metric(
+                            "Valor Total (R$):",
+                            f"{loss_total:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+                        )
+                
+                else:
+                    # Seção básica para Meio Ambiente (sem Segurança de Processo)
+                    with st.expander("🔬 Seção 3: Detalhes do Vazamento/Processo", expanded=True):
+                        st.info("💡 Esta seção aparece porque você marcou 'Meio Ambiente'")
+                        
+                        product_released = st.text_input(
+                            "Produto Liberado:",
+                            value=investigation.get('product_released', ''),
+                            placeholder="Ex: Gasolina, Etanol, Diesel...",
+                            help="Nome do produto que foi liberado/vazado"
+                        )
+                        
+                        col_vol1, col_vol2 = st.columns(2)
+                        with col_vol1:
+                            vol_released_val = investigation.get('volume_released')
+                            volume_released = st.number_input(
+                                "Volume Liberado (m³):",
+                                value=float(vol_released_val) if vol_released_val is not None else 0.0,
+                                min_value=0.0,
+                                step=0.1,
+                                help="Volume total liberado em metros cúbicos"
+                            )
+                        
+                        with col_vol2:
+                            vol_recovered_val = investigation.get('volume_recovered')
+                            volume_recovered = st.number_input(
+                                "Volume Recuperado (m³):",
+                                value=float(vol_recovered_val) if vol_recovered_val is not None else 0.0,
+                                min_value=0.0,
+                                step=0.1,
+                                help="Volume recuperado em metros cúbicos"
+                            )
+                        
+                        release_duration_val = investigation.get('release_duration_hours')
+                        release_duration_hours = st.number_input(
+                            "Duração do Vazamento (horas):",
+                            value=float(release_duration_val) if release_duration_val is not None else 0.0,
                             min_value=0.0,
                             step=0.1,
-                            help="Volume recuperado em metros cúbicos"
+                            help="Tempo de duração do vazamento em horas"
                         )
-                    
-                    release_duration_val = investigation.get('release_duration_hours')
-                    release_duration_hours = st.number_input(
-                        "Duração do Vazamento (horas):",
-                        value=float(release_duration_val) if release_duration_val is not None else 0.0,
-                        min_value=0.0,
-                        step=0.1,
-                        help="Tempo de duração do vazamento em horas"
-                    )
-                    
-                    equipment_involved = st.text_area(
-                        "Equipamento Envolvido:",
-                        value=investigation.get('equipment_involved', ''),
-                        height=80,
-                        help="Descrição do equipamento envolvido no acidente"
-                    )
-                    
-                    area_affected = st.radio(
-                        "Área Afetada:",
-                        options=["", "Soil", "Water", "Not Applicable", "Other"],
-                        index=0 if not investigation.get('area_affected') else 
-                              (["", "Soil", "Water", "Not Applicable", "Other"].index(investigation.get('area_affected'))
-                               if investigation.get('area_affected') in ["", "Soil", "Water", "Not Applicable", "Other"] else 0),
-                        help="Tipo de área afetada pelo vazamento"
-                    )
+                        
+                        equipment_involved = st.text_area(
+                            "Equipamento Envolvido:",
+                            value=investigation.get('equipment_involved', ''),
+                            height=80,
+                            help="Descrição do equipamento envolvido no acidente"
+                        )
+                        
+                        area_affected = st.radio(
+                            "Área Afetada:",
+                            options=["", "Soil", "Water", "Not Applicable", "Other"],
+                            index=0 if not investigation.get('area_affected') else 
+                                  (["", "Soil", "Water", "Not Applicable", "Other"].index(investigation.get('area_affected'))
+                                   if investigation.get('area_affected') in ["", "Soil", "Water", "Not Applicable", "Other"] else 0),
+                            help="Tipo de área afetada pelo vazamento"
+                        )
             
             # ========== SEÇÃO 4: ENVOLVIDOS ==========
             with st.expander("👥 Seção 4: Pessoas Envolvidas", expanded=True):
@@ -845,7 +1224,7 @@ def main():
                             driver_aso = st.date_input(f"Data ASO {i+1}:", value=driver_aso_val, key=f"driver_aso_{i}")
                         
                         if driver_name:
-                            drivers.append({
+                            driver_data = {
                                 'person_type': 'Driver',
                                 'name': driver_name,
                                 'registration_id': driver_reg or None,
@@ -853,7 +1232,36 @@ def main():
                                 'company': driver_company or None,
                                 'age': driver_age if driver_age else None,
                                 'aso_date': driver_aso.isoformat() if driver_aso else None
-                            })
+                            }
+                            
+                            # Adiciona campos adicionais se existirem na seção de segurança de processo
+                            # Esses campos são coletados via session_state quando estiverem na seção 3
+                            if class_process_safety and len(involved_drivers) > i:
+                                # Busca dados adicionais do condutor se foram preenchidos na seção de segurança de processo
+                                driver_key_marital = f"driver_marital_{i}"
+                                driver_key_children = f"driver_children_{i}"
+                                driver_key_time_company = f"driver_time_company_{i}"
+                                driver_key_time_role = f"driver_time_role_{i}"
+                                driver_key_time_vehicle = f"driver_time_vehicle_{i}"
+                                driver_key_time_license = f"driver_time_license_{i}"
+                                driver_key_observation = f"driver_observation_{i}"
+                                
+                                if driver_key_marital in st.session_state:
+                                    driver_data['marital_status'] = st.session_state[driver_key_marital] if st.session_state[driver_key_marital] else None
+                                if driver_key_children in st.session_state:
+                                    driver_data['children_count'] = st.session_state[driver_key_children] if st.session_state[driver_key_children] else None
+                                if driver_key_time_company in st.session_state:
+                                    driver_data['time_in_company'] = st.session_state[driver_key_time_company] if st.session_state[driver_key_time_company] else None
+                                if driver_key_time_role in st.session_state:
+                                    driver_data['time_in_role'] = st.session_state[driver_key_time_role] if st.session_state[driver_key_time_role] else None
+                                if driver_key_time_vehicle in st.session_state:
+                                    driver_data['time_driving_vehicle_type'] = st.session_state[driver_key_time_vehicle] if st.session_state[driver_key_time_vehicle] else None
+                                if driver_key_time_license in st.session_state:
+                                    driver_data['time_license'] = st.session_state[driver_key_time_license] if st.session_state[driver_key_time_license] else None
+                                if driver_key_observation in st.session_state:
+                                    driver_data['driver_observation'] = st.session_state[driver_key_observation] if st.session_state[driver_key_observation] else None
+                            
+                            drivers.append(driver_data)
                 
                 # Vítimas/Lesionados
                 st.subheader("🏥 Vítimas/Lesionados")
@@ -1196,6 +1604,62 @@ def main():
                         'equipment_involved': equipment_involved if equipment_involved else None,
                         'area_affected': area_affected if area_affected and area_affected != "" else None
                     })
+                    
+                    # Adiciona campos de Segurança de Processo (se aplicável)
+                    if class_process_safety:
+                        # Campos de incêndio
+                        update_data.update({
+                            'has_fire': has_fire,
+                            'fire_area': fire_area if fire_area else None,
+                            'fire_duration_hours': fire_duration_hours if fire_duration_hours and fire_duration_hours > 0 else None,
+                            'fire_observation': fire_observation if fire_observation else None,
+                        })
+                        
+                        # Campos de explosão
+                        update_data.update({
+                            'has_explosion': has_explosion,
+                            'explosion_type': explosion_type if explosion_type else None,
+                            'explosion_area': explosion_area if explosion_area else None,
+                            'explosion_duration_hours': explosion_duration_hours if explosion_duration_hours and explosion_duration_hours > 0 else None,
+                            'explosion_observation': explosion_observation if explosion_observation else None,
+                        })
+                        
+                        # Observação de segurança de processo
+                        update_data.update({
+                            'process_safety_observation': process_safety_observation if process_safety_observation else None,
+                        })
+                        
+                        # Campos da transportadora
+                        if transporter_not_applicable:
+                            update_data.update({
+                                'transporter_name': None,
+                                'transporter_cnpj': None,
+                                'transporter_contract_number': None,
+                                'transporter_contract_start': None,
+                                'transporter_contract_end': None,
+                            })
+                        else:
+                            update_data.update({
+                                'transporter_name': transporter_name if transporter_name else None,
+                                'transporter_cnpj': transporter_cnpj if transporter_cnpj else None,
+                                'transporter_contract_number': transporter_contract_number if transporter_contract_number else None,
+                                'transporter_contract_start': transporter_contract_start.isoformat() if transporter_contract_start else None,
+                                'transporter_contract_end': transporter_contract_end.isoformat() if transporter_contract_end else None,
+                            })
+                        
+                        # Campos de perdas
+                        update_data.update({
+                            'loss_product': loss_product if loss_product > 0 else None,
+                            'loss_material': loss_material if loss_material > 0 else None,
+                            'loss_vacuum_truck': loss_vacuum_truck if loss_vacuum_truck > 0 else None,
+                            'loss_indirect_contractor': loss_indirect_contractor if loss_indirect_contractor > 0 else None,
+                            'loss_overtime_hours': loss_overtime_hours if loss_overtime_hours > 0 else None,
+                            'loss_civil_works': loss_civil_works if loss_civil_works > 0 else None,
+                            'loss_waste_containers': loss_waste_containers if loss_waste_containers > 0 else None,
+                            'loss_mechanical_works': loss_mechanical_works if loss_mechanical_works > 0 else None,
+                            'loss_mobilization': loss_mobilization if loss_mobilization > 0 else None,
+                            'loss_total': loss_total if loss_total > 0 else None,
+                        })
                     
                     # Logs para debug (terminal)
                     import logging

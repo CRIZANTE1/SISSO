@@ -128,7 +128,18 @@ def update_accident(accident_id: str, **kwargs) -> bool:
             'class_injury', 'class_community', 'class_environment', 'class_process_safety',
             'class_asset_damage', 'class_near_miss', 'class_occupational_safety', 'severity_level', 'estimated_loss_value',
             'product_released', 'volume_released', 'volume_recovered', 'release_duration_hours',
-            'equipment_involved', 'area_affected', 'status'
+            'equipment_involved', 'area_affected', 'status',
+            # Campos de incêndio
+            'has_fire', 'fire_area', 'fire_duration_hours', 'fire_observation',
+            # Campos de explosão
+            'has_explosion', 'explosion_type', 'explosion_area', 'explosion_duration_hours', 'explosion_observation',
+            # Campos da transportadora
+            'transporter_name', 'transporter_cnpj', 'transporter_contract_number', 'transporter_contract_start', 'transporter_contract_end',
+            # Observação de segurança de processo
+            'process_safety_observation',
+            # Campos de perdas
+            'loss_product', 'loss_material', 'loss_vacuum_truck', 'loss_indirect_contractor', 'loss_overtime_hours',
+            'loss_civil_works', 'loss_waste_containers', 'loss_mechanical_works', 'loss_mobilization', 'loss_total'
         ]
         
         # Filtra apenas campos válidos, mantém todos (incluindo None)
@@ -156,6 +167,11 @@ def update_accident(accident_id: str, **kwargs) -> bool:
                 if v.tzinfo is not None:
                     v = v.replace(tzinfo=None)
                 final_data[k] = v.isoformat()
+            elif k in ['transporter_contract_start', 'transporter_contract_end'] and isinstance(v, (datetime, date)):
+                # Formata datas da transportadora
+                if isinstance(v, datetime):
+                    v = v.date()
+                final_data[k] = v.isoformat() if v else None
             else:
                 final_data[k] = v
         
@@ -272,6 +288,11 @@ def upsert_involved_people(accident_id: str, people: List[Dict[str, Any]]) -> bo
                     'employment_type': person.get('employment_type'),
                     'previous_accident_history': person.get('previous_accident_history'),
                     'certifications': person.get('certifications'),
+                    # Campos adicionais do condutor (para person_type = 'Driver')
+                    'time_in_company': person.get('time_in_company'),
+                    'time_driving_vehicle_type': person.get('time_driving_vehicle_type'),
+                    'time_license': person.get('time_license'),
+                    'driver_observation': person.get('driver_observation'),
                     # created_by não é passado (será NULL no banco) para evitar erro de FK com auth.users
                 }
                 # Remove campos None para não enviar dados desnecessários
