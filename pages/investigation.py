@@ -1212,9 +1212,11 @@ def main():
                         )
             
             # ========== SEÇÃO 4: ENVOLVIDOS ==========
-            with st.expander("👥 Seção 4: Dados das Pessoas Envolvidas", expanded=True):
-                # Motoristas
-                st.markdown("### 🚗 Motoristas")
+            st.markdown("### 👥 Seção 4: Pessoas Envolvidas")
+            st.markdown("**Motoristas, Vítimas e Testemunhas**")
+            
+            # Motoristas
+            with st.expander("🚗 Motoristas", expanded=True):
                 if st.session_state.get(f"num_drivers_{accident_id}", 0) == 0:
                     st.info("ℹ️ Configure a quantidade de motoristas acima para começar a preencher os dados.")
                 drivers = []
@@ -1279,11 +1281,9 @@ def main():
                                     driver_data['driver_observation'] = st.session_state[driver_key_observation] if st.session_state[driver_key_observation] else None
                             
                             drivers.append(driver_data)
-                
-                st.divider()
-                
-                # Vítimas/Lesionados
-                st.markdown("### 🏥 Vítimas/Lesionados")
+            
+            # Vítimas/Lesionados
+            with st.expander("🏥 Vítimas/Lesionados", expanded=True):
                 # Usa o valor do session_state (definido fora do form)
                 num_injured = st.session_state.get(f"num_injured_{accident_id}", len(involved_injured))
                 
@@ -1537,11 +1537,9 @@ def main():
                                     'age': injured_age if injured_age else None,
                                     'aso_date': injured_aso.isoformat() if injured_aso else None
                                 })
-                
-                st.divider()
-                
-                # Testemunhas
-                st.markdown("### 👁️ Testemunhas")
+            
+            # Testemunhas
+            with st.expander("👁️ Testemunhas", expanded=True):
                 # Usa o valor do session_state (definido fora do form)
                 num_witnesses = st.session_state.get(f"num_witnesses_{accident_id}", len(involved_witnesses))
                 
