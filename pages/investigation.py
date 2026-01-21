@@ -2559,6 +2559,37 @@ def main():
                     title = f"{number_prefix}{node_type_label} ({status_text}): {node['label'][:60]}..."
                 
                 with st.expander(title, expanded=False):
+                    # Botão de melhoria com IA
+                    col_ai_btn, col_empty = st.columns([1, 5])
+                    with col_ai_btn:
+                        ai_improve_key = f"ai_improve_{node['id']}"
+                        if st.button("✨ Melhorar Texto com IA", key=ai_improve_key, help="Use IA para melhorar e aprimorar o texto da descrição e justificativa desta hipótese/causa"):
+                            # Obtém contexto do acidente para melhorar o texto
+                            accident_context = investigation.get('description', '') if investigation else ''
+                            base_location = investigation.get('base_location', '') if investigation else ''
+                            
+                            # Contexto adicional das pessoas envolvidas
+                            involved_context = ""
+                            if 'involved_injured' in locals() and involved_injured:
+                                for inv in involved_injured:
+                                    if inv.get('name'):
+                                        involved_context += f"Vítima: {inv.get('name')}, {inv.get('age', '')} anos, {inv.get('job_title', '')} da empresa {inv.get('company', '')}. "
+                            
+                            # Constrói prompt para IA melhorar o texto
+                            prompt = f"""Contexto do Acidente:
+Local: {base_location}
+Descrição: {accident_context}
+{involved_context}
+
+Hipótese/Causa Atual: {node['label']}
+Justificativa Atual: {node.get('justification', 'Sem justificativa')}
+
+Melhore e torne o texto mais específico, profissional e contextualizado, usando os dados reais do acidente. Faça o texto mais claro e preciso, removendo termos genéricos."""
+
+                            # Aqui você pode integrar com uma API de IA (OpenAI, etc.)
+                            # Por enquanto, apenas mostra sucesso e sugere melhoria manual
+                            st.info("💡 Funcionalidade de IA em desenvolvimento. Por enquanto, revise e melhore o texto manualmente usando o contexto do acidente.")
+                    
                     # Campo de edição do label
                     edit_label_key = f"edit_label_{node['id']}"
                     edit_label_text = "✏️ Editar descrição da causa:" if node_type == 'fact' else "✏️ Editar descrição da hipótese:"
@@ -2668,6 +2699,42 @@ def main():
                     # Campo de justificativa
                     justification_key = f"justification_{node['id']}"
                     justification_label = "📝 Justificativa da Análise (obrigatória para confirmar ou descartar)"
+                    
+                    # Botão de melhoria de justificativa com IA
+                    col_ai_just, col_empty_just = st.columns([1, 5])
+                    with col_ai_just:
+                        ai_improve_just_key = f"ai_improve_just_{node['id']}"
+                        if st.button("✨ Melhorar Justificativa com IA", key=ai_improve_just_key, help="Use IA para melhorar e contextualizar a justificativa usando os dados reais do acidente"):
+                            # Obtém contexto completo
+                            accident_context = investigation.get('description', '') if investigation else ''
+                            base_location = investigation.get('base_location', '') if investigation else ''
+                            occurrence_date = investigation.get('occurrence_date', '') if investigation else ''
+                            
+                            # Contexto das pessoas envolvidas
+                            involved_context = ""
+                            if 'involved_injured' in locals() and involved_injured:
+                                for inv in involved_injured:
+                                    if inv.get('name'):
+                                        involved_context += f"Vítima: {inv.get('name')}, {inv.get('age', '')} anos, {inv.get('job_title', '')} da empresa {inv.get('company', '')}. "
+                            
+                            # Obtém outras hipóteses relacionadas para contexto
+                            related_context = ""
+                            related_nodes = [n for n in nodes if n['id'] != node['id'] and n.get('status') in ['validated', 'discarded']]
+                            if related_nodes:
+                                related_context = "Hipóteses já analisadas: "
+                                for rn in related_nodes[:3]:  # Limita a 3 para não ficar muito longo
+                                    related_context += f"{rn['label']} ({rn['status']}); "
+                            
+                            # Sugere melhoria
+                            st.info(f"""💡 **Sugestão de Contexto para Melhorar:**
+
+**Local:** {base_location}
+**Data/Hora:** {occurrence_date}
+**Descrição:** {accident_context}
+{involved_context}
+{related_context}
+
+Revise a justificativa incorporando estes dados reais do acidente para torná-la mais específica e profissional.""")
                     
                     if node_type == 'fact':
                         justification_help = """
