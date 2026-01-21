@@ -2372,25 +2372,34 @@ def main():
             )
             parent_id = parent_options[selected_parent_label]
             
-            st.markdown(f"**Pergunta:** Por que **{selected_parent_label}** aconteceu?")
+            st.markdown(f"**🎯 Pergunta de investigação:** Por que **{selected_parent_label}** aconteceu?")
+            st.caption("💡 Pense nas possíveis causas e fatores contribuintes. Seja específico e detalhado na descrição.")
         else:
             parent_id = None
             st.info("ℹ️ Adicione a primeira causa relacionada ao evento principal.")
         
         # Tipo de causa
         node_type = st.radio(
-            "Tipo de causa:",
+            "Tipo de causa/hipótese:",
             options=['hypothesis', 'fact'],
-            format_func=lambda x: "Hipótese (precisa validar)" if x == 'hypothesis' else "Causa Intermediária (confirmada, pode ter subcausas)",
-            help="💡 **Hipótese**: Uma possível causa que você precisa investigar e validar. **Causa Intermediária**: Uma causa já confirmada que pode ter subcausas (ex: 'Falhas de Inspeção e Manutenção').",
+            format_func=lambda x: "🔍 Hipótese (precisa investigar e validar)" if x == 'hypothesis' else "🔗 Causa Intermediária (já confirmada, pode ter subcausas)",
+            help="""
+            **🔍 Hipótese:** Use quando você suspeita de uma possível causa mas ainda precisa investigar e validar com evidências. 
+            Exemplos: "Possível falha no sistema de bloqueio", "Suspeita de treinamento inadequado", "Pode ter havido falha humana".
+            
+            **🔗 Causa Intermediária:** Use quando já tem certeza de que a causa existe e deseja investigar suas causas raízes (subcausas). 
+            Exemplos: "Falhas de Inspeção e Manutenção" (pode ter subcausas como "Ausência de checklists" ou "Equipamento de teste calibrado incorretamente").
+            
+            💡 **Dica:** Comece com hipóteses, valide-as, e então transforme as confirmadas em causas intermediárias para aprofundar a análise.
+            """,
             key="node_type_selector"
         )
         
         node_label = st.text_area(
-            "Qual é a causa?",
-            placeholder="Ex: Falta de treinamento do operador",
-            height=100,
-            help="💡 Liste todas as causas possíveis, mesmo que não tenha certeza. Você poderá validá-las depois.",
+            "Descreva a causa ou hipótese:",
+            placeholder="Ex: Falta de treinamento adequado do operador na operação de equipamentos específicos",
+            height=120,
+            help="💡 **Seja específico e detalhado**: Descreva claramente a possível causa. Inclua informações relevantes como: quem estava envolvido, qual processo/equipamento, em que condições ocorreu. Uma descrição bem elaborada facilita a validação posterior. Exemplos: 'Ausência de procedimento operacional para a atividade', 'Falha no sistema de bloqueio e etiquetagem', 'Condições climáticas adversas não consideradas no planejamento'.",
             key="node_label_input"
         )
         
@@ -2407,7 +2416,18 @@ def main():
         
         # Validação de hipóteses (interface conversacional)
         st.markdown("### ✅ Validar Hipóteses e Causas Intermediárias")
-        st.markdown("**Revise cada hipótese/causa e confirme se é verdadeira ou falsa. Causas intermediárias podem ter subcausas adicionadas:**")
+        st.markdown("""
+        **Processo de Validação:**
+        
+        Para cada hipótese ou causa intermediária identificada, você deve:
+        
+        1. **Revisar cuidadosamente** a descrição da hipótese/causa
+        2. **Coletar evidências** que suportem ou refutem a hipótese (fotos, depoimentos, relatórios, etc.)
+        3. **Documentar a justificativa** de forma clara e objetiva, explicando por que a hipótese foi confirmada ou descartada
+        4. **Incluir imagens** quando disponíveis, pois elas reforçam a análise e aparecem no relatório final
+        
+        **💡 Dica:** Causas intermediárias validadas podem ter subcausas adicionadas para aprofundar a análise.
+        """)
         
         # Inclui:
         # 1. Hipóteses (hypothesis) - todas
@@ -2541,13 +2561,13 @@ def main():
                 with st.expander(title, expanded=False):
                     # Campo de edição do label
                     edit_label_key = f"edit_label_{node['id']}"
-                    edit_label_text = "✏️ Editar causa:" if node_type == 'fact' else "✏️ Editar hipótese:"
+                    edit_label_text = "✏️ Editar descrição da causa:" if node_type == 'fact' else "✏️ Editar descrição da hipótese:"
                     edited_label = st.text_area(
                         edit_label_text,
                         value=node['label'],
                         key=edit_label_key,
-                        help="Você pode editar o texto desta causa/hipótese antes de validá-la.",
-                        height=80
+                        help="💡 **Melhore a descrição:** Certifique-se de que a descrição seja clara, específica e completa. Inclua detalhes relevantes como: contexto, envolvidos, equipamentos, condições, etc. Uma boa descrição facilita a compreensão e validação da causa/hipótese.",
+                        height=100
                     )
                     
                     # Botão para salvar edição do label
@@ -2567,7 +2587,10 @@ def main():
                     
                     # Mostra justificativa existente se houver
                     if node.get('justification'):
-                        st.info(f"📝 **Justificativa atual:** {node['justification']}")
+                        st.markdown("---")
+                        st.markdown("### 📝 Justificativa Registrada")
+                        st.info(f"**Análise documentada:**\n\n{node['justification']}")
+                        st.markdown("---")
                     
                     # Mostra imagem de justificativa existente se houver (mesma lógica da galeria de evidências)
                     justification_image_url = node.get('justification_image_url')
@@ -2644,26 +2667,49 @@ def main():
                     
                     # Campo de justificativa
                     justification_key = f"justification_{node['id']}"
-                    justification_label = "📝 Justificativa (obrigatória para confirmar ou descartar)"
-                    justification_help = "Explique o motivo da confirmação ou descarte desta hipótese. Esta justificativa aparecerá no relatório PDF."
+                    justification_label = "📝 Justificativa da Análise (obrigatória para confirmar ou descartar)"
+                    
                     if node_type == 'fact':
-                        justification_help = "Explique o motivo da confirmação ou descarte desta causa intermediária. Facts também precisam de justificativa ao serem descartados. Esta justificativa aparecerá no relatório PDF."
+                        justification_help = """
+                        **Como elaborar uma boa justificativa:**
+                        
+                        Explique **claramente e de forma fundamentada** por que esta causa intermediária foi confirmada ou descartada:
+                        
+                        ✅ **Para confirmar:** Cite as evidências que comprovam a causa (ex: "Análise do relatório técnico identificou falha no sistema de bloqueio"; "Fotos do local mostram ausência de sinalização"; "Depoimento do operador confirma que não havia procedimento específico").
+                        
+                        ❌ **Para descartar:** Explique por que a causa não se aplica ao caso (ex: "Verificação dos registros mostra que o treinamento estava atualizado"; "Inspeção do equipamento não identificou falhas mecânicas"; "Análise dos dados confirma que as condições ambientais estavam dentro dos parâmetros normais").
+                        
+                        Esta justificativa será incluída no relatório PDF oficial e deve ser precisa e profissional.
+                        """
+                    else:
+                        justification_help = """
+                        **Como elaborar uma boa justificativa:**
+                        
+                        Explique **claramente e de forma fundamentada** por que esta hipótese foi confirmada ou descartada:
+                        
+                        ✅ **Para confirmar:** Cite as evidências que comprovam a hipótese (ex: "Análise do relatório técnico identificou falha no sistema de bloqueio"; "Fotos do local mostram ausência de sinalização"; "Depoimento do operador confirma que não havia procedimento específico").
+                        
+                        ❌ **Para descartar:** Explique por que a hipótese não se aplica ao caso (ex: "Verificação dos registros mostra que o treinamento estava atualizado"; "Inspeção do equipamento não identificou falhas mecânicas"; "Análise dos dados confirma que as condições ambientais estavam dentro dos parâmetros normais").
+                        
+                        **💡 Importante:** Base sua justificativa em fatos, evidências e análises concretas, não em suposições. Esta justificativa será incluída no relatório PDF oficial e deve ser precisa e profissional.
+                        """
                     
                     justification = st.text_area(
                         justification_label,
                         value=node.get('justification', ''),
                         key=justification_key,
                         help=justification_help,
-                        height=100
+                        height=150,
+                        placeholder="Ex: Após análise detalhada das evidências coletadas (fotos, relatórios técnicos e depoimentos), foi identificado que..."
                     )
                     
                     # Upload de imagem para justificativa
-                    st.markdown("**📷 Imagem da Justificativa (opcional):**")
+                    st.markdown("**📷 Evidência Visual da Justificativa (opcional, mas recomendado):**")
                     uploaded_justification_image = st.file_uploader(
-                        "Adicione uma foto que comprove ou descarte esta hipótese:",
+                        "Adicione uma foto, diagrama ou documento que comprove ou descarte esta hipótese/causa:",
                         type=['png', 'jpg', 'jpeg'],
                         key=f"justification_image_{node['id']}",
-                        help="Esta imagem aparecerá no relatório PDF junto com a justificativa."
+                        help="💡 **Evidências visuais reforçam sua análise:** Fotos do local, diagramas técnicos, relatórios escaneados, prints de sistemas, etc. A imagem será exibida no relatório PDF junto com a justificativa, tornando a análise mais completa e convincente."
                     )
                     
                     if uploaded_justification_image:
@@ -2685,10 +2731,10 @@ def main():
                     
                     with col_val:
                         if st.button("✅ Confirmar/Verdadeiro", key=f"validate_{node['id']}", 
-                                   help="Use quando tiver evidências que confirmam esta causa"):
+                                   help="Use quando tiver evidências concretas (relatórios, fotos, depoimentos, análises) que confirmam esta causa/hipótese. A justificativa deve explicar claramente por que a causa é verdadeira."):
                             justification_clean = (justification or '').strip()
                             if not justification_clean:
-                                st.warning("⚠️ Por favor, insira uma justificativa antes de confirmar.")
+                                st.warning("⚠️ **Atenção:** Uma justificativa fundamentada é obrigatória para confirmar uma causa/hipótese. Por favor, descreva as evidências que comprovam esta causa antes de confirmar.")
                             else:
                                 # Se houver imagem sendo enviada, faz upload primeiro
                                 justification_img_url = None
@@ -2703,15 +2749,15 @@ def main():
                     
                     with col_disc:
                         # Ajuda específica para facts vs hipóteses
-                        discard_help = "Use quando tiver evidências que descartam esta causa. Facts (causas intermediárias) também podem ser descartados com justificativa."
+                        discard_help = "Use quando tiver evidências concretas que descartam esta causa/hipótese. A justificativa deve explicar claramente por que a causa não se aplica ao caso (ex: verificações realizadas, análises concluídas, condições não verificadas)."
                         if node_type == 'fact':
-                            discard_help = "Use quando tiver evidências que descartam esta causa intermediária. Facts podem ser descartados mesmo que já tenham sido confirmados anteriormente."
+                            discard_help = "Use quando tiver evidências concretas que descartam esta causa intermediária. Facts (causas intermediárias) também precisam de justificativa detalhada quando descartados, mesmo que tenham sido confirmados anteriormente."
                         
                         if st.button("❌ Descartar/Falso", key=f"discard_{node['id']}",
                                    help=discard_help):
                             justification_clean = (justification or '').strip()
                             if not justification_clean:
-                                st.warning("⚠️ Por favor, insira uma justificativa antes de descartar.")
+                                st.warning("⚠️ **Atenção:** Uma justificativa fundamentada é obrigatória para descartar uma causa/hipótese. Por favor, explique claramente por que esta causa não se aplica ao caso antes de descartar.")
                             else:
                                 # Aviso especial se for fact com filhos
                                 if node_type == 'fact' and has_children:
