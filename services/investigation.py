@@ -56,7 +56,14 @@ def create_accident(title: str, description: str = "", occurrence_date: Optional
         }
         
         if occurrence_date:
-            data["occurrence_date"] = occurrence_date.isoformat()
+            # Formata datetime para ISO string sem timezone (mantém horário como inserido)
+            if isinstance(occurrence_date, datetime):
+                # Remove timezone se existir para manter horário original
+                if occurrence_date.tzinfo is not None:
+                    occurrence_date = occurrence_date.replace(tzinfo=None)
+                data["occurrence_date"] = occurrence_date.isoformat()
+            else:
+                data["occurrence_date"] = occurrence_date
         
         # Adiciona campos opcionais do relatório Vibra
         optional_fields = [
@@ -142,7 +149,15 @@ def update_accident(accident_id: str, **kwargs) -> bool:
             required_fields = ['title']
             if k in required_fields and v is None:
                 continue  # Pula campos obrigatórios None
-            final_data[k] = v
+            
+            # Trata campos datetime para garantir formato correto
+            if k in ['occurrence_date'] and isinstance(v, datetime):
+                # Remove timezone se existir para manter horário original
+                if v.tzinfo is not None:
+                    v = v.replace(tzinfo=None)
+                final_data[k] = v.isoformat()
+            else:
+                final_data[k] = v
         
         logger.info(f"[UPDATE_ACCIDENT] Payload final: {list(final_data.keys())}")
         logger.info(f"[UPDATE_ACCIDENT] Valores: {final_data}")
@@ -243,6 +258,20 @@ def upsert_involved_people(accident_id: str, people: List[Dict[str, Any]]) -> bo
                     'aso_date': person.get('aso_date'),
                     'training_status': person.get('training_status'),
                     'commission_role': person.get('commission_role'),  # Função na comissão de investigação
+                    # Campos detalhados do perfil do acidentado (para person_type = 'Injured')
+                    'birth_date': person.get('birth_date'),
+                    'rg': person.get('rg'),
+                    'marital_status': person.get('marital_status'),
+                    'birthplace': person.get('birthplace'),
+                    'children_count': person.get('children_count'),
+                    'injury_type': person.get('injury_type'),
+                    'body_part': person.get('body_part'),
+                    'lost_days': person.get('lost_days'),
+                    'cat_number': person.get('cat_number'),
+                    'is_fatal': person.get('is_fatal'),
+                    'employment_type': person.get('employment_type'),
+                    'previous_accident_history': person.get('previous_accident_history'),
+                    'certifications': person.get('certifications'),
                     # created_by não é passado (será NULL no banco) para evitar erro de FK com auth.users
                 }
                 # Remove campos None para não enviar dados desnecessários
@@ -660,9 +689,19 @@ def add_timeline_event(accident_id: str, event_time: datetime, description: str)
         
         # NOTA: created_by referencia auth.users.id, mas código usa profiles.id (get_user_id())
         # Campo nullable por design - ver comentário em add_fault_tree_node() para detalhes completos
+        # Formata datetime para ISO string sem timezone (mantém horário como inserido)
+        # Se datetime já for string, usa diretamente
+        if isinstance(event_time, datetime):
+            # Remove timezone se existir para manter horário original
+            if event_time.tzinfo is not None:
+                event_time = event_time.replace(tzinfo=None)
+            event_time_str = event_time.isoformat()
+        else:
+            event_time_str = str(event_time)
+        
         data = {
             "accident_id": accident_id,
-            "event_time": event_time.isoformat(),
+            "event_time": event_time_str,
             "description": description,
             "created_by": None  # NULL por design - FK aponta para auth.users.id, código usa profiles.id
         }
@@ -698,8 +737,17 @@ def update_timeline_event(event_id: str, event_time: datetime, description: str)
             st.error("Erro ao conectar com o banco de dados")
             return False
         
+        # Formata datetime para ISO string sem timezone (mantém horário como inserido)
+        if isinstance(event_time, datetime):
+            # Remove timezone se existir para manter horário original
+            if event_time.tzinfo is not None:
+                event_time = event_time.replace(tzinfo=None)
+            event_time_str = event_time.isoformat()
+        else:
+            event_time_str = str(event_time)
+        
         data = {
-            "event_time": event_time.isoformat(),
+            "event_time": event_time_str,
             "description": description
         }
         
@@ -737,9 +785,18 @@ def add_commission_action(accident_id: str, action_time: datetime, description: 
         
         # NOTA: created_by referencia auth.users.id, mas não temos acesso direto via Supabase Auth na camada Python
         # Campo é nullable por design para evitar erros de FK. Ver comentário em add_fault_tree_node() para detalhes.
+        # Formata datetime para ISO string sem timezone (mantém horário como inserido)
+        if isinstance(action_time, datetime):
+            # Remove timezone se existir para manter horário original
+            if action_time.tzinfo is not None:
+                action_time = action_time.replace(tzinfo=None)
+            action_time_str = action_time.isoformat()
+        else:
+            action_time_str = str(action_time)
+        
         data = {
             "accident_id": accident_id,
-            "action_time": action_time.isoformat(),
+            "action_time": action_time_str,
             "description": description,
             "action_type": action_type,
             "responsible_person": responsible_person,
@@ -777,8 +834,17 @@ def update_commission_action(action_id: str, action_time: datetime, description:
             st.error("Erro ao conectar com o banco de dados")
             return False
         
+        # Formata datetime para ISO string sem timezone (mantém horário como inserido)
+        if isinstance(action_time, datetime):
+            # Remove timezone se existir para manter horário original
+            if action_time.tzinfo is not None:
+                action_time = action_time.replace(tzinfo=None)
+            action_time_str = action_time.isoformat()
+        else:
+            action_time_str = str(action_time)
+        
         data = {
-            "action_time": action_time.isoformat(),
+            "action_time": action_time_str,
             "description": description,
             "action_type": action_type,
             "responsible_person": responsible_person

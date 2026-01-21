@@ -620,17 +620,87 @@ HTML_TEMPLATE = """
     {% for person in injured %}
     <div class="vibra-green" style="margin-top: 10px;">1.7. Perfil da Vítima/Lesionado: {{ person.get('name', 'N/A') }}</div>
     <table class="form-table">
+        <!-- Primeira linha: Nome, Nascimento, Idade -->
         <tr>
-            <td width="20%"><span class="label">Nome</span><span class="value">{{ person.get('name', 'N/A') }}</span></td>
-            <td width="20%"><span class="label">Idade</span><span class="value">{{ person.get('age', 'N/A') }}</span></td>
-            <td width="20%"><span class="label">Função</span><span class="value">{{ person.get('job_title', 'N/A') }}</span></td>
-            <td width="20%"><span class="label">Empresa</span><span class="value">{{ person.get('company', 'N/A') }}</span></td>
-            <td width="20%"><span class="label">Matrícula/CPF</span><span class="value">{{ person.get('registration_id', 'N/A') }}</span></td>
+            <td width="33%"><span class="label">Nome</span><span class="value">{{ person.get('name', 'N/A') }}</span></td>
+            <td width="33%"><span class="label">Nascimento</span><span class="value">
+                {% if person.get('birth_date') %}
+                    {% set birth_dt = person.get('birth_date') %}
+                    {% if birth_dt is string %}
+                        {% if '-' in birth_dt %}
+                            {% set parts = birth_dt[:10].split('-') %}
+                            {{ parts[2] }}/{{ parts[1] }}/{{ parts[0] }}
+                        {% else %}
+                            {{ birth_dt[:10] if birth_dt|length > 10 else birth_dt }}
+                        {% endif %}
+                    {% else %}
+                        {{ birth_dt }}
+                    {% endif %}
+                {% else %}
+                    N/A
+                {% endif %}
+            </span></td>
+            <td width="34%"><span class="label">Idade</span><span class="value">{{ person.get('age', 'N/A') }}</span></td>
         </tr>
-        {% if person.get('time_in_role') or person.get('aso_date') %}
+        <!-- Segunda linha: CPF, RG, Estado Civil -->
         <tr>
-            <td colspan="2"><span class="label">Tempo na Função</span><span class="value">{{ person.get('time_in_role', 'N/A') }}</span></td>
-            <td colspan="3"><span class="label">Data ASO</span><span class="value">{{ person.get('aso_date', 'N/A') }}</span></td>
+            <td><span class="label">CPF</span><span class="value">{{ person.get('registration_id', 'N/A') }}</span></td>
+            <td><span class="label">RG</span><span class="value">{{ person.get('rg', 'N/A') }}</span></td>
+            <td><span class="label">Estado Civil</span><span class="value">{{ person.get('marital_status', 'N/A') }}</span></td>
+        </tr>
+        <!-- Terceira linha: Naturalidade, Número de Filhos -->
+        <tr>
+            <td><span class="label">Naturalidade</span><span class="value">{{ person.get('birthplace', 'N/A') }}</span></td>
+            <td><span class="label">Número de Filhos</span><span class="value">{{ person.get('children_count', 'N/A') }}</span></td>
+            <td></td>
+        </tr>
+        <!-- Quarta linha: Tipo de Lesão, Parte do Corpo, Dias Perdidos -->
+        <tr>
+            <td><span class="label">Tipo de Lesão</span><span class="value">{{ person.get('injury_type', 'N/A') }}</span></td>
+            <td><span class="label">Parte do Corpo</span><span class="value">{{ person.get('body_part', 'N/A') }}</span></td>
+            <td><span class="label">Dias Perdidos</span><span class="value">{{ person.get('lost_days', 'N/A') }}</span></td>
+        </tr>
+        <!-- Quinta linha: Data ASO, N° CAT, Fatalidade -->
+        <tr>
+            <td><span class="label">Data ASO</span><span class="value">{{ person.get('aso_date', 'N/A') }}</span></td>
+            <td><span class="label">N° CAT</span><span class="value">{{ person.get('cat_number', 'N/A') }}</span></td>
+            <td>
+                <span class="label">Fatalidade</span>
+                <span class="checkbox">{{ '☑' if person.get('is_fatal') else '☐' }}</span> Sim
+                <span class="checkbox">{{ '☑' if not person.get('is_fatal') else '☐' }}</span> Não
+            </td>
+        </tr>
+        <!-- Sexta linha: Tipo (Empregado/Contratado/Terceiros) -->
+        <tr>
+            <td><span class="label">Tipo</span>
+                <span class="checkbox">{{ '☑' if person.get('employment_type') == 'Empregado' else '☐' }}</span> Empregado
+                <span class="checkbox">{{ '☑' if person.get('employment_type') == 'Contratado' else '☐' }}</span> Contratado
+                <span class="checkbox">{{ '☑' if person.get('employment_type') == 'Terceiros/Comunidade' else '☐' }}</span> Terceiros/Comunidade
+            </td>
+            <td><span class="label">Função</span><span class="value">{{ person.get('job_title', 'N/A') }}</span></td>
+            <td><span class="label">Empresa</span><span class="value">{{ person.get('company', 'N/A') }}</span></td>
+        </tr>
+        <!-- Sétima linha: Histórico Acidente Anterior -->
+        <tr>
+            <td colspan="3">
+                <span class="label">Histórico Acidente Anterior</span>
+                <span class="checkbox">{{ '☑' if person.get('previous_accident_history') else '☐' }}</span> Sim
+                <span class="checkbox">{{ '☑' if not person.get('previous_accident_history') else '☐' }}</span> Não
+            </td>
+        </tr>
+        <!-- Oitava linha: Capacitações/Validade -->
+        {% if person.get('certifications') %}
+        <tr>
+            <td colspan="3">
+                <span class="label">Capacitações/Validade</span>
+                <span class="value">{{ person.get('certifications', 'N/A') }}</span>
+            </td>
+        </tr>
+        {% endif %}
+        <!-- Campos adicionais se existirem -->
+        {% if person.get('time_in_role') %}
+        <tr>
+            <td colspan="3"><span class="label">Tempo na Função</span><span class="value">{{ person.get('time_in_role', 'N/A') }}</span></td>
         </tr>
         {% endif %}
     </table>

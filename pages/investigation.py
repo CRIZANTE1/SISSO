@@ -4,7 +4,7 @@ Experiência intuitiva passo a passo baseada em FTA e NBR 14280
 """
 import streamlit as st
 import pandas as pd
-from datetime import datetime, date, time
+from datetime import datetime, date, time, timezone
 from typing import Optional, Dict, Any, List
 import requests
 from services.investigation import (
@@ -582,8 +582,13 @@ def main():
                 
                 with col_date:
                     if investigation.get('occurrence_date'):
-                        occ_date = pd.to_datetime(investigation.get('occurrence_date')).date()
-                        occ_time = pd.to_datetime(investigation.get('occurrence_date')).time()
+                        # Converte do banco (pode estar em UTC ou sem timezone)
+                        occ_dt = pd.to_datetime(investigation.get('occurrence_date'))
+                        # Remove timezone se existir para manter o horário original
+                        if occ_dt.tz is not None:
+                            occ_dt = occ_dt.tz_localize(None)
+                        occ_date = occ_dt.date()
+                        occ_time = occ_dt.time()
                     else:
                         occ_date = date.today()
                         occ_time = time(12, 0)
@@ -598,6 +603,7 @@ def main():
                         value=occ_time,
                         help="Hora do acidente"
                     )
+                    # Combina data e hora (sem timezone - mantém horário como inserido pelo usuário)
                     occurrence_datetime = datetime.combine(occurrence_date_input, occurrence_time_input)
                 
                 # Campo: Local da Base (input manual)
@@ -854,35 +860,233 @@ def main():
                 num_injured = st.number_input("Quantidade de vítimas:", min_value=0, max_value=10, value=len(involved_injured), key="num_injured")
                 injured = []
                 for i in range(num_injured):
-                    with st.container():
-                        col1, col2 = st.columns(2)
-                        with col1:
-                            injured_name = st.text_input(f"Nome {i+1}:", value=involved_injured[i].get('name', '') if i < len(involved_injured) else '', key=f"injured_name_{i}")
-                            injured_reg = st.text_input(f"Matrícula/CPF {i+1}:", value=involved_injured[i].get('registration_id', '') if i < len(involved_injured) else '', key=f"injured_reg_{i}")
-                            injured_company = st.text_input(f"Empresa {i+1}:", value=involved_injured[i].get('company', '') if i < len(involved_injured) else '', key=f"injured_company_{i}")
-                        with col2:
-                            injured_role = st.text_input(f"Cargo/Função {i+1}:", value=involved_injured[i].get('job_title', '') if i < len(involved_injured) else '', key=f"injured_role_{i}")
-                            injured_age_val = involved_injured[i].get('age') if i < len(involved_injured) and involved_injured[i].get('age') else 0
-                            injured_age = st.number_input(f"Idade {i+1}:", min_value=0, max_value=100, value=int(injured_age_val) if injured_age_val else 0, key=f"injured_age_{i}")
+                    # Se houver apenas 1 vítima, exibe formulário completo detalhado
+                    if num_injured == 1:
+                        with st.expander(f"📋 Perfil do Acidentado", expanded=True):
+                            # Linha 1: Nome | Nascimento | Idade
+                            col_nome, col_nasc, col_idade = st.columns(3)
+                            with col_nome:
+                                injured_name = st.text_input(
+                                    "Nome:",
+                                    value=involved_injured[i].get('name', '') if i < len(involved_injured) else '',
+                                    key=f"injured_name_{i}"
+                                )
+                            with col_nasc:
+                                birth_date_val = None
+                                if i < len(involved_injured) and involved_injured[i].get('birth_date'):
+                                    try:
+                                        birth_date_val = pd.to_datetime(involved_injured[i].get('birth_date')).date()
+                                    except:
+                                        birth_date_val = None
+                                injured_birth_date = st.date_input(
+                                    "Nascimento:",
+                                    value=birth_date_val,
+                                    key=f"injured_birth_date_{i}"
+                                )
+                            with col_idade:
+                                injured_age_val = involved_injured[i].get('age') if i < len(involved_injured) and involved_injured[i].get('age') else 0
+                                injured_age = st.number_input(
+                                    "Idade:",
+                                    min_value=0,
+                                    max_value=100,
+                                    value=int(injured_age_val) if injured_age_val else 0,
+                                    key=f"injured_age_{i}"
+                                )
                             
-                            injured_aso_val = None
-                            if i < len(involved_injured) and involved_injured[i].get('aso_date'):
-                                try:
-                                    injured_aso_val = pd.to_datetime(involved_injured[i].get('aso_date')).date()
-                                except:
-                                    injured_aso_val = None
-                            injured_aso = st.date_input(f"Data ASO {i+1}:", value=injured_aso_val, key=f"injured_aso_{i}")
-                        
-                        if injured_name:
-                            injured.append({
-                                'person_type': 'Injured',
-                                'name': injured_name,
-                                'registration_id': injured_reg or None,
-                                'job_title': injured_role or None,
-                                'company': injured_company or None,
-                                'age': injured_age if injured_age else None,
-                                'aso_date': injured_aso.isoformat() if injured_aso else None
-                            })
+                            # Linha 2: CPF | RG | Estado Civil
+                            col_cpf, col_rg, col_estado = st.columns(3)
+                            with col_cpf:
+                                injured_reg = st.text_input(
+                                    "CPF:",
+                                    value=involved_injured[i].get('registration_id', '') if i < len(involved_injured) else '',
+                                    key=f"injured_reg_{i}",
+                                    placeholder="000.000.000-00"
+                                )
+                            with col_rg:
+                                injured_rg = st.text_input(
+                                    "RG:",
+                                    value=involved_injured[i].get('rg', '') if i < len(involved_injured) else '',
+                                    key=f"injured_rg_{i}"
+                                )
+                            with col_estado:
+                                marital_status_options = ["", "Solteiro(a)", "Casado(a)", "Divorciado(a)", "Viúvo(a)", "União Estável"]
+                                current_marital = involved_injured[i].get('marital_status', '') if i < len(involved_injured) else ''
+                                marital_index = marital_status_options.index(current_marital) if current_marital in marital_status_options else 0
+                                injured_marital_status = st.selectbox(
+                                    "Estado Civil:",
+                                    options=marital_status_options,
+                                    index=marital_index,
+                                    key=f"injured_marital_{i}"
+                                )
+                            
+                            # Linha 3: Naturalidade | Número de Filhos | [vazio]
+                            col_natural, col_filhos, col_vazio = st.columns(3)
+                            with col_natural:
+                                injured_birthplace = st.text_input(
+                                    "Naturalidade:",
+                                    value=involved_injured[i].get('birthplace', '') if i < len(involved_injured) else '',
+                                    key=f"injured_birthplace_{i}",
+                                    placeholder="Ex: São Paulo"
+                                )
+                            with col_filhos:
+                                injured_children_count = st.number_input(
+                                    "Número de filhos:",
+                                    min_value=0,
+                                    max_value=20,
+                                    value=int(involved_injured[i].get('children_count', 0)) if i < len(involved_injured) and involved_injured[i].get('children_count') else 0,
+                                    key=f"injured_children_{i}"
+                                )
+                            with col_vazio:
+                                st.empty()  # Espaço vazio
+                            
+                            # Linha 4: Tipo de Lesão | Parte do Corpo | Dias Perdidos
+                            col_lesao, col_parte, col_dias = st.columns(3)
+                            with col_lesao:
+                                injured_injury_type = st.text_input(
+                                    "Tipo de Lesão:",
+                                    value=involved_injured[i].get('injury_type', '') if i < len(involved_injured) else '',
+                                    key=f"injured_injury_type_{i}"
+                                )
+                            with col_parte:
+                                injured_body_part = st.text_input(
+                                    "Parte do Corpo:",
+                                    value=involved_injured[i].get('body_part', '') if i < len(involved_injured) else '',
+                                    key=f"injured_body_part_{i}",
+                                    placeholder="Ex: Pé direito"
+                                )
+                            with col_dias:
+                                injured_lost_days = st.number_input(
+                                    "Dias Perdidos:",
+                                    min_value=0,
+                                    max_value=10000,
+                                    value=int(involved_injured[i].get('lost_days', 0)) if i < len(involved_injured) and involved_injured[i].get('lost_days') else 0,
+                                    key=f"injured_lost_days_{i}"
+                                )
+                            
+                            # Linha 5: Data ASO | N° CAT | Fatalidade
+                            col_aso, col_cat, col_fatal = st.columns(3)
+                            with col_aso:
+                                injured_aso_val = None
+                                if i < len(involved_injured) and involved_injured[i].get('aso_date'):
+                                    try:
+                                        injured_aso_val = pd.to_datetime(involved_injured[i].get('aso_date')).date()
+                                    except:
+                                        injured_aso_val = None
+                                injured_aso = st.date_input(
+                                    "Data ASO:",
+                                    value=injured_aso_val,
+                                    key=f"injured_aso_{i}"
+                                )
+                            with col_cat:
+                                injured_cat = st.text_input(
+                                    "N° CAT:",
+                                    value=involved_injured[i].get('cat_number', '') if i < len(involved_injured) else '',
+                                    key=f"injured_cat_{i}"
+                                )
+                            with col_fatal:
+                                injured_is_fatal = st.checkbox(
+                                    "Fatalidade",
+                                    value=bool(involved_injured[i].get('is_fatal', False)) if i < len(involved_injured) else False,
+                                    key=f"injured_fatal_{i}"
+                                )
+                                st.markdown("Sim ☒  Não ☐" if injured_is_fatal else "Sim ☐  Não ☒")
+                            
+                            # Linha 6: Tipo (Empregado/Contratado/Terceiros)
+                            col_tipo, col_empresa, col_role = st.columns(3)
+                            with col_tipo:
+                                employment_type_options = ["", "Empregado", "Contratado", "Terceiros/Comunidade"]
+                                current_employment = involved_injured[i].get('employment_type', '') if i < len(involved_injured) else ''
+                                employment_index = employment_type_options.index(current_employment) if current_employment in employment_type_options else 0
+                                injured_employment_type = st.selectbox(
+                                    "Tipo:",
+                                    options=employment_type_options,
+                                    index=employment_index,
+                                    key=f"injured_employment_{i}"
+                                )
+                            with col_empresa:
+                                injured_company = st.text_input(
+                                    "Empresa:",
+                                    value=involved_injured[i].get('company', '') if i < len(involved_injured) else '',
+                                    key=f"injured_company_{i}"
+                                )
+                            with col_role:
+                                injured_role = st.text_input(
+                                    "Cargo/Função:",
+                                    value=involved_injured[i].get('job_title', '') if i < len(involved_injured) else '',
+                                    key=f"injured_role_{i}"
+                                )
+                            
+                            # Histórico Acidente Anterior
+                            injured_previous = st.checkbox(
+                                "Histórico Acidente Anterior",
+                                value=bool(involved_injured[i].get('previous_accident_history', False)) if i < len(involved_injured) else False,
+                                key=f"injured_previous_{i}"
+                            )
+                            st.markdown("Sim ☒  Não ☐" if injured_previous else "Sim ☐  Não ☒")
+                            
+                            # Capacitações/Validade
+                            injured_certifications = st.text_area(
+                                "Capacitações/Validade:",
+                                value=involved_injured[i].get('certifications', '') if i < len(involved_injured) else '',
+                                key=f"injured_certifications_{i}",
+                                height=100,
+                                placeholder="Digite as capacitações e suas validades..."
+                            )
+                            
+                            if injured_name:
+                                injured.append({
+                                    'person_type': 'Injured',
+                                    'name': injured_name,
+                                    'registration_id': injured_reg or None,
+                                    'job_title': injured_role or None,
+                                    'company': injured_company or None,
+                                    'age': injured_age if injured_age else None,
+                                    'aso_date': injured_aso.isoformat() if injured_aso else None,
+                                    'birth_date': injured_birth_date.isoformat() if injured_birth_date else None,
+                                    'rg': injured_rg or None,
+                                    'marital_status': injured_marital_status if injured_marital_status else None,
+                                    'birthplace': injured_birthplace or None,
+                                    'children_count': injured_children_count if injured_children_count else None,
+                                    'injury_type': injured_injury_type or None,
+                                    'body_part': injured_body_part or None,
+                                    'lost_days': injured_lost_days if injured_lost_days else None,
+                                    'cat_number': injured_cat or None,
+                                    'is_fatal': injured_is_fatal,
+                                    'employment_type': injured_employment_type if injured_employment_type else None,
+                                    'previous_accident_history': injured_previous,
+                                    'certifications': injured_certifications or None
+                                })
+                    else:
+                        # Para múltiplas vítimas, mantém formulário simplificado
+                        with st.container():
+                            col1, col2 = st.columns(2)
+                            with col1:
+                                injured_name = st.text_input(f"Nome {i+1}:", value=involved_injured[i].get('name', '') if i < len(involved_injured) else '', key=f"injured_name_{i}")
+                                injured_reg = st.text_input(f"Matrícula/CPF {i+1}:", value=involved_injured[i].get('registration_id', '') if i < len(involved_injured) else '', key=f"injured_reg_{i}")
+                                injured_company = st.text_input(f"Empresa {i+1}:", value=involved_injured[i].get('company', '') if i < len(involved_injured) else '', key=f"injured_company_{i}")
+                            with col2:
+                                injured_role = st.text_input(f"Cargo/Função {i+1}:", value=involved_injured[i].get('job_title', '') if i < len(involved_injured) else '', key=f"injured_role_{i}")
+                                injured_age_val = involved_injured[i].get('age') if i < len(involved_injured) and involved_injured[i].get('age') else 0
+                                injured_age = st.number_input(f"Idade {i+1}:", min_value=0, max_value=100, value=int(injured_age_val) if injured_age_val else 0, key=f"injured_age_{i}")
+                                
+                                injured_aso_val = None
+                                if i < len(involved_injured) and involved_injured[i].get('aso_date'):
+                                    try:
+                                        injured_aso_val = pd.to_datetime(involved_injured[i].get('aso_date')).date()
+                                    except:
+                                        injured_aso_val = None
+                                injured_aso = st.date_input(f"Data ASO {i+1}:", value=injured_aso_val, key=f"injured_aso_{i}")
+                            
+                            if injured_name:
+                                injured.append({
+                                    'person_type': 'Injured',
+                                    'name': injured_name,
+                                    'registration_id': injured_reg or None,
+                                    'job_title': injured_role or None,
+                                    'company': injured_company or None,
+                                    'age': injured_age if injured_age else None,
+                                    'aso_date': injured_aso.isoformat() if injured_aso else None
+                                })
                 
                 # Testemunhas
                 st.subheader("👁️ Testemunhas")
@@ -1170,6 +1374,7 @@ def main():
             with col_time:
                 event_time_input = st.time_input("Hora do evento:", value=time(12, 0), key="timeline_time")
             
+            # Combina data e hora (sem timezone - mantém horário como inserido pelo usuário)
             event_datetime = datetime.combine(event_date, event_time_input)
             
             event_description = st.text_area(
@@ -1202,11 +1407,17 @@ def main():
                 event_time_raw = event.get('event_time')
                 description_raw = event.get('description', '')
                 
-                # Converte para tipos corretos
+                # Converte para tipos corretos, removendo timezone para manter horário original
                 if isinstance(event_time_raw, pd.Timestamp):
-                    event_time = event_time_raw.to_pydatetime()
+                    event_time_dt = event_time_raw
                 else:
-                    event_time = pd.to_datetime(event_time_raw).to_pydatetime()
+                    event_time_dt = pd.to_datetime(event_time_raw)
+                
+                # Remove timezone se existir para manter o horário original
+                if event_time_dt.tz is not None:
+                    event_time_dt = event_time_dt.tz_localize(None)
+                
+                event_time = event_time_dt.to_pydatetime()
                 
                 description = str(description_raw) if description_raw else ''
                 
@@ -1228,6 +1439,7 @@ def main():
                             key=f"edit_time_{event_id}"
                         )
                     
+                    # Combina data e hora (sem timezone - mantém horário como inserido pelo usuário)
                     edit_datetime = datetime.combine(edit_date, edit_time)
                     
                     edit_description = st.text_area(
@@ -1270,6 +1482,7 @@ def main():
             with col_time_action:
                 action_time_input = st.time_input("Hora da ação:", value=time(12, 0), key="action_time")
             
+            # Combina data e hora (sem timezone - mantém horário como inserido pelo usuário)
             action_datetime = datetime.combine(action_date, action_time_input)
             
             col_type, col_resp = st.columns(2)
@@ -1320,11 +1533,17 @@ def main():
                 action_type_raw = action.get('action_type', '')
                 responsible_raw = action.get('responsible_person', '')
                 
-                # Converte para tipos corretos
+                # Converte para tipos corretos, removendo timezone para manter horário original
                 if isinstance(action_time_raw, pd.Timestamp):
-                    action_time = action_time_raw.to_pydatetime()
+                    action_time_dt = action_time_raw
                 else:
-                    action_time = pd.to_datetime(action_time_raw).to_pydatetime()
+                    action_time_dt = pd.to_datetime(action_time_raw)
+                
+                # Remove timezone se existir para manter o horário original
+                if action_time_dt.tz is not None:
+                    action_time_dt = action_time_dt.tz_localize(None)
+                
+                action_time = action_time_dt.to_pydatetime()
                 
                 description = str(description_raw) if description_raw else ''
                 action_type = str(action_type_raw) if action_type_raw else ''
@@ -1350,6 +1569,7 @@ def main():
                             key=f"edit_action_time_{action_id}"
                         )
                     
+                    # Combina data e hora (sem timezone - mantém horário como inserido pelo usuário)
                     edit_datetime = datetime.combine(edit_date, edit_time)
                     
                     col_type_edit, col_resp_edit = st.columns(2)
