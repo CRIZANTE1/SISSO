@@ -628,11 +628,14 @@ def main():
                     except:
                         current_site_index = 0
                 
+                # Garante que o index está dentro dos limites
+                current_site_index = max(0, min(current_site_index, len(site_options) - 1))
                 selected_site_label = st.selectbox(
                     "Base:",
                     options=site_options,
                     index=current_site_index,
-                    help="Selecione a base da tabela de sites cadastrados"
+                    help="Selecione a base da tabela de sites cadastrados",
+                    disabled=False
                 )
                 
                 # Obtém o site_id correspondente à seleção
@@ -657,12 +660,15 @@ def main():
                     "sem_lesao": "Sem Lesão"
                 }
                 current_type_index = type_options.index(current_type) if current_type in type_options else 2
+                # Garante que o index está dentro dos limites
+                current_type_index = max(0, min(current_type_index, len(type_options) - 1))
                 accident_type = st.selectbox(
                     "Tipo do Acidente:",
                     options=type_options,
                     index=current_type_index,
                     format_func=lambda x: type_labels.get(x, x),
-                    help="Tipo do acidente: Fatal, Com Lesão ou Sem Lesão"
+                    help="Tipo do acidente: Fatal, Com Lesão ou Sem Lesão",
+                    disabled=False
                 )
                 
                 description = st.text_area(
@@ -734,11 +740,14 @@ def main():
                 if current_severity_en and current_severity_en in severity_options_en:
                     current_index = severity_options_en.index(current_severity_en)
                 
+                # Garante que o index está dentro dos limites
+                current_index = max(0, min(current_index, len(severity_options_pt) - 1))
                 severity_level_pt = st.selectbox(
                     "Nível de Gravidade:",
                     options=severity_options_pt,
                     index=current_index,
-                    help="Gravidade do acidente: Muito Baixa, Baixa, Média, Alta ou Catastrófica"
+                    help="Gravidade do acidente: Muito Baixa, Baixa, Média, Alta ou Catastrófica",
+                    disabled=False
                 )
                 
                 # Converte seleção em português para inglês (para salvar no banco)
@@ -932,12 +941,19 @@ def main():
                                 with st.expander(f"Condutor {i+1}: {driver.get('name', 'N/A')}", expanded=(i == 0)):
                                     col_d1, col_d2, col_d3 = st.columns(3)
                                     with col_d1:
+                                        marital_options = ["", "Solteiro(a)", "Casado(a)", "Divorciado(a)", "Viúvo(a)", "União Estável"]
+                                        current_driver_marital = driver.get('marital_status', '')
+                                        try:
+                                            driver_marital_index = marital_options.index(current_driver_marital) if current_driver_marital in marital_options else 0
+                                        except (ValueError, AttributeError):
+                                            driver_marital_index = 0
+                                        driver_marital_index = max(0, min(driver_marital_index, len(marital_options) - 1))
                                         driver_marital = st.selectbox(
                                             "Estado Civil:",
-                                            options=["", "Solteiro(a)", "Casado(a)", "Divorciado(a)", "Viúvo(a)", "União Estável"],
-                                            index=0 if not driver.get('marital_status') else 
-                                                  max(0, ["", "Solteiro(a)", "Casado(a)", "Divorciado(a)", "Viúvo(a)", "União Estável"].index(driver.get('marital_status')) if driver.get('marital_status') in ["", "Solteiro(a)", "Casado(a)", "Divorciado(a)", "Viúvo(a)", "União Estável"] else 0),
-                                            key=f"driver_marital_{i}"
+                                            options=marital_options,
+                                            index=driver_marital_index,
+                                            key=f"driver_marital_{i}",
+                                            disabled=False
                                         )
                                     
                                     with col_d2:
@@ -1333,12 +1349,18 @@ def main():
                             with col_estado:
                                 marital_status_options = ["", "Solteiro(a)", "Casado(a)", "Divorciado(a)", "Viúvo(a)", "União Estável"]
                                 current_marital = involved_injured[i].get('marital_status', '') if i < len(involved_injured) else ''
-                                marital_index = marital_status_options.index(current_marital) if current_marital in marital_status_options else 0
+                                try:
+                                    marital_index = marital_status_options.index(current_marital) if current_marital in marital_status_options else 0
+                                except (ValueError, AttributeError):
+                                    marital_index = 0
+                                # Garante que o index está dentro dos limites
+                                marital_index = max(0, min(marital_index, len(marital_status_options) - 1))
                                 injured_marital_status = st.selectbox(
                                     "Estado Civil:",
                                     options=marital_status_options,
                                     index=marital_index,
-                                    key=f"injured_marital_{i}"
+                                    key=f"injured_marital_{i}",
+                                    disabled=False
                                 )
                             
                             # Linha 3: Naturalidade | Número de Filhos | [vazio]
@@ -1418,12 +1440,18 @@ def main():
                             with col_tipo:
                                 employment_type_options = ["", "Empregado", "Contratado", "Terceiros/Comunidade"]
                                 current_employment = involved_injured[i].get('employment_type', '') if i < len(involved_injured) else ''
-                                employment_index = employment_type_options.index(current_employment) if current_employment in employment_type_options else 0
+                                try:
+                                    employment_index = employment_type_options.index(current_employment) if current_employment in employment_type_options else 0
+                                except (ValueError, AttributeError):
+                                    employment_index = 0
+                                # Garante que o index está dentro dos limites
+                                employment_index = max(0, min(employment_index, len(employment_type_options) - 1))
                                 injured_employment_type = st.selectbox(
                                     "Tipo:",
                                     options=employment_type_options,
                                     index=employment_index,
-                                    key=f"injured_employment_{i}"
+                                    key=f"injured_employment_{i}",
+                                    disabled=False
                                 )
                             with col_empresa:
                                 injured_company = st.text_input(
