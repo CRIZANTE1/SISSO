@@ -2862,12 +2862,14 @@ Retorne APENAS o texto da justificativa melhorada, sem explicações adicionais.
                         **💡 Importante:** Base sua justificativa em fatos, evidências e análises concretas, não em suposições. Esta justificativa será incluída no relatório PDF oficial e deve ser precisa e profissional.
                         """
                     
-                    # Usa session_state se foi gerada uma justificativa melhorada
-                    default_justification = st.session_state.get(justification_key, node.get('justification', ''))
+                    # Verifica se a chave já existe no session_state para evitar conflito
+                    # Se existir, não passa value= para deixar o Streamlit usar o valor do session_state
+                    # Se não existir, inicializa com o valor do node
+                    if justification_key not in st.session_state:
+                        st.session_state[justification_key] = node.get('justification', '')
                     
                     justification = st.text_area(
                         justification_label,
-                        value=default_justification,
                         key=justification_key,
                         help=justification_help,
                         height=150,
