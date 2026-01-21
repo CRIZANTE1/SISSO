@@ -7,6 +7,12 @@ import pandas as pd
 from datetime import datetime, date, time, timezone
 from typing import Optional, Dict, Any, List
 import requests
+import os
+try:
+    import google.generativeai as genai
+    GEMINI_AVAILABLE = True
+except ImportError:
+    GEMINI_AVAILABLE = False
 from services.investigation import (
     create_accident,
     get_accidents,
@@ -2559,43 +2565,81 @@ def main():
                     title = f"{number_prefix}{node_type_label} ({status_text}): {node['label'][:60]}..."
                 
                 with st.expander(title, expanded=False):
-                    # Botão de melhoria com IA
+                    # Botão de melhoria com IA para descrição
                     col_ai_btn, col_empty = st.columns([1, 5])
                     with col_ai_btn:
                         ai_improve_key = f"ai_improve_{node['id']}"
-                        if st.button("✨ Melhorar Texto com IA", key=ai_improve_key, help="Use IA para melhorar e aprimorar o texto da descrição e justificativa desta hipótese/causa"):
-                            # Obtém contexto do acidente para melhorar o texto
-                            accident_context = investigation.get('description', '') if investigation else ''
-                            base_location = investigation.get('base_location', '') if investigation else ''
-                            
-                            # Contexto adicional das pessoas envolvidas
-                            involved_context = ""
-                            if 'involved_injured' in locals() and involved_injured:
-                                for inv in involved_injured:
-                                    if inv.get('name'):
-                                        involved_context += f"Vítima: {inv.get('name')}, {inv.get('age', '')} anos, {inv.get('job_title', '')} da empresa {inv.get('company', '')}. "
-                            
-                            # Constrói prompt para IA melhorar o texto
-                            prompt = f"""Contexto do Acidente:
-Local: {base_location}
-Descrição: {accident_context}
+                        if st.button("✨ Melhorar Descrição com IA", key=ai_improve_key, help="Use IA para melhorar a descrição desta hipótese/causa tornando-a mais clara e específica"):
+                            with st.spinner("🔄 Gerando descrição melhorada com IA..."):
+                                try:
+                                    # Obtém contexto do acidente
+                                    accident_context = investigation.get('description', '') if investigation else ''
+                                    base_location = investigation.get('base_location', '') if investigation else ''
+                                    
+                                    # Contexto adicional das pessoas envolvidas
+                                    involved_context = ""
+                                    if 'involved_injured' in locals() and involved_injured:
+                                        for inv in involved_injured:
+                                            if inv.get('name'):
+                                                involved_context += f"Vítima: {inv.get('name')}, {inv.get('age', '')} anos, {inv.get('job_title', '')} da empresa {inv.get('company', '')}. "
+                                    
+                                    current_label = node['label']
+                                    
+                                    # Constrói prompt para IA melhorar o texto
+                                    prompt = f"""Você é um especialista em investigação de acidentes de trabalho.
+
+CONTEXTO DO ACIDENTE:
+- Local: {base_location}
+- Descrição: {accident_context}
 {involved_context}
 
-Hipótese/Causa Atual: {node['label']}
-Justificativa Atual: {node.get('justification', 'Sem justificativa')}
+DESCRIÇÃO ATUAL DA HIPÓTESE/CAUSA:
+{current_label}
 
-Melhore e torne o texto mais específico, profissional e contextualizado, usando os dados reais do acidente. Faça o texto mais claro e preciso, removendo termos genéricos."""
+INSTRUÇÕES:
+Melhore a descrição acima tornando-a mais clara, específica, profissional e contextualizada. Use os dados reais do acidente quando relevante. A descrição deve ser:
+- Clara e precisa
+- Específica (evite termos genéricos)
+- Profissional
+- Adequada para investigação técnica
 
-                            # Aqui você pode integrar com uma API de IA (OpenAI, etc.)
-                            # Por enquanto, apenas mostra sucesso e sugere melhoria manual
-                            st.info("💡 Funcionalidade de IA em desenvolvimento. Por enquanto, revise e melhore o texto manualmente usando o contexto do acidente.")
+Retorne APENAS o texto da descrição melhorada, sem explicações adicionais."""
+                                    
+                                    # Tenta usar Google Gemini
+                                    improved_text = None
+                                    if GEMINI_AVAILABLE:
+                                        try:
+                                            api_key = os.getenv('GOOGLE_AI_API_KEY') or st.secrets.get('GOOGLE_AI_API_KEY', None)
+                                            if api_key:
+                                                genai.configure(api_key=api_key)
+                                                model = genai.GenerativeModel('gemini-pro')
+                                                response = model.generate_content(prompt)
+                                                improved_text = response.text.strip()
+                                        except Exception as e:
+                                            st.warning(f"⚠️ Erro ao conectar com IA: {str(e)}")
+                                    
+                                    # Se não conseguiu usar IA, usa método básico
+                                    if not improved_text:
+                                        improved_text = current_label  # Mantém o original se não conseguir melhorar
+                                    
+                                    # Salva no session_state para preencher o campo
+                                    edit_label_key = f"edit_label_{node['id']}"
+                                    st.session_state[edit_label_key] = improved_text
+                                    st.success("✅ Descrição melhorada gerada! Revise o texto abaixo e ajuste se necessário antes de salvar.")
+                                    
+                                except Exception as e:
+                                    st.error(f"❌ Erro ao melhorar descrição: {str(e)}")
                     
                     # Campo de edição do label
                     edit_label_key = f"edit_label_{node['id']}"
                     edit_label_text = "✏️ Editar descrição da causa:" if node_type == 'fact' else "✏️ Editar descrição da hipótese:"
+                    
+                    # Usa session_state se foi gerada uma descrição melhorada
+                    default_label = st.session_state.get(edit_label_key, node['label'])
+                    
                     edited_label = st.text_area(
                         edit_label_text,
-                        value=node['label'],
+                        value=default_label,
                         key=edit_label_key,
                         help="💡 **Melhore a descrição:** Certifique-se de que a descrição seja clara, específica e completa. Inclua detalhes relevantes como: contexto, envolvidos, equipamentos, condições, etc. Uma boa descrição facilita a compreensão e validação da causa/hipótese.",
                         height=100
@@ -2705,36 +2749,93 @@ Melhore e torne o texto mais específico, profissional e contextualizado, usando
                     with col_ai_just:
                         ai_improve_just_key = f"ai_improve_just_{node['id']}"
                         if st.button("✨ Melhorar Justificativa com IA", key=ai_improve_just_key, help="Use IA para melhorar e contextualizar a justificativa usando os dados reais do acidente"):
-                            # Obtém contexto completo
-                            accident_context = investigation.get('description', '') if investigation else ''
-                            base_location = investigation.get('base_location', '') if investigation else ''
-                            occurrence_date = investigation.get('occurrence_date', '') if investigation else ''
-                            
-                            # Contexto das pessoas envolvidas
-                            involved_context = ""
-                            if 'involved_injured' in locals() and involved_injured:
-                                for inv in involved_injured:
-                                    if inv.get('name'):
-                                        involved_context += f"Vítima: {inv.get('name')}, {inv.get('age', '')} anos, {inv.get('job_title', '')} da empresa {inv.get('company', '')}. "
-                            
-                            # Obtém outras hipóteses relacionadas para contexto
-                            related_context = ""
-                            related_nodes = [n for n in nodes if n['id'] != node['id'] and n.get('status') in ['validated', 'discarded']]
-                            if related_nodes:
-                                related_context = "Hipóteses já analisadas: "
-                                for rn in related_nodes[:3]:  # Limita a 3 para não ficar muito longo
-                                    related_context += f"{rn['label']} ({rn['status']}); "
-                            
-                            # Sugere melhoria
-                            st.info(f"""💡 **Sugestão de Contexto para Melhorar:**
+                            with st.spinner("🔄 Gerando justificativa melhorada com IA..."):
+                                try:
+                                    # Obtém contexto completo
+                                    accident_context = investigation.get('description', '') if investigation else ''
+                                    base_location = investigation.get('base_location', '') if investigation else ''
+                                    occurrence_date = investigation.get('occurrence_date', '') if investigation else ''
+                                    accident_type = investigation.get('type', '') if investigation else ''
+                                    
+                                    # Contexto das pessoas envolvidas
+                                    involved_context = ""
+                                    if 'involved_injured' in locals() and involved_injured:
+                                        for inv in involved_injured:
+                                            if inv.get('name'):
+                                                involved_context += f"Vítima: {inv.get('name')}, {inv.get('age', '')} anos, {inv.get('job_title', '')} da empresa {inv.get('company', '')}. "
+                                                if inv.get('injury_type'):
+                                                    involved_context += f"Tipo de lesão: {inv.get('injury_type')}, parte do corpo: {inv.get('body_part', '')}. "
+                                    
+                                    # Obtém outras hipóteses relacionadas para contexto
+                                    related_context = ""
+                                    related_nodes = [n for n in nodes if n['id'] != node['id'] and n.get('status') in ['validated', 'discarded']]
+                                    if related_nodes:
+                                        related_context = "\nHipóteses já analisadas neste acidente:\n"
+                                        for rn in related_nodes[:3]:  # Limita a 3 para não ficar muito longo
+                                            related_context += f"- {rn['label']} (Status: {rn['status']})\n"
+                                    
+                                    # Justificativa atual
+                                    current_justification = node.get('justification', '')
+                                    
+                                    # Constrói prompt para IA
+                                    prompt = f"""Você é um especialista em investigação de acidentes de trabalho. 
 
-**Local:** {base_location}
-**Data/Hora:** {occurrence_date}
-**Descrição:** {accident_context}
+CONTEXTO DO ACIDENTE:
+- Tipo: {accident_type}
+- Local: {base_location}
+- Data/Hora: {occurrence_date}
+- Descrição: {accident_context}
 {involved_context}
 {related_context}
 
-Revise a justificativa incorporando estes dados reais do acidente para torná-la mais específica e profissional.""")
+HIPÓTESE/CAUSA A ANALISAR:
+{node['label']}
+
+STATUS ATUAL: {current_status}
+
+JUSTIFICATIVA ATUAL (se existir):
+{current_justification if current_justification else 'Nenhuma justificativa ainda escrita'}
+
+INSTRUÇÕES:
+{"Se já existe uma justificativa, MELHORE-A tornando-a mais específica, profissional e contextualizada usando os dados reais do acidente acima. Remova termos genéricos e adicione detalhes específicos." if current_justification else "GERE uma justificativa profissional, específica e contextualizada usando os dados reais do acidente acima. A justificativa deve explicar por que esta hipótese foi confirmada ou descartada, citando evidências concretas e dados específicos do caso. Não use termos genéricos."}
+
+A justificativa deve:
+- Ser específica e profissional
+- Usar dados reais do acidente (nomes, local, horário, contexto)
+- Evitar termos genéricos
+- Explicar claramente o raciocínio de confirmação ou descarte
+- Ser adequada para aparecer em relatório técnico oficial
+
+Retorne APENAS o texto da justificativa melhorada, sem explicações adicionais."""
+                                    
+                                    # Tenta usar Google Gemini
+                                    improved_text = None
+                                    if GEMINI_AVAILABLE:
+                                        try:
+                                            api_key = os.getenv('GOOGLE_AI_API_KEY') or st.secrets.get('GOOGLE_AI_API_KEY', None)
+                                            if api_key:
+                                                genai.configure(api_key=api_key)
+                                                model = genai.GenerativeModel('gemini-pro')
+                                                response = model.generate_content(prompt)
+                                                improved_text = response.text.strip()
+                                        except Exception as e:
+                                            st.warning(f"⚠️ Erro ao conectar com IA: {str(e)}")
+                                    
+                                    # Se não conseguiu usar IA ou não está disponível, usa método básico
+                                    if not improved_text:
+                                        # Gera texto melhorado usando lógica básica
+                                        if current_justification:
+                                            improved_text = f"{current_justification}\n\n[Nota: Revisar e contextualizar com dados específicos do acidente: Local: {base_location}, Data: {occurrence_date}{', ' + involved_context if involved_context else ''}]"
+                                        else:
+                                            improved_text = f"""Após análise detalhada do acidente ocorrido em {base_location} em {occurrence_date}{', envolvendo ' + involved_context.replace('Vítima: ', '') if involved_context else ''}, esta hipótese sobre "{node['label']}" requer investigação específica considerando as circunstâncias reais do evento. É necessário verificar evidências concretas, depoimentos dos envolvidos, condições do local e fatores específicos que possam confirmar ou descartar esta hipótese no contexto deste acidente específico."""
+                                    
+                                    # Salva no session_state para preencher o campo
+                                    st.session_state[justification_key] = improved_text
+                                    st.success("✅ Justificativa melhorada gerada! Revise o texto abaixo e ajuste se necessário antes de salvar.")
+                                    
+                                except Exception as e:
+                                    st.error(f"❌ Erro ao melhorar justificativa: {str(e)}")
+                                    st.info("💡 Tente melhorar a justificativa manualmente usando o contexto do acidente.")
                     
                     if node_type == 'fact':
                         justification_help = """
@@ -2761,9 +2862,12 @@ Revise a justificativa incorporando estes dados reais do acidente para torná-la
                         **💡 Importante:** Base sua justificativa em fatos, evidências e análises concretas, não em suposições. Esta justificativa será incluída no relatório PDF oficial e deve ser precisa e profissional.
                         """
                     
+                    # Usa session_state se foi gerada uma justificativa melhorada
+                    default_justification = st.session_state.get(justification_key, node.get('justification', ''))
+                    
                     justification = st.text_area(
                         justification_label,
-                        value=node.get('justification', ''),
+                        value=default_justification,
                         key=justification_key,
                         help=justification_help,
                         height=150,
