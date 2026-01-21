@@ -1540,36 +1540,72 @@ def main():
                             # Capacitações/Validade
                             st.markdown("**📚 Capacitações/Validade:**")
                             
-                            # Inicializa lista de capacitações no session_state
-                            certs_key = f"injured_certifications_{i}_{accident_id}"
-                            if certs_key not in st.session_state:
-                                # Tenta carregar do banco (formato: "Capacitação 1|Validade 1;Capacitação 2|Validade 2")
+                            # Controla número de capacitações usando input numérico (dentro do form)
+                            num_certs_key = f"num_certs_{i}_{accident_id}"
+                            
+                            # Inicializa número de capacitações baseado no que existe no banco
+                            if num_certs_key not in st.session_state:
                                 existing_certs = involved_injured[i].get('certifications', '') if i < len(involved_injured) else ''
                                 if existing_certs:
-                                    # Parse do formato antigo ou novo
+                                    if ';' in existing_certs:
+                                        num_existing = len([c for c in existing_certs.split(';') if c.strip()])
+                                        st.session_state[num_certs_key] = max(1, num_existing)
+                                    else:
+                                        st.session_state[num_certs_key] = 1 if existing_certs.strip() else 0
+                                else:
+                                    st.session_state[num_certs_key] = 0
+                            
+                            num_certifications = st.number_input(
+                                "Número de Capacitações:",
+                                min_value=0,
+                                max_value=20,
+                                value=st.session_state.get(num_certs_key, 0),
+                                key=f"num_cert_input_{i}_{accident_id}",
+                                help="Selecione quantas capacitações deseja adicionar"
+                            )
+                            
+                            # Atualiza session_state se mudou
+                            if num_certifications != st.session_state.get(num_certs_key, 0):
+                                st.session_state[num_certs_key] = num_certifications
+                            
+                            # Carrega capacitações existentes
+                            certs_key = f"injured_certifications_{i}_{accident_id}"
+                            if certs_key not in st.session_state:
+                                existing_certs = involved_injured[i].get('certifications', '') if i < len(involved_injured) else ''
+                                if existing_certs:
                                     certs_list = []
                                     if ';' in existing_certs:
-                                        # Formato: "Nome|Validade;Nome|Validade"
                                         for cert_str in existing_certs.split(';'):
                                             if '|' in cert_str:
                                                 parts = cert_str.split('|', 1)
                                                 certs_list.append({'name': parts[0].strip(), 'validity': parts[1].strip()})
                                     else:
-                                        # Formato antigo (texto livre) - converte para primeira capacitação
                                         if existing_certs.strip():
                                             certs_list.append({'name': existing_certs.strip(), 'validity': ''})
-                                    st.session_state[certs_key] = certs_list if certs_list else [{'name': '', 'validity': ''}]
+                                    # Completa até o número necessário
+                                    while len(certs_list) < num_certifications:
+                                        certs_list.append({'name': '', 'validity': ''})
+                                    st.session_state[certs_key] = certs_list
                                 else:
-                                    st.session_state[certs_key] = [{'name': '', 'validity': ''}]
+                                    st.session_state[certs_key] = [{'name': '', 'validity': ''} for _ in range(num_certifications)]
                             
-                            # Exibe lista de capacitações
-                            certifications_list = st.session_state[certs_key].copy()
+                            # Ajusta lista para ter o número correto de capacitações
+                            certifications_list = st.session_state.get(certs_key, [])
+                            while len(certifications_list) < num_certifications:
+                                certifications_list.append({'name': '', 'validity': ''})
+                            if len(certifications_list) > num_certifications:
+                                certifications_list = certifications_list[:num_certifications]
+                            st.session_state[certs_key] = certifications_list
                             
-                            # Lista para armazenar capacitações atualizadas
+                            # Exibe campos de capacitações
                             updated_certs = []
-                            
-                            for cert_idx, cert in enumerate(certifications_list):
-                                col_cert_name, col_cert_date, col_cert_del = st.columns([3, 2, 1])
+                            for cert_idx in range(num_certifications):
+                                if cert_idx < len(certifications_list):
+                                    cert = certifications_list[cert_idx]
+                                else:
+                                    cert = {'name': '', 'validity': ''}
+                                
+                                col_cert_name, col_cert_date = st.columns([3, 2])
                                 with col_cert_name:
                                     cert_name = st.text_input(
                                         f"Capacitação {cert_idx + 1}:",
@@ -1592,28 +1628,11 @@ def main():
                                         key=f"cert_validity_{i}_{cert_idx}_{accident_id}",
                                         help="Data de validade da capacitação"
                                     )
-                                with col_cert_del:
-                                    st.write("")  # Espaço para alinhar
-                                    st.write("")  # Espaço para alinhar
-                                    if st.button("🗑️", key=f"del_cert_{i}_{cert_idx}_{accident_id}", help="Remover esta capacitação"):
-                                        certifications_list.pop(cert_idx)
-                                        st.session_state[certs_key] = certifications_list
-                                        st.rerun()
                                 
-                                # Adiciona à lista atualizada (mesmo que vazio, para manter ordem)
                                 updated_certs.append({
                                     'name': cert_name,
                                     'validity': cert_validity.isoformat() if cert_validity else ''
                                 })
-                            
-                            # Atualiza session_state com valores dos inputs
-                            st.session_state[certs_key] = updated_certs
-                            
-                            # Botão para adicionar nova capacitação
-                            if st.button("➕ Adicionar Capacitação", key=f"add_cert_{i}_{accident_id}"):
-                                updated_certs.append({'name': '', 'validity': ''})
-                                st.session_state[certs_key] = updated_certs
-                                st.rerun()
                             
                             # Converte lista para string formatada para salvar no banco
                             # Formato: "Nome|Validade;Nome|Validade"
