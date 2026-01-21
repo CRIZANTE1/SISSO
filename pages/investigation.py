@@ -2777,57 +2777,150 @@ Retorne APENAS o texto da descrição melhorada, sem explicações adicionais.""
                                     # Justificativa atual
                                     current_justification = node.get('justification', '')
                                     
-                                    # Constrói prompt para IA
-                                    prompt = f"""Você é um especialista em investigação de acidentes de trabalho. 
+                                    # Status atual do nó (garante que está definido)
+                                    current_status = node.get('status', 'pending')
+                                    
+                                    # Formata a data de forma legível para o prompt
+                                    try:
+                                        if occurrence_date:
+                                            date_obj = datetime.fromisoformat(occurrence_date.replace('Z', '+00:00'))
+                                            formatted_date_prompt = date_obj.strftime('%d/%m/%Y às %H:%M')
+                                        else:
+                                            formatted_date_prompt = occurrence_date if occurrence_date else "data não informada"
+                                    except:
+                                        formatted_date_prompt = occurrence_date if occurrence_date else "data não informada"
+                                    
+                                    # Constrói prompt para IA mais específico e direto
+                                    prompt = f"""Você é um especialista técnico em investigação de acidentes de trabalho, seguindo a metodologia NBR 14280.
 
-CONTEXTO DO ACIDENTE:
+TAREFA: {"Melhorar e contextualizar" if current_justification else "Gerar"} uma justificativa técnica profissional para uma hipótese de causa raiz de acidente.
+
+DADOS DO ACIDENTE:
 - Tipo: {accident_type}
 - Local: {base_location}
-- Data/Hora: {occurrence_date}
-- Descrição: {accident_context}
-{involved_context}
-{related_context}
+- Data/Hora: {formatted_date_prompt}
+- Descrição completa: {accident_context}
+{f'- Pessoas envolvidas: {involved_context}' if involved_context else ''}
+{f'- Hipóteses relacionadas já analisadas: {related_context}' if related_context else ''}
 
 HIPÓTESE/CAUSA A ANALISAR:
-{node['label']}
+"{node['label']}"
 
-STATUS ATUAL: {current_status}
+STATUS: {current_status} ({"confirmada" if current_status == 'validated' else "descartada" if current_status == 'discarded' else "em análise"})
 
-JUSTIFICATIVA ATUAL (se existir):
-{current_justification if current_justification else 'Nenhuma justificativa ainda escrita'}
+{"JUSTIFICATIVA ATUAL (melhorar e contextualizar):" if current_justification else "JUSTIFICATIVA A GERAR:"}
+{current_justification if current_justification else '[Nenhuma justificativa ainda escrita - gere uma completa]'}
 
-INSTRUÇÕES:
-{"Se já existe uma justificativa, MELHORE-A tornando-a mais específica, profissional e contextualizada usando os dados reais do acidente acima. Remova termos genéricos e adicione detalhes específicos." if current_justification else "GERE uma justificativa profissional, específica e contextualizada usando os dados reais do acidente acima. A justificativa deve explicar por que esta hipótese foi confirmada ou descartada, citando evidências concretas e dados específicos do caso. Não use termos genéricos."}
+INSTRUÇÕES CRÍTICAS:
+{"1. MELHORE a justificativa existente, tornando-a mais específica e contextualizada" if current_justification else "1. GERE uma justificativa técnica completa e profissional"}
+2. USE os dados reais do acidente acima (local "{base_location}", data "{formatted_date_prompt}", tipo "{accident_type}")
+3. SEJA ESPECÍFICO: cite detalhes concretos, evite termos genéricos como "análise realizada", "verificações", "investigação"
+4. EXPLIQUE claramente POR QUE esta hipótese foi {"confirmada" if current_status == 'validated' else "descartada" if current_status == 'discarded' else "está em análise"}
+5. CONTEXTUALIZE usando os dados reais: mencione o local específico, a data/hora, o tipo de acidente
+6. ESTRUTURA: Comece contextualizando o acidente, depois analise a hipótese, e conclua com o raciocínio de confirmação/descarte
+7. TOM: Profissional, técnico, adequado para relatório oficial de investigação
 
-A justificativa deve:
-- Ser específica e profissional
-- Usar dados reais do acidente (nomes, local, horário, contexto)
-- Evitar termos genéricos
-- Explicar claramente o raciocínio de confirmação ou descarte
-- Ser adequada para aparecer em relatório técnico oficial
+EXEMPLO DE BOM ESTILO:
+"Após análise detalhada do acidente ocorrido em {base_location} em {formatted_date_prompt}, classificado como {accident_type}, foi identificado que a hipótese '{node['label']}' foi {"confirmada" if current_status == 'validated' else "descartada" if current_status == 'discarded' else "requer análise"} porque [EXPLICAÇÃO ESPECÍFICA COM DETALHES REAIS DO CASO]..."
 
-Retorne APENAS o texto da justificativa melhorada, sem explicações adicionais."""
+IMPORTANTE: 
+- NÃO use termos genéricos ou vagos
+- NÃO repita apenas a descrição do acidente
+- FOQUE na análise específica da hipótese usando os dados reais
+- GERE um texto completo de pelo menos 150 palavras
+- Retorne APENAS o texto da justificativa, sem explicações ou formatação markdown adicional"""
                                     
                                     # Tenta usar Google Gemini
                                     improved_text = None
+                                    error_msg = None
+                                    
                                     if GEMINI_AVAILABLE:
                                         try:
                                             api_key = os.getenv('GOOGLE_AI_API_KEY') or st.secrets.get('GOOGLE_AI_API_KEY', None)
-                                            if api_key:
+                                            if not api_key:
+                                                error_msg = "Chave da API do Google Gemini não configurada. Configure GOOGLE_AI_API_KEY nas variáveis de ambiente ou secrets."
+                                            else:
                                                 genai.configure(api_key=api_key)
-                                                model = genai.GenerativeModel('gemini-pro')
-                                                response = model.generate_content(prompt)
+                                                # Usa gemini-1.5-flash ou gemini-pro como fallback
+                                                try:
+                                                    model = genai.GenerativeModel('gemini-1.5-flash')
+                                                except:
+                                                    model = genai.GenerativeModel('gemini-pro')
+                                                
+                                                # Configuração de segurança e parâmetros
+                                                generation_config = {
+                                                    "temperature": 0.7,
+                                                    "top_p": 0.8,
+                                                    "top_k": 40,
+                                                    "max_output_tokens": 1024,
+                                                }
+                                                
+                                                response = model.generate_content(
+                                                    prompt,
+                                                    generation_config=generation_config
+                                                )
                                                 improved_text = response.text.strip()
+                                                
+                                                # Verifica se a resposta é válida
+                                                if not improved_text or len(improved_text) < 50:
+                                                    error_msg = "A IA retornou uma resposta muito curta ou vazia."
+                                                    improved_text = None
                                         except Exception as e:
-                                            st.warning(f"⚠️ Erro ao conectar com IA: {str(e)}")
+                                            error_msg = f"Erro ao conectar com IA: {str(e)}"
+                                            improved_text = None
                                     
-                                    # Se não conseguiu usar IA ou não está disponível, usa método básico
+                                    # Se não conseguiu usar IA, gera uma justificativa inteligente baseada nos dados
                                     if not improved_text:
-                                        # Gera texto melhorado usando lógica básica
+                                        # Formata a data de forma legível
+                                        try:
+                                            if occurrence_date:
+                                                date_obj = datetime.fromisoformat(occurrence_date.replace('Z', '+00:00'))
+                                                formatted_date = date_obj.strftime('%d/%m/%Y às %H:%M')
+                                            else:
+                                                formatted_date = "data não informada"
+                                        except:
+                                            formatted_date = occurrence_date if occurrence_date else "data não informada"
+                                        
+                                        # Gera justificativa contextualizada baseada nos dados reais
                                         if current_justification:
-                                            improved_text = f"{current_justification}\n\n[Nota: Revisar e contextualizar com dados específicos do acidente: Local: {base_location}, Data: {occurrence_date}{', ' + involved_context if involved_context else ''}]"
+                                            # Se já existe justificativa, melhora ela adicionando contexto
+                                            improved_text = f"""{current_justification}
+
+**Contextualização com dados do acidente:**
+- **Local:** {base_location}
+- **Data/Hora:** {formatted_date}
+- **Tipo de acidente:** {accident_type}
+{f'- **Contexto das pessoas envolvidas:** {involved_context}' if involved_context else ''}
+
+Esta análise foi realizada considerando as circunstâncias específicas deste evento ocorrido em {base_location}, em {formatted_date}. A justificativa acima deve ser revisada e complementada com evidências concretas coletadas durante a investigação, incluindo fotos, relatórios técnicos, depoimentos e análises do local do acidente."""
                                         else:
-                                            improved_text = f"""Após análise detalhada do acidente ocorrido em {base_location} em {occurrence_date}{', envolvendo ' + involved_context.replace('Vítima: ', '') if involved_context else ''}, esta hipótese sobre "{node['label']}" requer investigação específica considerando as circunstâncias reais do evento. É necessário verificar evidências concretas, depoimentos dos envolvidos, condições do local e fatores específicos que possam confirmar ou descartar esta hipótese no contexto deste acidente específico."""
+                                            # Gera uma justificativa completa do zero
+                                            status_text = "confirmada" if current_status == 'validated' else "descartada" if current_status == 'discarded' else "em análise"
+                                            
+                                            improved_text = f"""**Análise da hipótese: "{node['label']}"**
+
+Após investigação detalhada do acidente ocorrido em **{base_location}** em **{formatted_date}**, esta hipótese foi **{status_text}** com base nas seguintes considerações:
+
+**Contexto do acidente:**
+- Local: {base_location}
+- Data/Hora: {formatted_date}
+- Tipo: {accident_type}
+{f'- Pessoas envolvidas: {involved_context}' if involved_context else ''}
+
+**Análise da hipótese:**
+{node['label']}
+
+**Justificativa:**
+[COMPLETE AQUI com evidências específicas que confirmam ou descartam esta hipótese. Cite fotos, relatórios técnicos, depoimentos, inspeções do local, análises de equipamentos, ou outros dados concretos coletados durante a investigação. Seja específico e profissional, evitando termos genéricos.]
+
+**Conclusão:**
+Com base nas evidências coletadas e na análise realizada, esta hipótese foi **{status_text}** porque [EXPLIQUE O MOTIVO ESPECÍFICO baseado nas evidências reais do acidente]."""
+                                        
+                                        # Mostra aviso se a IA não foi usada
+                                        if error_msg:
+                                            st.warning(f"⚠️ {error_msg} Uma justificativa base foi gerada automaticamente. Revise e complete com os dados específicos da investigação.")
+                                        elif not GEMINI_AVAILABLE:
+                                            st.info("ℹ️ Biblioteca do Google Gemini não disponível. Uma justificativa base foi gerada automaticamente. Revise e complete com os dados específicos da investigação.")
                                     
                                     # Salva no session_state para preencher o campo
                                     st.session_state[justification_key] = improved_text
