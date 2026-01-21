@@ -693,7 +693,32 @@ HTML_TEMPLATE = """
         <tr>
             <td colspan="3">
                 <span class="label">Capacitações/Validade</span>
-                <span class="value">{{ person.get('certifications', 'N/A') }}</span>
+                <div style="margin-top: 5px;">
+                    {% set certs_str = person.get('certifications', '') %}
+                    {% if ';' in certs_str %}
+                        {% for cert_item in certs_str.split(';') %}
+                            {% if '|' in cert_item %}
+                                {% set parts = cert_item.split('|', 1) %}
+                                <div style="margin-bottom: 5px;">
+                                    <strong>{{ parts[0] }}</strong>
+                                    {% if parts[1] %}
+                                        {% set validity_dt = parts[1] %}
+                                        {% if validity_dt is string and '-' in validity_dt %}
+                                            {% set validity_parts = validity_dt[:10].split('-') %}
+                                            - Validade: {{ validity_parts[2] }}/{{ validity_parts[1] }}/{{ validity_parts[0] }}
+                                        {% else %}
+                                            - Validade: {{ validity_dt }}
+                                        {% endif %}
+                                    {% endif %}
+                                </div>
+                            {% else %}
+                                <div style="margin-bottom: 5px;">{{ cert_item }}</div>
+                            {% endif %}
+                        {% endfor %}
+                    {% else %}
+                        <span class="value">{{ person.get('certifications', 'N/A') }}</span>
+                    {% endif %}
+                </div>
             </td>
         </tr>
         {% endif %}
