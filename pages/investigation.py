@@ -548,24 +548,84 @@ def main():
         involved_commission = get_involved_people(accident_id, 'Commission_Member')
         involved_witnesses = get_involved_people(accident_id, 'Witness')
         
-        # Campo de quantidade de membros da comissão FORA do form para permitir interação dinâmica
-        form_key = f"num_commission_{accident_id}"
-        if form_key not in st.session_state:
-            st.session_state[form_key] = len(involved_commission) if involved_commission else 0
+        # ========== CAMPOS DE CONTROLE FORA DO FORM (para atualização imediata) ==========
+        st.divider()
+        st.markdown("### 👥 Configuração de Pessoas Envolvidas")
         
-        # Campo de quantidade FORA do form (permite interação dinâmica)
+        # Inicializa session_state para todos os contadores
+        num_drivers_key = f"num_drivers_{accident_id}"
+        num_injured_key = f"num_injured_{accident_id}"
+        num_witnesses_key = f"num_witnesses_{accident_id}"
+        num_commission_key = f"num_commission_{accident_id}"
+        
+        if num_drivers_key not in st.session_state:
+            st.session_state[num_drivers_key] = len(involved_drivers)
+        if num_injured_key not in st.session_state:
+            st.session_state[num_injured_key] = len(involved_injured)
+        if num_witnesses_key not in st.session_state:
+            st.session_state[num_witnesses_key] = len(involved_witnesses)
+        if num_commission_key not in st.session_state:
+            st.session_state[num_commission_key] = len(involved_commission) if involved_commission else 0
+        
+        # Campos de número FORA DO FORM para atualização imediata
+        col_drv, col_inj, col_wit = st.columns(3)
+        with col_drv:
+            num_drivers = st.number_input(
+                "🚗 Quantidade de motoristas:", 
+                min_value=0, 
+                max_value=10, 
+                value=st.session_state[num_drivers_key], 
+                key=f"num_drivers_input_{accident_id}",
+                help="Digite o número de motoristas"
+            )
+            if num_drivers != st.session_state[num_drivers_key]:
+                st.session_state[num_drivers_key] = num_drivers
+                st.rerun()
+        
+        with col_inj:
+            num_injured = st.number_input(
+                "🏥 Quantidade de vítimas:", 
+                min_value=0, 
+                max_value=10, 
+                value=st.session_state[num_injured_key], 
+                key=f"num_injured_input_{accident_id}",
+                help="Digite 1 para ver campos detalhados do perfil do acidentado"
+            )
+            if num_injured != st.session_state[num_injured_key]:
+                st.session_state[num_injured_key] = num_injured
+                st.rerun()
+            # Mensagem informativa
+            if num_injured == 1:
+                st.success("✅ Campos detalhados aparecerão no formulário")
+        
+        with col_wit:
+            num_witnesses = st.number_input(
+                "👁️ Quantidade de testemunhas:", 
+                min_value=0, 
+                max_value=10, 
+                value=st.session_state[num_witnesses_key], 
+                key=f"num_witnesses_input_{accident_id}",
+                help="Digite o número de testemunhas"
+            )
+            if num_witnesses != st.session_state[num_witnesses_key]:
+                st.session_state[num_witnesses_key] = num_witnesses
+                st.rerun()
+        
+        # Campo de quantidade de membros da comissão FORA do form
         with st.expander("👔 Configurar Comissão de Investigação", expanded=True):
             num_commission = st.number_input(
                 "Quantidade de membros:", 
                 min_value=0, 
                 max_value=10, 
-                value=st.session_state[form_key], 
+                value=st.session_state[num_commission_key], 
                 key=f"num_commission_input_{accident_id}",
                 help="Defina quantos membros da comissão você deseja cadastrar. Os campos aparecerão no formulário abaixo."
             )
-            if num_commission != st.session_state[form_key]:
-                st.session_state[form_key] = num_commission
+            if num_commission != st.session_state[num_commission_key]:
+                st.session_state[num_commission_key] = num_commission
                 st.rerun()
+        
+        st.divider()
         
         # Formulário completo com seções
         with st.form("accident_context_form", clear_on_submit=False):
@@ -1563,7 +1623,7 @@ def main():
                 st.markdown("**Membros da Comissão de Investigação**")
                 
                 # Usa o valor do session_state (definido fora do form)
-                num_commission = st.session_state[form_key]
+                num_commission = st.session_state[num_commission_key]
                 
                 if num_commission == 0:
                     st.info("💡 **Configure a quantidade de membros no campo acima (fora do formulário)** para começar a preencher os dados.")
