@@ -2609,7 +2609,7 @@ Retorne APENAS o texto da descrição melhorada, sem explicações adicionais.""
                                     improved_text = None
                                     if GEMINI_AVAILABLE:
                                         try:
-                                            api_key = os.getenv('GOOGLE_AI_API_KEY') or st.secrets.get('GOOGLE_AI_API_KEY', None)
+                                            api_key = os.getenv('GOOGLE_AI_API_KEY') or st.secrets.get('general', {}).get('GOOGLE_AI_API_KEY', None)
                                             if api_key:
                                                 genai.configure(api_key=api_key)
                                                 model = genai.GenerativeModel('gemini-pro')
@@ -2836,7 +2836,7 @@ IMPORTANTE:
                                     
                                     if GEMINI_AVAILABLE:
                                         try:
-                                            api_key = os.getenv('GOOGLE_AI_API_KEY') or st.secrets.get('GOOGLE_AI_API_KEY', None)
+                                            api_key = os.getenv('GOOGLE_AI_API_KEY') or st.secrets.get('general', {}).get('GOOGLE_AI_API_KEY', None)
                                             if not api_key:
                                                 error_msg = "Chave da API do Google Gemini não configurada. Configure GOOGLE_AI_API_KEY nas variáveis de ambiente ou secrets."
                                             else:
