@@ -2585,23 +2585,29 @@ def main():
                                     
                                     current_label = node['label']
                                     
-                                    # Constrói prompt para IA melhorar o texto
+                                    # Constrói prompt para IA melhorar o texto, usando a descrição atual como contexto
                                     prompt = f"""Você é um especialista em investigação de acidentes de trabalho.
 
-CONTEXTO DO ACIDENTE:
-- Local: {base_location}
-- Descrição: {accident_context}
-{involved_context}
+=== CONTEXTO DO ACIDENTE ===
+Local: {base_location}
+Descrição: {accident_context}
+{f'Pessoas envolvidas: {involved_context}' if involved_context else ''}
 
-DESCRIÇÃO ATUAL DA HIPÓTESE/CAUSA:
-{current_label}
+=== DESCRIÇÃO ATUAL DA HIPÓTESE/CAUSA ===
+"{current_label}"
 
-INSTRUÇÕES:
-Melhore a descrição acima tornando-a mais clara, específica, profissional e contextualizada. Use os dados reais do acidente quando relevante. A descrição deve ser:
-- Clara e precisa
-- Específica (evite termos genéricos)
-- Profissional
-- Adequada para investigação técnica
+Esta é a descrição atual que precisa ser melhorada. Use esta descrição como base e contexto para criar uma versão melhorada.
+
+=== INSTRUÇÕES ===
+1. MELHORE a descrição acima tornando-a mais clara, específica, profissional e contextualizada
+2. USE a descrição atual "{current_label}" como contexto - mantenha o significado, mas torne mais clara e específica
+3. USE os dados reais do acidente quando relevante (local: {base_location})
+4. A descrição melhorada deve ser:
+   - Clara e precisa
+   - Específica (evite termos genéricos)
+   - Profissional
+   - Adequada para investigação técnica
+   - Contextualizada com os dados do acidente quando aplicável
 
 Retorne APENAS o texto da descrição melhorada, sem explicações adicionais."""
                                     
@@ -2612,13 +2618,32 @@ Retorne APENAS o texto da descrição melhorada, sem explicações adicionais.""
                                             api_key = os.getenv('GOOGLE_AI_API_KEY') or st.secrets.get('general', {}).get('GOOGLE_AI_API_KEY', None)
                                             if api_key:
                                                 genai.configure(api_key=api_key)
-                                                # Usa gemini-1.5-flash ou gemini-pro como fallback
+                                                # Usa gemini-3-flash-preview ou gemini-1.5-flash como fallback
                                                 try:
                                                     model = genai.GenerativeModel('gemini-3-flash-preview')
                                                 except:
-                                                    model = genai.GenerativeModel('gemini-3-flash-preview')
-                                                response = model.generate_content(prompt)
-                                                improved_text = response.text.strip()
+                                                    model = genai.GenerativeModel('gemini-1.5-flash')
+                                                
+                                                # Configuração para melhor geração
+                                                generation_config = {
+                                                    "temperature": 0.7,
+                                                    "top_p": 0.8,
+                                                    "top_k": 40,
+                                                    "max_output_tokens": 1024,
+                                                }
+                                                
+                                                response = model.generate_content(
+                                                    prompt,
+                                                    generation_config=generation_config
+                                                )
+                                                
+                                                # Extrai o texto de forma robusta
+                                                try:
+                                                    improved_text = response.text.strip() if response.text else None
+                                                    if not improved_text or len(improved_text) < 10:
+                                                        improved_text = current_label  # Mantém original se resposta inválida
+                                                except:
+                                                    improved_text = current_label  # Mantém original se erro na extração
                                         except Exception as e:
                                             st.warning(f"⚠️ Erro ao conectar com IA: {str(e)}")
                                     
@@ -2794,44 +2819,52 @@ Retorne APENAS o texto da descrição melhorada, sem explicações adicionais.""
                                     except:
                                         formatted_date_prompt = occurrence_date if occurrence_date else "data não informada"
                                     
-                                    # Constrói prompt para IA mais específico e direto
+                                    # Constrói prompt para IA mais específico e direto, usando hipótese e justificativa como contexto
                                     prompt = f"""Você é um especialista técnico em investigação de acidentes de trabalho, seguindo a metodologia NBR 14280.
 
 TAREFA: {"Melhorar e contextualizar" if current_justification else "Gerar"} uma justificativa técnica profissional para uma hipótese de causa raiz de acidente.
 
-DADOS DO ACIDENTE:
-- Tipo: {accident_type}
-- Local: {base_location}
-- Data/Hora: {formatted_date_prompt}
-- Descrição completa: {accident_context}
-{f'- Pessoas envolvidas: {involved_context}' if involved_context else ''}
-{f'- Hipóteses relacionadas já analisadas: {related_context}' if related_context else ''}
+=== CONTEXTO DO ACIDENTE ===
+Tipo: {accident_type}
+Local: {base_location}
+Data/Hora: {formatted_date_prompt}
+Descrição completa: {accident_context}
+{f'Pessoas envolvidas: {involved_context}' if involved_context else ''}
+{f'Hipóteses relacionadas já analisadas: {related_context}' if related_context else ''}
 
-HIPÓTESE/CAUSA A ANALISAR:
+=== HIPÓTESE/CAUSA A ANALISAR ===
 "{node['label']}"
 
-STATUS: {current_status} ({"confirmada" if current_status == 'validated' else "descartada" if current_status == 'discarded' else "em análise"})
+Esta é a hipótese que precisa ser justificada. Use esta descrição como base para sua análise e explique como ela se relaciona com o acidente ocorrido.
 
-{"JUSTIFICATIVA ATUAL (melhorar e contextualizar):" if current_justification else "JUSTIFICATIVA A GERAR:"}
-{current_justification if current_justification else '[Nenhuma justificativa ainda escrita - gere uma completa]'}
+STATUS ATUAL: {current_status} ({"confirmada" if current_status == 'validated' else "descartada" if current_status == 'discarded' else "em análise"})
 
-INSTRUÇÕES CRÍTICAS:
-{"1. MELHORE a justificativa existente, tornando-a mais específica e contextualizada" if current_justification else "1. GERE uma justificativa técnica completa e profissional"}
-2. USE os dados reais do acidente acima (local "{base_location}", data "{formatted_date_prompt}", tipo "{accident_type}")
-3. SEJA ESPECÍFICO: cite detalhes concretos, evite termos genéricos como "análise realizada", "verificações", "investigação"
-4. EXPLIQUE claramente POR QUE esta hipótese foi {"confirmada" if current_status == 'validated' else "descartada" if current_status == 'discarded' else "está em análise"}
-5. CONTEXTUALIZE usando os dados reais: mencione o local específico, a data/hora, o tipo de acidente
-6. ESTRUTURA: Comece contextualizando o acidente, depois analise a hipótese, e conclua com o raciocínio de confirmação/descarte
-7. TOM: Profissional, técnico, adequado para relatório oficial de investigação
+=== JUSTIFICATIVA ATUAL ===
+{"A justificativa abaixo já existe e deve ser MELHORADA e CONTEXTUALIZADA com os dados do acidente:" if current_justification else "Nenhuma justificativa ainda escrita - GERE uma completa:"}
+{current_justification if current_justification else '[Nenhuma justificativa ainda escrita - gere uma completa baseada na hipótese e nos dados do acidente]'}
 
-EXEMPLO DE BOM ESTILO:
-"Após análise detalhada do acidente ocorrido em {base_location} em {formatted_date_prompt}, classificado como {accident_type}, foi identificado que a hipótese '{node['label']}' foi {"confirmada" if current_status == 'validated' else "descartada" if current_status == 'discarded' else "requer análise"} porque [EXPLICAÇÃO ESPECÍFICA COM DETALHES REAIS DO CASO]..."
+Use a justificativa acima como base e contexto. Se ela existir, melhore-a. Se não existir, crie uma nova usando a hipótese e os dados do acidente como referência.
 
-IMPORTANTE: 
+=== INSTRUÇÕES CRÍTICAS ===
+{"1. MELHORE a justificativa existente, tornando-a mais específica e contextualizada com os dados reais do acidente" if current_justification else "1. GERE uma justificativa técnica completa e profissional baseada na hipótese e nos dados do acidente"}
+2. USE a HIPÓTESE "{node['label']}" como contexto central - explique como ela se relaciona com o acidente
+3. USE os dados reais do acidente: local "{base_location}", data "{formatted_date_prompt}", tipo "{accident_type}"
+4. SEJA ESPECÍFICO: cite detalhes concretos, evite termos genéricos como "análise realizada", "verificações", "investigação"
+5. EXPLIQUE claramente POR QUE esta hipótese foi {"confirmada" if current_status == 'validated' else "descartada" if current_status == 'discarded' else "está em análise"}
+6. CONTEXTUALIZE usando os dados reais: mencione o local específico, a data/hora, o tipo de acidente
+7. ESTRUTURA: Comece contextualizando o acidente, depois analise a hipótese "{node['label']}", e conclua com o raciocínio de confirmação/descarte
+8. TOM: Profissional, técnico, adequado para relatório oficial de investigação
+9. REFERENCIE a hipótese explicitamente no texto da justificativa
+
+=== EXEMPLO DE BOM ESTILO ===
+"Após análise detalhada do acidente ocorrido em {base_location} em {formatted_date_prompt}, classificado como {accident_type}, foi identificado que a hipótese '{node['label']}' foi {"confirmada" if current_status == 'validated' else "descartada" if current_status == 'discarded' else "requer análise"} porque [EXPLICAÇÃO ESPECÍFICA COM DETALHES REAIS DO CASO, REFERENCIANDO A HIPÓTESE E OS DADOS DO ACIDENTE]..."
+
+=== IMPORTANTE ===
 - NÃO use termos genéricos ou vagos
 - NÃO repita apenas a descrição do acidente
-- FOQUE na análise específica da hipótese usando os dados reais
-- GERE um texto completo de pelo menos 150 palavras
+- FOQUE na análise específica da hipótese "{node['label']}" usando os dados reais
+- USE a justificativa atual como contexto se ela existir
+- GERE um texto completo de pelo menos 200 palavras
 - Retorne APENAS o texto da justificativa, sem explicações ou formatação markdown adicional"""
                                     
                                     # Tenta usar Google Gemini
@@ -2856,18 +2889,34 @@ IMPORTANTE:
                                                     "temperature": 0.7,
                                                     "top_p": 0.8,
                                                     "top_k": 40,
-                                                    "max_output_tokens": 1024,
+                                                    "max_output_tokens": 2048,  # Aumentado para permitir textos mais longos
                                                 }
                                                 
                                                 response = model.generate_content(
                                                     prompt,
                                                     generation_config=generation_config
                                                 )
-                                                improved_text = response.text.strip()
                                                 
-                                                # Verifica se a resposta é válida
-                                                if not improved_text or len(improved_text) < 50:
-                                                    error_msg = "A IA retornou uma resposta muito curta ou vazia."
+                                                # Extrai o texto de forma mais robusta
+                                                try:
+                                                    improved_text = response.text.strip() if response.text else None
+                                                    
+                                                    # Verifica se a resposta foi truncada
+                                                    if improved_text:
+                                                        # Verifica se termina abruptamente (sem pontuação final)
+                                                        if not improved_text.endswith(('.', '!', '?', ':', ';', '\n')):
+                                                            # Pode estar truncada, mas ainda usa o texto disponível
+                                                            st.info("ℹ️ A resposta pode estar incompleta. Revise o texto gerado.")
+                                                        
+                                                        # Verifica se a resposta é válida
+                                                        if len(improved_text) < 50:
+                                                            error_msg = "A IA retornou uma resposta muito curta ou vazia."
+                                                            improved_text = None
+                                                    else:
+                                                        error_msg = "A IA retornou uma resposta vazia."
+                                                        improved_text = None
+                                                except Exception as extract_error:
+                                                    error_msg = f"Erro ao extrair texto da resposta: {str(extract_error)}"
                                                     improved_text = None
                                         except Exception as e:
                                             error_msg = f"Erro ao conectar com IA: {str(e)}"
