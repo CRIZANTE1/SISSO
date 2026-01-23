@@ -2618,11 +2618,11 @@ Retorne APENAS o texto da descrição melhorada, sem explicações adicionais.""
                                             api_key = os.getenv('GOOGLE_AI_API_KEY') or st.secrets.get('general', {}).get('GOOGLE_AI_API_KEY', None)
                                             if api_key:
                                                 genai.configure(api_key=api_key)
-                                                # Usa gemini-3-flash-preview ou gemini-1.5-flash como fallback
+                                                # Usa gemini-3-flash-preview ou gemini-2.5-flash como fallback
                                                 try:
                                                     model = genai.GenerativeModel('gemini-3-flash-preview')
                                                 except:
-                                                    model = genai.GenerativeModel('gemini-1.5-flash')
+                                                    model = genai.GenerativeModel('gemini-2.5-flash')
                                                 
                                                 # Configuração para melhor geração
                                                 generation_config = {
@@ -2788,12 +2788,20 @@ Retorne APENAS o texto da descrição melhorada, sem explicações adicionais.""
                                     
                                     # Contexto das pessoas envolvidas
                                     involved_context = ""
-                                    if 'involved_injured' in locals() and involved_injured:
-                                        for inv in involved_injured:
+                                    try:
+                                        # Tenta usar involved_injured se disponível, senão busca
+                                        if 'involved_injured' in locals() and involved_injured:
+                                            involved_list = involved_injured
+                                        else:
+                                            involved_list = get_involved_people(accident_id, 'Injured')
+                                        
+                                        for inv in involved_list:
                                             if inv.get('name'):
                                                 involved_context += f"Vítima: {inv.get('name')}, {inv.get('age', '')} anos, {inv.get('job_title', '')} da empresa {inv.get('company', '')}. "
                                                 if inv.get('injury_type'):
                                                     involved_context += f"Tipo de lesão: {inv.get('injury_type')}, parte do corpo: {inv.get('body_part', '')}. "
+                                    except:
+                                        pass
                                     
                                     # Obtém outras hipóteses relacionadas para contexto
                                     related_context = ""
@@ -2878,11 +2886,11 @@ Use a justificativa acima como base e contexto. Se ela existir, melhore-a. Se n�
                                                 error_msg = "Chave da API do Google Gemini não configurada. Configure GOOGLE_AI_API_KEY nas variáveis de ambiente ou secrets."
                                             else:
                                                 genai.configure(api_key=api_key)
-                                                # Usa gemini-1.5-flash ou gemini-pro como fallback
+                                                # Usa gemini-3-flash-preview ou gemini-2.5-flash como fallback
                                                 try:
                                                     model = genai.GenerativeModel('gemini-3-flash-preview')
                                                 except:
-                                                    model = genai.GenerativeModel('gemini-3-flash-preview')
+                                                    model = genai.GenerativeModel('gemini-2.5-flash')
                                                 
                                                 # Configuração de segurança e parâmetros
                                                 generation_config = {
@@ -3302,11 +3310,187 @@ Com base nas evidências coletadas e na análise realizada, esta hipótese foi *
                     
                     # Campo de recomendação
                     st.divider()
-                    st.markdown("**💡 Recomendação para esta Causa Básica:**")
                     recommendation_key = f"recommendation_basic_{node['id']}"
+                    
+                    # Título e botão na mesma linha
+                    col_title_rec, col_btn_rec = st.columns([3, 1])
+                    with col_title_rec:
+                        st.markdown("**💡 Recomendação para esta Causa Básica:**")
+                    with col_btn_rec:
+                        ai_generate_rec_key = f"ai_generate_rec_basic_{node['id']}"
+                        if st.button("✨ Gerar com IA", key=ai_generate_rec_key, help="Use IA para gerar recomendações técnicas baseadas na causa, justificativa e dados do acidente"):
+                            with st.spinner("🔄 Gerando recomendação com IA..."):
+                                try:
+                                    # Obtém contexto completo
+                                    accident_context = investigation.get('description', '') if investigation else ''
+                                    base_location = investigation.get('base_location', '') if investigation else ''
+                                    occurrence_date = investigation.get('occurrence_date', '') if investigation else ''
+                                    accident_type = investigation.get('type', '') if investigation else ''
+                                    
+                                    # Contexto das pessoas envolvidas
+                                    involved_context = ""
+                                    try:
+                                        # Tenta usar involved_injured se disponível, senão busca
+                                        if 'involved_injured' in locals() and involved_injured:
+                                            involved_list = involved_injured
+                                        else:
+                                            involved_list = get_involved_people(accident_id, 'Injured')
+                                        
+                                        for inv in involved_list:
+                                            if inv.get('name'):
+                                                involved_context += f"Vítima: {inv.get('name')}, {inv.get('age', '')} anos, {inv.get('job_title', '')} da empresa {inv.get('company', '')}. "
+                                    except:
+                                        pass
+                                    
+                                    # Justificativa atual do nó
+                                    current_justification = node.get('justification', '')
+                                    current_recommendation = node.get('recommendation', '')
+                                    
+                                    # Formata a data
+                                    try:
+                                        if occurrence_date:
+                                            date_obj = datetime.fromisoformat(occurrence_date.replace('Z', '+00:00'))
+                                            formatted_date_prompt = date_obj.strftime('%d/%m/%Y às %H:%M')
+                                        else:
+                                            formatted_date_prompt = occurrence_date if occurrence_date else "data não informada"
+                                    except:
+                                        formatted_date_prompt = occurrence_date if occurrence_date else "data não informada"
+                                    
+                                    # Constrói prompt para IA gerar recomendação
+                                    prompt = f"""Você é um especialista técnico em investigação de acidentes de trabalho, seguindo a metodologia NBR 14280.
+
+TAREFA: {"Melhorar e contextualizar" if current_recommendation else "Gerar"} recomendações técnicas profissionais para prevenir ou corrigir uma causa básica de acidente.
+
+=== CONTEXTO DO ACIDENTE ===
+Tipo: {accident_type}
+Local: {base_location}
+Data/Hora: {formatted_date_prompt}
+Descrição completa: {accident_context}
+{f'Pessoas envolvidas: {involved_context}' if involved_context else ''}
+
+=== CAUSA BÁSICA A CORRIGIR ===
+"{node['label']}"
+
+Esta é a causa básica identificada. As recomendações devem ser específicas para prevenir ou corrigir esta causa.
+
+=== JUSTIFICATIVA DA CAUSA ===
+{current_justification if current_justification else 'Nenhuma justificativa disponível ainda.'}
+
+Use a justificativa acima para entender melhor a causa e gerar recomendações mais específicas e efetivas.
+
+{"=== RECOMENDAÇÃO ATUAL (melhorar) ===" if current_recommendation else ""}
+{current_recommendation if current_recommendation else ''}
+{"Use a recomendação acima como base e melhore-a." if current_recommendation else "Gere recomendações completas e específicas."}
+
+=== INSTRUÇÕES CRÍTICAS ===
+{"1. MELHORE a recomendação existente, tornando-a mais específica e acionável" if current_recommendation else "1. GERE recomendações técnicas completas e profissionais"}
+2. FOQUE na causa básica "{node['label']}" - as recomendações devem ser específicas para prevenir/corrigir esta causa
+3. USE a justificativa como contexto para entender melhor a causa e gerar recomendações mais efetivas
+4. USE os dados reais do acidente: local "{base_location}", data "{formatted_date_prompt}", tipo "{accident_type}"
+5. SEJA ESPECÍFICO: recomendações devem ser acionáveis, com ações concretas
+6. ESTRUTURA: Liste recomendações claras e objetivas, priorizando as mais importantes
+7. TOM: Profissional, técnico, adequado para relatório oficial de investigação
+8. FOQUE em prevenção: como evitar que esta causa ocorra novamente
+
+=== EXEMPLO DE BOM ESTILO ===
+"Para prevenir a causa '{node['label']}' identificada no acidente ocorrido em {base_location} em {formatted_date_prompt}, recomenda-se:
+1. [Recomendação específica e acionável]
+2. [Recomendação específica e acionável]
+3. [Recomendação específica e acionável]"
+
+=== IMPORTANTE ===
+- NÃO use termos genéricos ou vagos
+- FOQUE em ações concretas e acionáveis
+- PRIORIZE recomendações que previnam a causa específica "{node['label']}"
+- USE a justificativa como contexto para entender melhor a causa
+- GERE pelo menos 3 recomendações específicas
+- Retorne APENAS o texto das recomendações, sem explicações ou formatação markdown adicional"""
+                                    
+                                    # Tenta usar Google Gemini
+                                    improved_recommendation = None
+                                    error_msg = None
+                                    
+                                    if GEMINI_AVAILABLE:
+                                        try:
+                                            api_key = os.getenv('GOOGLE_AI_API_KEY') or st.secrets.get('general', {}).get('GOOGLE_AI_API_KEY', None)
+                                            if not api_key:
+                                                error_msg = "Chave da API do Google Gemini não configurada. Configure GOOGLE_AI_API_KEY nas variáveis de ambiente ou secrets."
+                                            else:
+                                                genai.configure(api_key=api_key)
+                                                # Usa gemini-3-flash-preview ou gemini-2.5-flash como fallback
+                                                try:
+                                                    model = genai.GenerativeModel('gemini-3-flash-preview')
+                                                except:
+                                                    model = genai.GenerativeModel('gemini-2.5-flash')
+                                                
+                                                # Configuração de segurança e parâmetros
+                                                generation_config = {
+                                                    "temperature": 0.7,
+                                                    "top_p": 0.8,
+                                                    "top_k": 40,
+                                                    "max_output_tokens": 2048,
+                                                }
+                                                
+                                                response = model.generate_content(
+                                                    prompt,
+                                                    generation_config=generation_config
+                                                )
+                                                
+                                                # Extrai o texto de forma mais robusta
+                                                try:
+                                                    improved_recommendation = response.text.strip() if response.text else None
+                                                    
+                                                    if improved_recommendation:
+                                                        if not improved_recommendation.endswith(('.', '!', '?', ':', ';', '\n')):
+                                                            st.info("ℹ️ A resposta pode estar incompleta. Revise o texto gerado.")
+                                                        
+                                                        if len(improved_recommendation) < 50:
+                                                            error_msg = "A IA retornou uma resposta muito curta ou vazia."
+                                                            improved_recommendation = None
+                                                    else:
+                                                        error_msg = "A IA retornou uma resposta vazia."
+                                                        improved_recommendation = None
+                                                except Exception as extract_error:
+                                                    error_msg = f"Erro ao extrair texto da resposta: {str(extract_error)}"
+                                                    improved_recommendation = None
+                                        except Exception as e:
+                                            error_msg = f"Erro ao conectar com IA: {str(e)}"
+                                            improved_recommendation = None
+                                    
+                                    # Se não conseguiu usar IA, gera uma recomendação base
+                                    if not improved_recommendation:
+                                        if current_recommendation:
+                                            improved_recommendation = current_recommendation
+                                        else:
+                                            # Gera uma recomendação contextualizada baseada nos dados reais
+                                            improved_recommendation = f"""Para prevenir a causa básica "{node['label']}" identificada no acidente ocorrido em {base_location} em {formatted_date_prompt}, recomenda-se:
+
+1. Implementar medidas preventivas específicas para esta causa
+2. Realizar treinamento adequado dos envolvidos
+3. Revisar procedimentos e normas relacionadas
+4. Estabelecer controles e monitoramento contínuo
+
+Esta recomendação deve ser revisada e complementada com ações específicas baseadas na análise técnica completa da causa."""
+                                        
+                                        if error_msg:
+                                            st.warning(f"⚠️ {error_msg} Uma recomendação base foi gerada automaticamente. Revise e complete com ações específicas.")
+                                        elif not GEMINI_AVAILABLE:
+                                            st.info("ℹ️ Biblioteca do Google Gemini não disponível. Uma recomendação base foi gerada automaticamente. Revise e complete com ações específicas.")
+                                    
+                                    # Salva no session_state para preencher o campo
+                                    st.session_state[recommendation_key] = improved_recommendation
+                                    st.success("✅ Recomendação gerada! Revise o texto abaixo e ajuste se necessário antes de salvar.")
+                                    
+                                except Exception as e:
+                                    st.error(f"❌ Erro ao gerar recomendação: {str(e)}")
+                                    st.info("💡 Tente criar a recomendação manualmente usando o contexto do acidente.")
+                    
+                    # Usa session_state se foi gerada uma recomendação
+                    default_recommendation = st.session_state.get(recommendation_key, node.get('recommendation', ''))
+                    
                     recommendation = st.text_area(
                         "Descreva as recomendações para prevenir ou corrigir esta causa básica:",
-                        value=node.get('recommendation', ''),
+                        value=default_recommendation,
                         key=recommendation_key,
                         help="Esta recomendação aparecerá no relatório PDF ao final, na seção de recomendações.",
                         height=120
@@ -3401,11 +3585,187 @@ Com base nas evidências coletadas e na análise realizada, esta hipótese foi *
                     
                     # Campo de recomendação
                     st.divider()
-                    st.markdown("**💡 Recomendação para esta Causa Contribuinte:**")
                     recommendation_key = f"recommendation_contributing_{node['id']}"
+                    
+                    # Título e botão na mesma linha
+                    col_title_rec, col_btn_rec = st.columns([3, 1])
+                    with col_title_rec:
+                        st.markdown("**💡 Recomendação para esta Causa Contribuinte:**")
+                    with col_btn_rec:
+                        ai_generate_rec_key = f"ai_generate_rec_contributing_{node['id']}"
+                        if st.button("✨ Gerar com IA", key=ai_generate_rec_key, help="Use IA para gerar recomendações técnicas baseadas na causa, justificativa e dados do acidente"):
+                            with st.spinner("🔄 Gerando recomendação com IA..."):
+                                try:
+                                    # Obtém contexto completo
+                                    accident_context = investigation.get('description', '') if investigation else ''
+                                    base_location = investigation.get('base_location', '') if investigation else ''
+                                    occurrence_date = investigation.get('occurrence_date', '') if investigation else ''
+                                    accident_type = investigation.get('type', '') if investigation else ''
+                                    
+                                    # Contexto das pessoas envolvidas
+                                    involved_context = ""
+                                    try:
+                                        # Tenta usar involved_injured se disponível, senão busca
+                                        if 'involved_injured' in locals() and involved_injured:
+                                            involved_list = involved_injured
+                                        else:
+                                            involved_list = get_involved_people(accident_id, 'Injured')
+                                        
+                                        for inv in involved_list:
+                                            if inv.get('name'):
+                                                involved_context += f"Vítima: {inv.get('name')}, {inv.get('age', '')} anos, {inv.get('job_title', '')} da empresa {inv.get('company', '')}. "
+                                    except:
+                                        pass
+                                    
+                                    # Justificativa atual do nó
+                                    current_justification = node.get('justification', '')
+                                    current_recommendation = node.get('recommendation', '')
+                                    
+                                    # Formata a data
+                                    try:
+                                        if occurrence_date:
+                                            date_obj = datetime.fromisoformat(occurrence_date.replace('Z', '+00:00'))
+                                            formatted_date_prompt = date_obj.strftime('%d/%m/%Y às %H:%M')
+                                        else:
+                                            formatted_date_prompt = occurrence_date if occurrence_date else "data não informada"
+                                    except:
+                                        formatted_date_prompt = occurrence_date if occurrence_date else "data não informada"
+                                    
+                                    # Constrói prompt para IA gerar recomendação
+                                    prompt = f"""Você é um especialista técnico em investigação de acidentes de trabalho, seguindo a metodologia NBR 14280.
+
+TAREFA: {"Melhorar e contextualizar" if current_recommendation else "Gerar"} recomendações técnicas profissionais para prevenir ou corrigir uma causa contribuinte de acidente.
+
+=== CONTEXTO DO ACIDENTE ===
+Tipo: {accident_type}
+Local: {base_location}
+Data/Hora: {formatted_date_prompt}
+Descrição completa: {accident_context}
+{f'Pessoas envolvidas: {involved_context}' if involved_context else ''}
+
+=== CAUSA CONTRIBUINTE A CORRIGIR ===
+"{node['label']}"
+
+Esta é a causa contribuinte identificada. As recomendações devem ser específicas para prevenir ou corrigir esta causa.
+
+=== JUSTIFICATIVA DA CAUSA ===
+{current_justification if current_justification else 'Nenhuma justificativa disponível ainda.'}
+
+Use a justificativa acima para entender melhor a causa e gerar recomendações mais específicas e efetivas.
+
+{"=== RECOMENDAÇÃO ATUAL (melhorar) ===" if current_recommendation else ""}
+{current_recommendation if current_recommendation else ''}
+{"Use a recomendação acima como base e melhore-a." if current_recommendation else "Gere recomendações completas e específicas."}
+
+=== INSTRUÇÕES CRÍTICAS ===
+{"1. MELHORE a recomendação existente, tornando-a mais específica e acionável" if current_recommendation else "1. GERE recomendações técnicas completas e profissionais"}
+2. FOQUE na causa contribuinte "{node['label']}" - as recomendações devem ser específicas para prevenir/corrigir esta causa
+3. USE a justificativa como contexto para entender melhor a causa e gerar recomendações mais efetivas
+4. USE os dados reais do acidente: local "{base_location}", data "{formatted_date_prompt}", tipo "{accident_type}"
+5. SEJA ESPECÍFICO: recomendações devem ser acionáveis, com ações concretas
+6. ESTRUTURA: Liste recomendações claras e objetivas, priorizando as mais importantes
+7. TOM: Profissional, técnico, adequado para relatório oficial de investigação
+8. FOQUE em prevenção: como evitar que esta causa ocorra novamente
+
+=== EXEMPLO DE BOM ESTILO ===
+"Para prevenir a causa contribuinte '{node['label']}' identificada no acidente ocorrido em {base_location} em {formatted_date_prompt}, recomenda-se:
+1. [Recomendação específica e acionável]
+2. [Recomendação específica e acionável]
+3. [Recomendação específica e acionável]"
+
+=== IMPORTANTE ===
+- NÃO use termos genéricos ou vagos
+- FOQUE em ações concretas e acionáveis
+- PRIORIZE recomendações que previnam a causa específica "{node['label']}"
+- USE a justificativa como contexto para entender melhor a causa
+- GERE pelo menos 3 recomendações específicas
+- Retorne APENAS o texto das recomendações, sem explicações ou formatação markdown adicional"""
+                                    
+                                    # Tenta usar Google Gemini
+                                    improved_recommendation = None
+                                    error_msg = None
+                                    
+                                    if GEMINI_AVAILABLE:
+                                        try:
+                                            api_key = os.getenv('GOOGLE_AI_API_KEY') or st.secrets.get('general', {}).get('GOOGLE_AI_API_KEY', None)
+                                            if not api_key:
+                                                error_msg = "Chave da API do Google Gemini não configurada. Configure GOOGLE_AI_API_KEY nas variáveis de ambiente ou secrets."
+                                            else:
+                                                genai.configure(api_key=api_key)
+                                                # Usa gemini-3-flash-preview ou gemini-2.5-flash como fallback
+                                                try:
+                                                    model = genai.GenerativeModel('gemini-3-flash-preview')
+                                                except:
+                                                    model = genai.GenerativeModel('gemini-2.5-flash')
+                                                
+                                                # Configuração de segurança e parâmetros
+                                                generation_config = {
+                                                    "temperature": 0.7,
+                                                    "top_p": 0.8,
+                                                    "top_k": 40,
+                                                    "max_output_tokens": 2048,
+                                                }
+                                                
+                                                response = model.generate_content(
+                                                    prompt,
+                                                    generation_config=generation_config
+                                                )
+                                                
+                                                # Extrai o texto de forma mais robusta
+                                                try:
+                                                    improved_recommendation = response.text.strip() if response.text else None
+                                                    
+                                                    if improved_recommendation:
+                                                        if not improved_recommendation.endswith(('.', '!', '?', ':', ';', '\n')):
+                                                            st.info("ℹ️ A resposta pode estar incompleta. Revise o texto gerado.")
+                                                        
+                                                        if len(improved_recommendation) < 50:
+                                                            error_msg = "A IA retornou uma resposta muito curta ou vazia."
+                                                            improved_recommendation = None
+                                                    else:
+                                                        error_msg = "A IA retornou uma resposta vazia."
+                                                        improved_recommendation = None
+                                                except Exception as extract_error:
+                                                    error_msg = f"Erro ao extrair texto da resposta: {str(extract_error)}"
+                                                    improved_recommendation = None
+                                        except Exception as e:
+                                            error_msg = f"Erro ao conectar com IA: {str(e)}"
+                                            improved_recommendation = None
+                                    
+                                    # Se não conseguiu usar IA, gera uma recomendação base
+                                    if not improved_recommendation:
+                                        if current_recommendation:
+                                            improved_recommendation = current_recommendation
+                                        else:
+                                            # Gera uma recomendação contextualizada baseada nos dados reais
+                                            improved_recommendation = f"""Para prevenir a causa contribuinte "{node['label']}" identificada no acidente ocorrido em {base_location} em {formatted_date_prompt}, recomenda-se:
+
+1. Implementar medidas preventivas específicas para esta causa
+2. Realizar treinamento adequado dos envolvidos
+3. Revisar procedimentos e normas relacionadas
+4. Estabelecer controles e monitoramento contínuo
+
+Esta recomendação deve ser revisada e complementada com ações específicas baseadas na análise técnica completa da causa."""
+                                        
+                                        if error_msg:
+                                            st.warning(f"⚠️ {error_msg} Uma recomendação base foi gerada automaticamente. Revise e complete com ações específicas.")
+                                        elif not GEMINI_AVAILABLE:
+                                            st.info("ℹ️ Biblioteca do Google Gemini não disponível. Uma recomendação base foi gerada automaticamente. Revise e complete com ações específicas.")
+                                    
+                                    # Salva no session_state para preencher o campo
+                                    st.session_state[recommendation_key] = improved_recommendation
+                                    st.success("✅ Recomendação gerada! Revise o texto abaixo e ajuste se necessário antes de salvar.")
+                                    
+                                except Exception as e:
+                                    st.error(f"❌ Erro ao gerar recomendação: {str(e)}")
+                                    st.info("💡 Tente criar a recomendação manualmente usando o contexto do acidente.")
+                    
+                    # Usa session_state se foi gerada uma recomendação
+                    default_recommendation = st.session_state.get(recommendation_key, node.get('recommendation', ''))
+                    
                     recommendation = st.text_area(
                         "Descreva as recomendações para prevenir ou corrigir esta causa contribuinte:",
-                        value=node.get('recommendation', ''),
+                        value=default_recommendation,
                         key=recommendation_key,
                         help="Esta recomendação aparecerá no relatório PDF ao final, na seção de recomendações.",
                         height=120
