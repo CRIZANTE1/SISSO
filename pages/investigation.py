@@ -3485,12 +3485,14 @@ Esta recomendação deve ser revisada e complementada com ações específicas b
                                     st.error(f"❌ Erro ao gerar recomendação: {str(e)}")
                                     st.info("💡 Tente criar a recomendação manualmente usando o contexto do acidente.")
                     
-                    # Usa session_state se foi gerada uma recomendação
-                    default_recommendation = st.session_state.get(recommendation_key, node.get('recommendation', ''))
+                    # Verifica se a chave já existe no session_state para evitar conflito
+                    # Se existir, não passa value= para deixar o Streamlit usar o valor do session_state
+                    # Se não existir, inicializa com o valor do node
+                    if recommendation_key not in st.session_state:
+                        st.session_state[recommendation_key] = node.get('recommendation', '')
                     
                     recommendation = st.text_area(
                         "Descreva as recomendações para prevenir ou corrigir esta causa básica:",
-                        value=default_recommendation,
                         key=recommendation_key,
                         help="Esta recomendação aparecerá no relatório PDF ao final, na seção de recomendações.",
                         height=120
@@ -3760,12 +3762,14 @@ Esta recomendação deve ser revisada e complementada com ações específicas b
                                     st.error(f"❌ Erro ao gerar recomendação: {str(e)}")
                                     st.info("💡 Tente criar a recomendação manualmente usando o contexto do acidente.")
                     
-                    # Usa session_state se foi gerada uma recomendação
-                    default_recommendation = st.session_state.get(recommendation_key, node.get('recommendation', ''))
+                    # Verifica se a chave já existe no session_state para evitar conflito
+                    # Se existir, não passa value= para deixar o Streamlit usar o valor do session_state
+                    # Se não existir, inicializa com o valor do node
+                    if recommendation_key not in st.session_state:
+                        st.session_state[recommendation_key] = node.get('recommendation', '')
                     
                     recommendation = st.text_area(
                         "Descreva as recomendações para prevenir ou corrigir esta causa contribuinte:",
-                        value=default_recommendation,
                         key=recommendation_key,
                         help="Esta recomendação aparecerá no relatório PDF ao final, na seção de recomendações.",
                         height=120
