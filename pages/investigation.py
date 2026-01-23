@@ -2847,9 +2847,9 @@ IMPORTANTE:
                                                 genai.configure(api_key=api_key)
                                                 # Usa gemini-1.5-flash ou gemini-pro como fallback
                                                 try:
-                                                    model = genai.GenerativeModel('gemini-1.5-flash')
+                                                    model = genai.GenerativeModel('gemini-3.0-flash-preview')
                                                 except:
-                                                    model = genai.GenerativeModel('gemini-pro')
+                                                    model = genai.GenerativeModel('gemini-2.5-flash')
                                                 
                                                 # Configuração de segurança e parâmetros
                                                 generation_config = {
