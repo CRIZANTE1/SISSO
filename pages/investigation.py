@@ -2614,9 +2614,9 @@ Retorne APENAS o texto da descrição melhorada, sem explicações adicionais.""
                                                 genai.configure(api_key=api_key)
                                                 # Usa gemini-1.5-flash ou gemini-pro como fallback
                                                 try:
-                                                    model = genai.GenerativeModel('gemini-3.0-flash-preview')
+                                                    model = genai.GenerativeModel('gemini-3-flash-preview')
                                                 except:
-                                                    model = genai.GenerativeModel('gemini-2.5-flash')
+                                                    model = genai.GenerativeModel('gemini-3-flash-preview')
                                                 response = model.generate_content(prompt)
                                                 improved_text = response.text.strip()
                                         except Exception as e:
@@ -2847,9 +2847,9 @@ IMPORTANTE:
                                                 genai.configure(api_key=api_key)
                                                 # Usa gemini-1.5-flash ou gemini-pro como fallback
                                                 try:
-                                                    model = genai.GenerativeModel('gemini-3.0-flash-preview')
+                                                    model = genai.GenerativeModel('gemini-3-flash-preview')
                                                 except:
-                                                    model = genai.GenerativeModel('gemini-2.5-flash')
+                                                    model = genai.GenerativeModel('gemini-3-flash-preview')
                                                 
                                                 # Configuração de segurança e parâmetros
                                                 generation_config = {
