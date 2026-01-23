@@ -3809,137 +3809,72 @@ Esta recomendação deve ser revisada e complementada com ações específicas b
         with col_next:
             st.success("✅ Investigação concluída! Você pode revisar os dados ou gerar o relatório PDF.")
         
-        # ========== GERAÇÃO DE RELATÓRIO PDF ==========
+        # ========== GERAÇÃO DE RELATÓRIO ==========
         st.divider()
-        st.markdown("### 📄 Relatório Final PDF")
+        st.markdown("### 📄 Relatórios Finais")
         st.markdown("**Gere o relatório completo no padrão Vibra**")
         
-        if st.button("📥 Gerar Relatório PDF Oficial", type="primary", width='stretch'):
-            with st.spinner("🔄 Gerando PDF no padrão Vibra... Isso pode levar alguns segundos."):
-                try:
-                    from utils.report_generator import generate_pdf_report
-                    
-                    # 1. Busca dados completos
-                    accident_full = get_accident(accident_id)
-                    if not accident_full:
-                        st.error("Erro ao buscar dados do acidente")
-                        return
-                    
-                    # 2. Busca pessoas envolvidas
-                    all_people = get_involved_people(accident_id)
-                    
-                    # 3. Busca timeline
-                    timeline_events = get_timeline(accident_id)
-                    
-                    # 4. Busca causas validadas com códigos NBR
-                    validated_nodes = get_validated_nodes(accident_id)
-                    verified_causes = []
-                    
-                    # Processa nós validados (já vem com join de nbr_standards)
-                    # IMPORTANTE: Só inclui causas que foram validadas E classificadas com código NBR
-                    for node in validated_nodes:
-                        node_label = node.get('label', 'N/A')
-                        nbr_info = node.get('nbr_standards')
+        # Botões lado a lado
+        col_pdf, col_word = st.columns(2)
+        
+        with col_pdf:
+            if st.button("📥 Gerar Relatório PDF", type="primary", use_container_width=True):
+                with st.spinner("🔄 Gerando PDF no padrão Vibra... Isso pode levar alguns segundos."):
+                    try:
+                        from utils.report_generator import generate_pdf_report
                         
-                        # Só adiciona se tiver código NBR (foi classificado)
-                        if nbr_info:
-                            # nbr_standards vem do join (pode ser dict ou list)
-                            if isinstance(nbr_info, dict):
-                                verified_causes.append({
-                                    'label': node_label,
-                                    'nbr_code': nbr_info.get('code', 'N/A'),
-                                    'nbr_description': nbr_info.get('description', 'N/A')
-                                })
-                            elif isinstance(nbr_info, list) and len(nbr_info) > 0:
-                                nbr = nbr_info[0]
-                                verified_causes.append({
-                                    'label': node_label,
-                                    'nbr_code': nbr.get('code', 'N/A'),
-                                    'nbr_description': nbr.get('description', 'N/A')
-                                })
-                        # Se não tiver código NBR, não adiciona à lista (foi removido o else)
-                    
-                    # 5. Busca evidências
-                    evidence_list = get_evidence(accident_id)
-                    evidence_images = [e.get('image_url', '') for e in evidence_list if e.get('image_url')]
-                    
-                    # 5.5. Pré-carrega imagens no session state (mesma lógica da galeria)
-                    # Isso garante que as imagens sejam baixadas corretamente antes de gerar o PDF
-                    cache_key = f"pdf_images_cache_{accident_id}"
-                    if cache_key not in st.session_state:
-                        st.session_state[cache_key] = {}
-                    
-                    # Pré-carrega imagens de evidência
-                    for i, img_url in enumerate(evidence_images):
-                        if img_url and img_url not in st.session_state[cache_key]:
-                            try:
-                                # Extrai o path da URL
-                                path = None
-                                if '/storage/v1/object/public/evidencias/' in img_url:
-                                    path = img_url.split('/storage/v1/object/public/evidencias/')[1]
-                                elif '/evidencias/' in img_url:
-                                    parts = img_url.split('/evidencias/')
-                                    if len(parts) > 1:
-                                        path = parts[1]
-                                
-                                # Tenta baixar do Supabase Storage
-                                if path:
-                                    from managers.supabase_config import get_service_role_client
-                                    supabase = get_service_role_client()
-                                    if supabase:
-                                        # Decodifica o path para usar no download
-                                        from urllib.parse import unquote
-                                        decoded_path = unquote(path)
-                                        try:
-                                            image_bytes = supabase.storage.from_('evidencias').download(decoded_path)
-                                            if image_bytes:
-                                                # Converte para base64 e armazena
-                                                import base64
-                                                img_b64 = base64.b64encode(image_bytes).decode('utf-8')
-                                                st.session_state[cache_key][img_url] = f"data:image/jpeg;base64,{img_b64}"
-                                                print(f"[PDF_PRELOAD] Imagem de evidência {i+1} pré-carregada")
-                                        except Exception as e:
-                                            # Se falhar com path decodificado, tenta com path original
-                                            try:
-                                                image_bytes = supabase.storage.from_('evidencias').download(path)
-                                                if image_bytes:
-                                                    import base64
-                                                    img_b64 = base64.b64encode(image_bytes).decode('utf-8')
-                                                    st.session_state[cache_key][img_url] = f"data:image/jpeg;base64,{img_b64}"
-                                                    print(f"[PDF_PRELOAD] Imagem de evidência {i+1} pré-carregada (path original)")
-                                            except:
-                                                pass
-                            except Exception as e:
-                                print(f"[PDF_PRELOAD] Erro ao pré-carregar evidência {i+1}: {str(e)}")
-                    
-                    # Substitui URLs por versões em cache se disponíveis
-                    evidence_images_cached = []
-                    for img_url in evidence_images:
-                        if img_url in st.session_state[cache_key]:
-                            evidence_images_cached.append(st.session_state[cache_key][img_url])
-                        else:
-                            evidence_images_cached.append(img_url)
-                    evidence_images = evidence_images_cached
-                    
-                    # 6. Busca JSON da árvore para gerar imagem
-                    tree_json = build_fault_tree_json(accident_id)
-                    
-                    # 6.3. Pré-carrega imagens de justificativa das hipóteses
-                    if tree_json:
-                        def extract_justification_images(node):
-                            """Extrai URLs de imagens de justificativa recursivamente"""
-                            images = []
-                            justification_url = node.get('justification_image_url')
-                            if justification_url:
-                                images.append(justification_url)
-                            for child in node.get('children', []):
-                                images.extend(extract_justification_images(child))
-                            return images
+                        # 1. Busca dados completos
+                        accident_full = get_accident(accident_id)
+                        if not accident_full:
+                            st.error("Erro ao buscar dados do acidente")
+                            return
                         
-                        justification_image_urls = extract_justification_images(tree_json)
+                        # 2. Busca pessoas envolvidas
+                        all_people = get_involved_people(accident_id)
                         
-                        # Pré-carrega cada imagem de justificativa
-                        for i, img_url in enumerate(justification_image_urls):
+                        # 3. Busca timeline
+                        timeline_events = get_timeline(accident_id)
+                        
+                        # 4. Busca causas validadas com códigos NBR
+                        validated_nodes = get_validated_nodes(accident_id)
+                        verified_causes = []
+                        
+                        # Processa nós validados (já vem com join de nbr_standards)
+                        # IMPORTANTE: Só inclui causas que foram validadas E classificadas com código NBR
+                        for node in validated_nodes:
+                            node_label = node.get('label', 'N/A')
+                            nbr_info = node.get('nbr_standards')
+                            
+                            # Só adiciona se tiver código NBR (foi classificado)
+                            if nbr_info:
+                                # nbr_standards vem do join (pode ser dict ou list)
+                                if isinstance(nbr_info, dict):
+                                    verified_causes.append({
+                                        'label': node_label,
+                                        'nbr_code': nbr_info.get('code', 'N/A'),
+                                        'nbr_description': nbr_info.get('description', 'N/A')
+                                    })
+                                elif isinstance(nbr_info, list) and len(nbr_info) > 0:
+                                    nbr = nbr_info[0]
+                                    verified_causes.append({
+                                        'label': node_label,
+                                        'nbr_code': nbr.get('code', 'N/A'),
+                                        'nbr_description': nbr.get('description', 'N/A')
+                                    })
+                            # Se não tiver código NBR, não adiciona à lista (foi removido o else)
+                        
+                        # 5. Busca evidências
+                        evidence_list = get_evidence(accident_id)
+                        evidence_images = [e.get('image_url', '') for e in evidence_list if e.get('image_url')]
+                        
+                        # 5.5. Pré-carrega imagens no session state (mesma lógica da galeria)
+                        # Isso garante que as imagens sejam baixadas corretamente antes de gerar o PDF
+                        cache_key = f"pdf_images_cache_{accident_id}"
+                        if cache_key not in st.session_state:
+                            st.session_state[cache_key] = {}
+                        
+                        # Pré-carrega imagens de evidência
+                        for i, img_url in enumerate(evidence_images):
                             if img_url and img_url not in st.session_state[cache_key]:
                                 try:
                                     # Extrai o path da URL
@@ -3966,7 +3901,7 @@ Esta recomendação deve ser revisada e complementada com ações específicas b
                                                     import base64
                                                     img_b64 = base64.b64encode(image_bytes).decode('utf-8')
                                                     st.session_state[cache_key][img_url] = f"data:image/jpeg;base64,{img_b64}"
-                                                    print(f"[PDF_PRELOAD] Imagem de justificativa {i+1} pré-carregada")
+                                                    print(f"[PDF_PRELOAD] Imagem de evidência {i+1} pré-carregada")
                                             except Exception as e:
                                                 # Se falhar com path decodificado, tenta com path original
                                                 try:
@@ -3975,50 +3910,207 @@ Esta recomendação deve ser revisada e complementada com ações específicas b
                                                         import base64
                                                         img_b64 = base64.b64encode(image_bytes).decode('utf-8')
                                                         st.session_state[cache_key][img_url] = f"data:image/jpeg;base64,{img_b64}"
-                                                        print(f"[PDF_PRELOAD] Imagem de justificativa {i+1} pré-carregada (path original)")
+                                                        print(f"[PDF_PRELOAD] Imagem de evidência {i+1} pré-carregada (path original)")
                                                 except:
                                                     pass
                                 except Exception as e:
-                                    print(f"[PDF_PRELOAD] Erro ao pré-carregar justificativa {i+1}: {str(e)}")
-                    
-                    # 6.5. Busca ações da comissão
-                    commission_actions = get_commission_actions(accident_id)
-                    
-                    # 7. Gera PDF (passa o cache de imagens)
-                    pdf_bytes = generate_pdf_report(
-                        accident_data=accident_full,
-                        people_data=all_people,
-                        timeline_events=timeline_events,
-                        verified_causes=verified_causes,
-                        evidence_images=evidence_images,
-                        fault_tree_json=tree_json,
-                        commission_actions=commission_actions,
-                        image_cache=st.session_state.get(cache_key, {})
-                    )
-                    
-                    # 8. Botão de download
-                    registry_num = accident_full.get('registry_number', 'N/A').replace('/', '-') if accident_full.get('registry_number') else 'N/A'
-                    filename = f"Relatorio_Vibra_{registry_num}_{datetime.now().strftime('%Y%m%d')}.pdf"
-                    
-                    st.success("✅ PDF gerado com sucesso!")
-                    st.download_button(
-                        label="⬇️ Baixar Relatório PDF",
-                        data=pdf_bytes,
-                        file_name=filename,
-                        mime="application/pdf",
-                        type="primary",
-                        width='stretch'
-                    )
-                    
-                    st.info("💡 **Dica:** O relatório segue o padrão visual da Vibra com todas as seções do documento original.")
-                    
-                except ImportError as e:
-                    st.error(f"❌ Erro: Bibliotecas não instaladas. Execute: `pip install jinja2 weasyprint`")
-                    st.code("pip install jinja2 weasyprint", language="bash")
-                except Exception as e:
-                    st.error(f"❌ Erro ao gerar PDF: {str(e)}")
-                    import traceback
-                    st.code(traceback.format_exc())
+                                    print(f"[PDF_PRELOAD] Erro ao pré-carregar evidência {i+1}: {str(e)}")
+                        
+                        # Substitui URLs por versões em cache se disponíveis
+                        evidence_images_cached = []
+                        for img_url in evidence_images:
+                            if img_url in st.session_state[cache_key]:
+                                evidence_images_cached.append(st.session_state[cache_key][img_url])
+                            else:
+                                evidence_images_cached.append(img_url)
+                        evidence_images = evidence_images_cached
+                        
+                        # 6. Busca JSON da árvore para gerar imagem
+                        tree_json = build_fault_tree_json(accident_id)
+                        
+                        # 6.3. Pré-carrega imagens de justificativa das hipóteses
+                        if tree_json:
+                            def extract_justification_images(node):
+                                """Extrai URLs de imagens de justificativa recursivamente"""
+                                images = []
+                                justification_url = node.get('justification_image_url')
+                                if justification_url:
+                                    images.append(justification_url)
+                                for child in node.get('children', []):
+                                    images.extend(extract_justification_images(child))
+                                return images
+                            
+                            justification_image_urls = extract_justification_images(tree_json)
+                            
+                            # Pré-carrega cada imagem de justificativa
+                            for i, img_url in enumerate(justification_image_urls):
+                                if img_url and img_url not in st.session_state[cache_key]:
+                                    try:
+                                        # Extrai o path da URL
+                                        path = None
+                                        if '/storage/v1/object/public/evidencias/' in img_url:
+                                            path = img_url.split('/storage/v1/object/public/evidencias/')[1]
+                                        elif '/evidencias/' in img_url:
+                                            parts = img_url.split('/evidencias/')
+                                            if len(parts) > 1:
+                                                path = parts[1]
+                                        
+                                        # Tenta baixar do Supabase Storage
+                                        if path:
+                                            from managers.supabase_config import get_service_role_client
+                                            supabase = get_service_role_client()
+                                            if supabase:
+                                                # Decodifica o path para usar no download
+                                                from urllib.parse import unquote
+                                                decoded_path = unquote(path)
+                                                try:
+                                                    image_bytes = supabase.storage.from_('evidencias').download(decoded_path)
+                                                    if image_bytes:
+                                                        # Converte para base64 e armazena
+                                                        import base64
+                                                        img_b64 = base64.b64encode(image_bytes).decode('utf-8')
+                                                        st.session_state[cache_key][img_url] = f"data:image/jpeg;base64,{img_b64}"
+                                                        print(f"[PDF_PRELOAD] Imagem de justificativa {i+1} pré-carregada")
+                                                except Exception as e:
+                                                    # Se falhar com path decodificado, tenta com path original
+                                                    try:
+                                                        image_bytes = supabase.storage.from_('evidencias').download(path)
+                                                        if image_bytes:
+                                                            import base64
+                                                            img_b64 = base64.b64encode(image_bytes).decode('utf-8')
+                                                            st.session_state[cache_key][img_url] = f"data:image/jpeg;base64,{img_b64}"
+                                                            print(f"[PDF_PRELOAD] Imagem de justificativa {i+1} pré-carregada (path original)")
+                                                    except:
+                                                        pass
+                                    except Exception as e:
+                                        print(f"[PDF_PRELOAD] Erro ao pré-carregar justificativa {i+1}: {str(e)}")
+                        
+                        # 6.5. Busca ações da comissão
+                        commission_actions = get_commission_actions(accident_id)
+                        
+                        # 7. Gera PDF (passa o cache de imagens)
+                        pdf_bytes = generate_pdf_report(
+                            accident_data=accident_full,
+                            people_data=all_people,
+                            timeline_events=timeline_events,
+                            verified_causes=verified_causes,
+                            evidence_images=evidence_images,
+                            fault_tree_json=tree_json,
+                            commission_actions=commission_actions,
+                            image_cache=st.session_state.get(cache_key, {})
+                        )
+                        
+                        # 8. Botão de download
+                        registry_num = accident_full.get('registry_number', 'N/A').replace('/', '-') if accident_full.get('registry_number') else 'N/A'
+                        filename = f"Relatorio_Vibra_{registry_num}_{datetime.now().strftime('%Y%m%d')}.pdf"
+                        
+                        st.success("✅ PDF gerado com sucesso!")
+                        st.download_button(
+                            label="⬇️ Baixar Relatório PDF",
+                            data=pdf_bytes,
+                            file_name=filename,
+                            mime="application/pdf",
+                            type="primary",
+                            width='stretch'
+                        )
+                        
+                        st.info("💡 **Dica:** O relatório segue o padrão visual da Vibra com todas as seções do documento original.")
+                        
+                    except ImportError as e:
+                        st.error(f"❌ Erro: Bibliotecas não instaladas. Execute: `pip install jinja2 weasyprint`")
+                        st.code("pip install jinja2 weasyprint", language="bash")
+                    except Exception as e:
+                        st.error(f"❌ Erro ao gerar PDF: {str(e)}")
+                        import traceback
+                        st.code(traceback.format_exc())
+        
+        with col_word:
+            if st.button("📄 Gerar Relatório Word", type="secondary", use_container_width=True):
+                with st.spinner("🔄 Gerando Word no padrão Vibra... Isso pode levar alguns segundos."):
+                    try:
+                        from utils.word_generator import generate_word_report
+                        
+                        # 1. Busca dados completos (reutiliza mesma lógica do PDF)
+                        accident_full = get_accident(accident_id)
+                        if not accident_full:
+                            st.error("Erro ao buscar dados do acidente")
+                            return
+                        
+                        # 2. Busca pessoas envolvidas
+                        all_people = get_involved_people(accident_id)
+                        
+                        # 3. Busca timeline
+                        timeline_events = get_timeline(accident_id)
+                        
+                        # 4. Busca causas validadas com códigos NBR
+                        validated_nodes = get_validated_nodes(accident_id)
+                        verified_causes = []
+                        
+                        # Processa nós validados (já vem com join de nbr_standards)
+                        for node in validated_nodes:
+                            node_label = node.get('label', 'N/A')
+                            nbr_info = node.get('nbr_standards')
+                            
+                            if nbr_info:
+                                if isinstance(nbr_info, dict):
+                                    verified_causes.append({
+                                        'label': node_label,
+                                        'nbr_code': nbr_info.get('code', 'N/A'),
+                                        'nbr_description': nbr_info.get('description', 'N/A')
+                                    })
+                                elif isinstance(nbr_info, list) and len(nbr_info) > 0:
+                                    nbr = nbr_info[0]
+                                    verified_causes.append({
+                                        'label': node_label,
+                                        'nbr_code': nbr.get('code', 'N/A'),
+                                        'nbr_description': nbr.get('description', 'N/A')
+                                    })
+                        
+                        # 5. Busca evidências
+                        evidence_list = get_evidence(accident_id)
+                        evidence_images = [e.get('image_url', '') for e in evidence_list if e.get('image_url')]
+                        
+                        # 6. Busca JSON da árvore
+                        tree_json = build_fault_tree_json(accident_id)
+                        
+                        # 7. Busca ações da comissão
+                        commission_actions = get_commission_actions(accident_id)
+                        
+                        # 8. Gera Word
+                        word_bytes = generate_word_report(
+                            accident_data=accident_full,
+                            people_data=all_people,
+                            timeline_events=timeline_events,
+                            verified_causes=verified_causes,
+                            evidence_images=evidence_images,
+                            fault_tree_json=tree_json,
+                            commission_actions=commission_actions,
+                            image_cache=None  # Word não precisa de cache de imagens
+                        )
+                        
+                        # 9. Botão de download
+                        registry_num = accident_full.get('registry_number', 'N/A').replace('/', '-') if accident_full.get('registry_number') else 'N/A'
+                        filename_word = f"Relatorio_Vibra_{registry_num}_{datetime.now().strftime('%Y%m%d')}.docx"
+                        
+                        st.success("✅ Word gerado com sucesso!")
+                        st.download_button(
+                            label="⬇️ Baixar Relatório Word",
+                            data=word_bytes,
+                            file_name=filename_word,
+                            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                            type="secondary",
+                            use_container_width=True
+                        )
+                        
+                        st.info("💡 **Dica:** O relatório Word é editável e pode ser ajustado conforme necessário.")
+                        
+                    except ImportError as e:
+                        st.error(f"❌ Erro: Biblioteca não instalada. Execute: `pip install python-docx`")
+                        st.code("pip install python-docx", language="bash")
+                    except Exception as e:
+                        st.error(f"❌ Erro ao gerar Word: {str(e)}")
+                        import traceback
+                        st.code(traceback.format_exc())
 
 
 if __name__ == "__main__":
