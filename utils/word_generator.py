@@ -331,20 +331,20 @@ def generate_word_report(
         add_label_value_cell(row.cells[2], 'Data de Ocorrência', str(occurrence_date))
         add_label_value_cell(row.cells[3], 'Status', accident_data.get('status', 'N/A'))
         
-            # Segunda linha (Local da Base - colspan 4)
-            row = general_table.add_row()
-            cell = row.cells[0]
-            # Mescla células
-            for i in range(1, 4):
-                cell.merge(row.cells[i])
-            add_label_value_cell(cell, 'Local da Base', accident_data.get('base_location', 'N/A'))
-            
-            # Terceira linha (Descrição Completa - colspan 4)
-            row = general_table.add_row()
-            cell = row.cells[0]
-            for i in range(1, 4):
-                cell.merge(row.cells[i])
-            add_label_value_cell(cell, 'Descrição Completa', accident_data.get('description', accident_data.get('title', 'N/A')))
+        # Segunda linha (Local da Base - colspan 4)
+        row = general_table.add_row()
+        cell = row.cells[0]
+        # Mescla células
+        for i in range(1, 4):
+            cell.merge(row.cells[i])
+        add_label_value_cell(cell, 'Local da Base', accident_data.get('base_location', 'N/A'))
+        
+        # Terceira linha (Descrição Completa - colspan 4)
+        row = general_table.add_row()
+        cell = row.cells[0]
+        for i in range(1, 4):
+            cell.merge(row.cells[i])
+        add_label_value_cell(cell, 'Descrição Completa', accident_data.get('description', accident_data.get('title', 'N/A')))
         
         # 1.2 Classificação
         sub_title = doc.add_paragraph()
