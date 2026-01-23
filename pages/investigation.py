@@ -2612,7 +2612,11 @@ Retorne APENAS o texto da descrição melhorada, sem explicações adicionais.""
                                             api_key = os.getenv('GOOGLE_AI_API_KEY') or st.secrets.get('general', {}).get('GOOGLE_AI_API_KEY', None)
                                             if api_key:
                                                 genai.configure(api_key=api_key)
-                                                model = genai.GenerativeModel('gemini-pro')
+                                                # Usa gemini-1.5-flash ou gemini-pro como fallback
+                                                try:
+                                                    model = genai.GenerativeModel('gemini-3.0-flash-preview')
+                                                except:
+                                                    model = genai.GenerativeModel('gemini-2.5-flash')
                                                 response = model.generate_content(prompt)
                                                 improved_text = response.text.strip()
                                         except Exception as e:
