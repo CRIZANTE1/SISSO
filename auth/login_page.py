@@ -30,18 +30,11 @@ def _load_login_lottie() -> Optional[dict]:
 
 
 def _render_login_lottie(key: str = "login_lottie") -> None:
-    """Exibe o Lottie na coluna direita (fundo branco, centralizado)."""
+    """Exibe o Lottie na coluna direita."""
     animation = _load_login_lottie()
     if not animation:
         return
-    st_lottie(
-        animation,
-        height=320,
-        width=320,
-        key=key,
-        loop=True,
-        quality="high",
-    )
+    st_lottie(animation, height=340, key=key, loop=True, quality="high")
 
 
 def _inject_login_css() -> None:
@@ -131,37 +124,6 @@ def _inject_login_css() -> None:
             min-height: 220px;
             padding: 0.5rem 0 1rem 0;
         }
-    }
-
-    /* Coluna direita: fundo branco + Lottie centralizado */
-    div[data-testid="stHorizontalBlock"] > div[data-testid="column"]:nth-child(2) {
-        background: #ffffff !important;
-    }
-
-    div[data-testid="stHorizontalBlock"] > div[data-testid="column"]:nth-child(2) > div[data-testid="stVerticalBlock"] {
-        background: #ffffff !important;
-        min-height: 380px;
-        display: flex !important;
-        flex-direction: column !important;
-        align-items: center !important;
-        justify-content: center !important;
-    }
-
-    div[data-testid="stHorizontalBlock"] > div[data-testid="column"]:nth-child(2) .element-container {
-        display: flex !important;
-        justify-content: center !important;
-        align-items: center !important;
-        width: 100% !important;
-        background: #ffffff !important;
-    }
-
-    div[data-testid="stHorizontalBlock"] > div[data-testid="column"]:nth-child(2) iframe,
-    div[data-testid="stHorizontalBlock"] > div[data-testid="column"]:nth-child(2) [data-testid="stLottie"],
-    div[data-testid="stHorizontalBlock"] > div[data-testid="column"]:nth-child(2) svg {
-        background: #ffffff !important;
-        margin-left: auto !important;
-        margin-right: auto !important;
-        display: block !important;
     }
 
     .sisso-brand-mark {
