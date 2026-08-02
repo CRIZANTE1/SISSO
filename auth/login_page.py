@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Optional
 
 import streamlit as st
-from streamlit_lottie import st_lottie
+import streamlit.components.v1 as components
 
 from .auth_utils import (
     get_user_display_name,
@@ -29,13 +29,80 @@ def _load_login_lottie() -> Optional[dict]:
         return None
 
 
-def _render_login_lottie(key: str = "login_lottie") -> None:
-    """Exibe o Lottie na coluna direita."""
+def _render_login_lottie(key: str = "login_lottie", height: int = 340) -> None:
+    """
+    Exibe o Lottie na coluna direita, isolado do tema do sistema/Streamlit.
+
+    Renderiza em iframe via components.html com color-scheme forçado para light,
+    para que cores e contraste da animação não mudem com dark mode.
+    """
     animation = _load_login_lottie()
     if not animation:
         return
-    st_lottie(animation, height=340, key=key, loop=True, quality="high")
 
+    anim_json = json.dumps(animation)
+    # key evita aviso de unused; o iframe é isolado por página
+    _ = key
+
+    components.html(
+        f"""
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="color-scheme" content="light only">
+  <style>
+    html, body {{
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: transparent !important;
+      color-scheme: light only !important;
+      forced-color-adjust: none !important;
+    }}
+    #sisso-lottie {{
+      width: 100%;
+      height: {height}px;
+      background: transparent !important;
+      color-scheme: light only !important;
+      forced-color-adjust: none !important;
+      filter: none !important;
+      -webkit-filter: none !important;
+    }}
+    #sisso-lottie svg {{
+      filter: none !important;
+      -webkit-filter: none !important;
+      forced-color-adjust: none !important;
+    }}
+  </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/lottie-web/5.12.2/lottie.min.js"></script>
+</head>
+<body>
+  <div id="sisso-lottie"></div>
+  <script>
+    (function () {{
+      var data = {anim_json};
+      window.lottie.loadAnimation({{
+        container: document.getElementById("sisso-lottie"),
+        renderer: "svg",
+        loop: true,
+        autoplay: true,
+        animationData: data,
+        rendererSettings: {{
+          preserveAspectRatio: "xMidYMid meet",
+          progressiveLoad: true
+        }}
+      }});
+    }})();
+  </script>
+</body>
+</html>
+        """,
+        height=height,
+        scrolling=False,
+    )
 
 def _inject_login_css() -> None:
     """CSS e tipografia para as telas de autenticação (layout card minimalista)."""
@@ -113,10 +180,34 @@ def _inject_login_css() -> None:
         justify-content: center;
         min-height: 360px;
         padding: 1rem 0.5rem;
+        color-scheme: light only !important;
+        forced-color-adjust: none !important;
+        background: transparent !important;
     }
 
     .sisso-lottie-wrap > div {
         width: 100%;
+    }
+
+    /* Isola iframe do Lottie do tema dark do Streamlit/OS */
+    iframe[title="streamlit_html"],
+    [data-testid="stHtml"] iframe,
+    .stHtml iframe {
+        color-scheme: light only !important;
+        background: transparent !important;
+        border: none !important;
+        filter: none !important;
+        -webkit-filter: none !important;
+    }
+
+    @media (prefers-color-scheme: dark) {
+        iframe[title="streamlit_html"],
+        [data-testid="stHtml"] iframe,
+        .stHtml iframe {
+            color-scheme: light only !important;
+            filter: none !important;
+            -webkit-filter: none !important;
+        }
     }
 
     @media (max-width: 768px) {
