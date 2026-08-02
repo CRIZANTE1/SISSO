@@ -788,41 +788,87 @@ def app(filters=None):
     with tab4:
         st.subheader("Registrar Novo Acidente")
         
-        # Instruções de cadastro
-        with st.expander("📖 Como Cadastrar um Acidente", expanded=True):
+        with st.expander("📖 Como Cadastrar um Acidente", expanded=False):
             st.markdown("""
-            **Siga estes passos para registrar um novo acidente:**
-            
-            1. **Data do Acidente**: Selecione a data em que o acidente ocorreu
-            
-            2. **Tipo de Acidente**: Escolha entre:
-               - **Fatal**: Acidente que resultou em óbito
-               - **Com Lesão**: Acidente que causou lesão ao trabalhador
-               - **Sem Lesão**: Acidente que não causou lesão física
-            
-            3. **Dias Perdidos**: Informe quantos dias o funcionário ficou afastado do trabalho (0 se não houve afastamento)
-            
-            4. **Classificação**: Selecione o tipo:
-               - **Típico**: Acidente durante a jornada de trabalho
-               - **Trajeto**: Acidente no caminho para/do trabalho
-               - **Doença do Trabalho**: Relacionada às condições de trabalho
-               - **Outro**: Especifique no campo que aparecer
-            
-            5. **Parte do Corpo Afetada**: Selecione a região do corpo que foi afetada pelo acidente
-            
-            6. **Causa Raiz**: Identifique a causa principal:
-               - Fator Humano, Material, Ambiental, Organizacional, Técnico ou Outros
-            
-            7. **Funcionário**: (Opcional) Selecione o funcionário envolvido, ou deixe "Sem funcionário"
-            
-            8. **Descrição**: Descreva detalhadamente o que aconteceu
-            
-            9. **Status**: Defina se o caso está "Aberto" ou "Fechado"
-            
-            10. **Evidências**: (Opcional) Anexe fotos, documentos ou outros arquivos relacionados
-            
-            **💡 Dica**: Preencha todos os campos obrigatórios (marcados com *) antes de salvar.
+            1. Cadastre ou selecione o **funcionário** envolvido  
+            2. Preencha data, tipo, classificação e descrição  
+            3. Salve o acidente  
             """)
+
+        # ---- Funcionário: seleção + cadastro FORA do form do acidente ----
+        from auth.auth_utils import get_user_id
+        from services.employees import create_employee, get_all_employees
+
+        st.markdown("### 👷 Funcionário envolvido")
+        current_user_id = get_user_id()
+        if not current_user_id:
+            st.error("Sessão inválida: faça login novamente para cadastrar/selecionar funcionários.")
+
+        employees = get_all_employees()
+        emp_options = {"— (Sem funcionário) —": None}
+        for e in employees:
+            name = e.get("full_name") or "Sem Nome"
+            dept = e.get("department") or "-"
+            email = e.get("email") or ""
+            label = f"{name} ({dept})"
+            if email:
+                label += f" — {email}"
+            emp_options[label] = e.get("id")
+
+        if not employees:
+            st.warning(
+                "Nenhum funcionário cadastrado ainda. Use o formulário abaixo para adicionar "
+                "o acidentado e depois selecione-o na lista."
+            )
+        else:
+            st.caption(f"{len(employees)} funcionário(s) disponível(is).")
+
+        selected_emp_label = st.selectbox(
+            "Selecionar funcionário",
+            options=list(emp_options.keys()),
+            key="accident_employee_select",
+            help="Lista dos funcionários vinculados à sua conta.",
+        )
+        st.session_state["accident_selected_employee_id"] = emp_options[selected_emp_label]
+
+        with st.expander("➕ Cadastrar novo funcionário", expanded=not employees):
+            with st.form("new_employee_accident_form", clear_on_submit=True):
+                col_e1, col_e2 = st.columns(2)
+                with col_e1:
+                    emp_full_name = st.text_input("Nome Completo *")
+                    emp_document = st.text_input("CPF/Documento")
+                    emp_email = st.text_input("E-mail (opcional)")
+                with col_e2:
+                    emp_department = st.text_input("Departamento")
+                    emp_job_title = st.text_input("Cargo")
+                    emp_admission = st.date_input("Data de Admissão", value=date.today())
+                    emp_active = st.checkbox("Funcionário Ativo", value=True)
+
+                if st.form_submit_button("💾 Cadastrar Funcionário", type="primary"):
+                    errors = []
+                    if not (emp_full_name or "").strip():
+                        errors.append("Nome completo é obrigatório.")
+                    if not current_user_id:
+                        errors.append("Sessão inválida: não foi possível identificar o usuário logado.")
+
+                    if errors:
+                        for error in errors:
+                            st.error(error)
+                    else:
+                        ok = create_employee({
+                            "full_name": emp_full_name.strip(),
+                            "document_id": (emp_document or "").strip() or None,
+                            "email": (emp_email or "").strip().lower() or None,
+                            "job_title": (emp_job_title or "").strip() or None,
+                            "department": (emp_department or "").strip() or None,
+                            "admission_date": emp_admission.isoformat() if emp_admission else None,
+                            "status": "active" if emp_active else "inactive",
+                            "user_id": current_user_id,
+                        })
+                        if ok:
+                            st.rerun()
+
+        st.markdown("---")
         
         with st.form("new_accident_form"):
             col1, col2 = st.columns(2)
@@ -839,7 +885,6 @@ def app(filters=None):
                     }[x]
                 )
                 lost_days = st.number_input("Dias Perdidos", min_value=0, value=0)
-                # is_fatal removido - campo não existe na tabela accidents
             
             with col2:
                 classification_options = [
@@ -849,8 +894,15 @@ def app(filters=None):
                     "Outro"
                 ]
                 classification_sel = st.selectbox("Classificação", options=classification_options)
+                # Evita widget condicional dentro do form (quebra o estado do Streamlit)
+                classification_other = st.text_input(
+                    "Se Outro, especifique a classificação",
+                    placeholder="Preencha apenas se escolheu Outro",
+                )
                 classification = (
-                    st.text_input("Classificação (Outro)") if classification_sel == "Outro" else classification_sel
+                    classification_other.strip()
+                    if classification_sel == "Outro" and classification_other.strip()
+                    else classification_sel
                 )
 
                 body_part_options = [
@@ -869,116 +921,27 @@ def app(filters=None):
                     "Outras"
                 ]
                 body_part_sel = st.selectbox("Parte do Corpo Afetada", options=body_part_options)
+                body_part_other = st.text_input(
+                    "Se Outras, especifique a parte do corpo",
+                    placeholder="Preencha apenas se escolheu Outras",
+                )
                 body_part = (
-                    st.text_input("Parte do Corpo (Outra)") if body_part_sel == "Outras" else body_part_sel
+                    body_part_other.strip()
+                    if body_part_sel == "Outras" and body_part_other.strip()
+                    else body_part_sel
                 )
                 root_cause = st.selectbox(
                     "Causa Raiz",
                     options=["Fator Humano", "Fator Material", "Fator Ambiental", 
                             "Fator Organizacional", "Fator Técnico", "Outros"]
                 )
-                
-                # Campos adicionais removidos - não existem na tabela accidents
-                # cat_number, communication_date, investigation_* campos não existem na tabela
+
+            employee_id = st.session_state.get("accident_selected_employee_id")
+            if employee_id:
+                st.info(f"Funcionário selecionado: **{selected_emp_label}**")
+            else:
+                st.caption("Nenhum funcionário selecionado (opcional).")
             
-            # Seleção opcional do acidentado
-            employees = get_employees()
-            emp_options = {"— (Sem funcionário) —": None}
-            # Melhora a exibição do select box com mais informações
-            for e in employees:
-                name = e.get('full_name', 'Sem Nome')
-                dept = e.get('department', '-')
-                email = e.get('email', '')
-                emp_id = e.get('id', '')
-                # Mostra nome, departamento e ID (últimos 8 caracteres do UUID)
-                display_text = f"{name} ({dept})"
-                if email:
-                    display_text += f" - {email}"
-                emp_options[display_text] = emp_id
-            
-            selected_emp = st.selectbox(
-                "Funcionário (opcional)", 
-                options=list(emp_options.keys()),
-                help="Selecione o funcionário relacionado ao acidente. Os funcionários são filtrados por usuário (apenas seus funcionários aparecem)."
-            )
-            employee_id = emp_options[selected_emp]
-            
-            # Opção para adicionar novo acidentado
-            if st.checkbox("Adicionar novo acidentado", key="add_new_employee_accident"):
-                st.subheader("Adicionar Novo Funcionário")
-                st.info("💡 **Dica**: Preencha pelo menos Nome Completo, CPF e E-mail. Para cadastrar funcionários completos, use a página **Perfil do Usuário**.")
-                with st.form("new_employee_accident_form"):
-                    col1, col2 = st.columns(2)
-                    
-                    with col1:
-                        full_name = st.text_input("Nome Completo")
-                        cpf = st.text_input("CPF")
-                        email = st.text_input("E-mail")
-                        phone = st.text_input("Telefone")
-                        employee_id_input = st.text_input("ID do Funcionário")
-                        
-                    with col2:
-                        department = st.text_input("Departamento")
-                        position = st.text_input("Cargo")
-                        admission_date = st.date_input("Data de Admissão", value=date.today())
-                        is_active = st.checkbox("Funcionário Ativo", value=True)
-                        site_id = st.text_input("ID do Site")
-                    
-                    submitted_new = st.form_submit_button("Adicionar Funcionário", type="secondary")
-                    if submitted_new:
-                        # Validação de campos obrigatórios
-                        errors = []
-                        if not full_name:
-                            errors.append("Nome completo é obrigatório.")
-                        if not cpf:
-                            errors.append("CPF é obrigatório.")
-                        if not email:
-                            errors.append("E-mail é obrigatório.")
-                        
-                        if errors:
-                            for error in errors:
-                                st.error(error)
-                        else:
-                            try:
-                                from managers.supabase_config import get_service_role_client
-                                supabase = get_service_role_client()
-                                
-                                # Alinhado com estrutura real da tabela employees
-                                from auth.auth_utils import get_user_id
-                                user_id = get_user_id()
-                                
-                                employee_data = {
-                                    "full_name": full_name,
-                                    "document_id": cpf if cpf else None,  # cpf -> document_id
-                                    "email": email,
-                                    "job_title": position if position else None,  # position -> job_title
-                                    "department": department,
-                                    "admission_date": admission_date.isoformat(),
-                                    "status": "active" if is_active else "inactive",  # is_active -> status
-                                    "user_id": user_id
-                                }
-                                # Campos removidos: phone, employee_id, site_id (não existem na tabela)
-                                
-                                from managers.supabase_config import get_service_role_client
-                                supabase_service = get_service_role_client()
-                                if not supabase_service:
-                                    st.error("Erro ao conectar com o banco de dados")
-                                else:
-                                    result = supabase_service.table("employees").insert(employee_data).execute()
-                                
-                                if result.data:
-                                    st.success("✅ Funcionário cadastrado com sucesso!")
-                                    st.rerun()
-                                else:
-                                    st.error("Erro ao cadastrar funcionário.")
-                                    
-                            except Exception as e:
-                                st.error(f"Erro: {str(e)}")
-            
-            # Campos de investigação removidos - não existem na tabela accidents
-            # investigation_completed, investigation_date, investigation_responsible, investigation_notes, corrective_actions não existem na tabela
-            
-            # Campo de título (importante para investigação)
             title = st.text_input(
                 "Título do Acidente",
                 placeholder="Ex: Queda durante manutenção, Vazamento de produto, etc.",
@@ -987,7 +950,6 @@ def app(filters=None):
             
             description = st.text_area("Descrição do Acidente", height=100)
 
-            # Status padronizado
             status = st.selectbox(
                 "Status",
                 options=["aberto", "fechado"],
@@ -997,7 +959,6 @@ def app(filters=None):
                 }[x]
             )
             
-            # Upload de evidências
             uploaded_files = st.file_uploader(
                 "Evidências (Fotos, PDFs, etc.)",
                 accept_multiple_files=True,
@@ -1012,7 +973,6 @@ def app(filters=None):
                 else:
                     try:
                         from managers.supabase_config import get_service_role_client
-                        from auth.auth_utils import get_user_id
                         # Usa service_role para contornar RLS ao inserir acidente
                         supabase = get_service_role_client()
                         

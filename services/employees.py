@@ -4,6 +4,7 @@ Serviços para gerenciamento de funcionários (employees)
 import streamlit as st
 from managers.supabase_config import get_supabase_client, get_service_role_client
 from typing import List, Dict, Optional
+from datetime import date
 import pandas as pd
 
 def get_all_employees() -> List[Dict]:
@@ -17,6 +18,9 @@ def get_all_employees() -> List[Dict]:
         
         # Usa service_role para contornar RLS e aplicar filtro de segurança no código
         supabase = get_service_role_client()
+        if not supabase:
+            st.error("Erro de conexão com o banco ao buscar funcionários.")
+            return []
         
         # Admin vê todos os funcionários
         if is_admin():
@@ -76,14 +80,29 @@ def get_employee_by_id(employee_id: str) -> Optional[Dict]:
 def create_employee(employee_data: Dict) -> bool:
     """Cria um novo funcionário"""
     try:
+        from auth.auth_utils import get_user_id
+
+        # Garante vínculo com o usuário logado
+        user_id = employee_data.get("user_id") or get_user_id()
+        if not user_id:
+            st.error("Não foi possível identificar o usuário logado. Faça login novamente.")
+            return False
+        employee_data = {**employee_data, "user_id": user_id}
+
+        # Remove chaves vazias que podem quebrar o insert
+        clean = {k: v for k, v in employee_data.items() if v is not None and v != ""}
+
         supabase = get_service_role_client()
-        result = supabase.table("employees").insert(employee_data).execute()
+        if not supabase:
+            st.error("Erro ao conectar com o banco de dados.")
+            return False
+
+        result = supabase.table("employees").insert(clean).execute()
         if result.data:
             st.success("✅ Funcionário cadastrado com sucesso!")
             return True
-        else:
-            st.error("Erro ao cadastrar funcionário.")
-            return False
+        st.error("Erro ao cadastrar funcionário.")
+        return False
     except Exception as e:
         st.error(f"Erro ao criar funcionário: {str(e)}")
         return False
@@ -137,8 +156,29 @@ def employee_form(employee_data: Optional[Dict] = None) -> Optional[Dict]:
             
         with col2:
             department = st.text_input("Departamento", value=employee_data.get("department", "") if is_update else "")
-            admission_date = st.date_input("Data de Admissão", value=pd.to_datetime(employee_data.get("admission_date")).date() if is_update and employee_data.get("admission_date") else None)
-            termination_date = st.date_input("Data de Demissão (opcional)", value=pd.to_datetime(employee_data.get("termination_date")).date() if is_update and employee_data.get("termination_date") else None)
+            default_admission = date.today()
+            if is_update and employee_data.get("admission_date"):
+                try:
+                    default_admission = pd.to_datetime(employee_data.get("admission_date")).date()
+                except Exception:
+                    default_admission = date.today()
+            admission_date = st.date_input("Data de Admissão", value=default_admission)
+
+            has_termination = bool(is_update and employee_data.get("termination_date"))
+            include_termination = st.checkbox(
+                "Informar data de demissão",
+                value=has_termination,
+            )
+            termination_date = None
+            if include_termination:
+                default_term = date.today()
+                if has_termination:
+                    try:
+                        default_term = pd.to_datetime(employee_data.get("termination_date")).date()
+                    except Exception:
+                        default_term = date.today()
+                termination_date = st.date_input("Data de Demissão", value=default_term)
+
             # status é texto com default 'active' - mapeado para checkbox
             status_value = employee_data.get("status", "active") if is_update else "active"
             is_active = st.checkbox("Funcionário Ativo", value=(status_value == "active") if is_update else True)
@@ -149,8 +189,6 @@ def employee_form(employee_data: Optional[Dict] = None) -> Optional[Dict]:
             errors = []
             if not full_name:
                 errors.append("Nome completo é obrigatório.")
-            if not email:
-                errors.append("E-mail é obrigatório.")
             
             if errors:
                 for error in errors:
@@ -160,20 +198,22 @@ def employee_form(employee_data: Optional[Dict] = None) -> Optional[Dict]:
             # Alinhado com estrutura real da tabela employees
             from auth.auth_utils import get_user_id
             user_id = get_user_id()
+            if not user_id:
+                st.error("Sessão inválida: faça login novamente antes de cadastrar.")
+                return None
             
-            employee_data = {
-                "full_name": full_name,
-                "document_id": document_id if document_id else None,  # cpf -> document_id
-                "email": email,
-                "job_title": job_title if job_title else None,  # position -> job_title
-                "department": department if department else None,
+            payload = {
+                "full_name": full_name.strip(),
+                "document_id": document_id.strip() if document_id else None,
+                "email": email.strip().lower() if email else None,
+                "job_title": job_title.strip() if job_title else None,
+                "department": department.strip() if department else None,
                 "admission_date": admission_date.isoformat() if admission_date else None,
                 "termination_date": termination_date.isoformat() if termination_date else None,
-                "status": "active" if is_active else "inactive",  # is_active -> status
-                "user_id": user_id
+                "status": "active" if is_active else "inactive",
+                "user_id": user_id,
             }
-            # Campos removidos: phone, employee_id, site_id, cpf, position (não existem na tabela)
-            return employee_data
+            return payload
 
 def list_employees_table():
     """Exibe tabela de funcionários com opções de edição/remoção"""

@@ -106,14 +106,137 @@ def app(filters=None):
     
     with tab2:
         st.subheader("Gerenciar Usuários")
+
+        # Solicitações pendentes de aprovação
+        pending_users = [u for u in (get_users() or []) if (u.get("status") or "").lower() == "pendente"]
+        if pending_users:
+            st.markdown("### ⏳ Solicitações Pendentes")
+            st.caption("Usuários que solicitaram acesso e aguardam aprovação.")
+            for pending in pending_users:
+                p_email = pending.get("email", "")
+                p_name = pending.get("full_name") or "—"
+                p_id = pending.get("id")
+                with st.container(border=True):
+                    c1, c2, c3 = st.columns([3, 1, 1])
+                    with c1:
+                        st.markdown(f"**{p_name}**")
+                        st.caption(p_email)
+                    with c2:
+                        if st.button("✅ Aprovar", key=f"approve_{p_id}", width='stretch'):
+                            if _update_user_status(p_email, "ativo"):
+                                st.success(f"Usuário {p_email} aprovado.")
+                                st.rerun()
+                    with c3:
+                        if st.button("❌ Rejeitar", key=f"reject_{p_id}", width='stretch'):
+                            if _update_user_status(p_email, "inativo"):
+                                st.warning(f"Solicitação de {p_email} rejeitada.")
+                                st.rerun()
+            st.markdown("---")
         
-        # Lista usuários existentes
+        # Lista usuários existentes com edição inline de role e status
         users = get_users()
-        
+
         if users:
             st.write("**Usuários Cadastrados:**")
+            st.caption("Edite o **Papel** ou **Status** diretamente na tabela e clique em 'Salvar Alterações'.")
+
+            # Preparar dataframe para exibição e edição
             users_df = pd.DataFrame(users)
-            st.dataframe(users_df, width='stretch', hide_index=True)
+            display_cols = ['full_name', 'email', 'role', 'status', 'plan', 'created_at']
+            display_df = users_df[display_cols].copy()
+
+            # Guarda snapshot original para detectar mudanças
+            # Recria o original sempre que o data_editor for resetado ou na primeira carga
+            if 'original_users_df' not in st.session_state or st.session_state.get('_reset_user_editor'):
+                st.session_state.original_users_df = display_df.copy()
+                st.session_state._reset_user_editor = False
+
+            edited_df = st.data_editor(
+                display_df,
+                column_config={
+                    "full_name": st.column_config.TextColumn("Nome", disabled=True),
+                    "email": st.column_config.TextColumn("Email", disabled=True),
+                    "role": st.column_config.SelectboxColumn(
+                        "Papel",
+                        options=["admin", "editor", "viewer"],
+                        format_func=lambda x: {
+                            "admin": "Administrador",
+                            "editor": "Editor",
+                            "viewer": "Visualizador"
+                        }.get(x, x),
+                        required=True,
+                    ),
+                    "status": st.column_config.SelectboxColumn(
+                        "Status",
+                        options=["ativo", "inativo", "pendente", "suspenso"],
+                        required=True,
+                    ),
+                    "plan": st.column_config.TextColumn("Plano", disabled=True),
+                    "created_at": st.column_config.DatetimeColumn("Criado em", disabled=True),
+                },
+                hide_index=True,
+                use_container_width=True,
+                key="user_editor",
+                num_rows="fixed",
+            )
+
+            col_save, col_undo = st.columns([1, 4])
+            with col_save:
+                if st.button("💾 Salvar Alterações", type="primary", key="save_user_changes"):
+                    changes_made = 0
+                    current_user_email = (st.session_state.get('user_email', '') or '').lower().strip()
+
+                    for idx, row in edited_df.iterrows():
+                        if idx >= len(st.session_state.original_users_df):
+                            continue
+                        original_row = st.session_state.original_users_df.iloc[idx]
+                        email = row['email']
+
+                        role_changed = row['role'] != original_row['role']
+                        status_changed = row['status'] != original_row['status']
+
+                        if role_changed or status_changed:
+                            # Proteção: admin não pode remover o próprio papel
+                            if email.lower().strip() == current_user_email and row['role'] != 'admin':
+                                st.error(f"⚠️ Você não pode remover seu próprio papel de administrador!")
+                                continue
+
+                            update_data = {}
+                            if role_changed:
+                                update_data['role'] = row['role']
+                            if status_changed:
+                                update_data['status'] = row['status']
+
+                            try:
+                                from managers.supabase_config import get_service_role_client
+                                supabase = get_service_role_client()
+                                if supabase:
+                                    result = (
+                                        supabase.table("profiles")
+                                        .update(update_data)
+                                        .eq("email", email.lower().strip())
+                                        .execute()
+                                    )
+                                    if result.data:
+                                        changes_made += 1
+                            except Exception as e:
+                                st.error(f"Erro ao atualizar {email}: {str(e)}")
+
+                    if changes_made > 0:
+                        st.success(f"✅ {changes_made} usuário(s) atualizado(s) com sucesso!")
+                        # Atualiza snapshot e recarrega
+                        st.session_state.original_users_df = edited_df.copy()
+                        st.rerun()
+                    else:
+                        st.info("Nenhuma alteração detectada.")
+
+            with col_undo:
+                if st.button("🔄 Desfazer Alterações", key="undo_user_changes"):
+                    # Remove o estado do widget para resetar ao valor original do banco
+                    if 'user_editor' in st.session_state:
+                        del st.session_state['user_editor']
+                    st.session_state._reset_user_editor = True
+                    st.rerun()
         else:
             st.info("Nenhum usuário cadastrado.")
         
@@ -136,9 +259,11 @@ def app(filters=None):
                 )
             
             with col2:
-                # site_ids removido - campo não existe na tabela profiles
-                # A tabela profiles não tem relação direta com sites
-                pass  # Coluna vazia - campo removido
+                password = st.text_input(
+                    "Senha (opcional)",
+                    type="password",
+                    help="Se informada, cria login por e-mail no Supabase Auth. Sem senha, o usuário entra só via Google.",
+                )
             
             is_active = st.checkbox("Usuário Ativo", value=True)
             
@@ -147,63 +272,86 @@ def app(filters=None):
             if submitted:
                 if not email:
                     st.error("E-mail é obrigatório.")
+                elif password and len(password) < 6:
+                    st.error("A senha deve ter pelo menos 6 caracteres.")
                 else:
                     try:
                         from managers.supabase_config import get_service_role_client
+                        from auth.auth_utils import extract_name_from_email
                         supabase = get_service_role_client()
                         if not supabase:
                             st.error("Erro ao conectar com o banco de dados")
                         else:
-                            # Verifica se o perfil já existe antes de criar
-                            existing_profile = supabase.table("profiles").select("*").eq("email", email).execute()
-                            
+                            email_norm = email.lower().strip()
+                            full_name = extract_name_from_email(email_norm)
+                            status_val = "ativo" if is_active else "inativo"
+
+                            # Conta Auth (e-mail/senha) — só se senha foi informada
+                            if password:
+                                try:
+                                    supabase.auth.admin.create_user({
+                                        "email": email_norm,
+                                        "password": password,
+                                        "email_confirm": True,
+                                        "user_metadata": {"full_name": full_name},
+                                    })
+                                except Exception as auth_err:
+                                    err_text = str(auth_err).lower()
+                                    if "already" in err_text or "registered" in err_text or "exists" in err_text:
+                                        st.warning(
+                                            "Usuário já existe no Auth. Atualizando apenas o perfil."
+                                        )
+                                    else:
+                                        raise
+
+                            existing_profile = (
+                                supabase.table("profiles")
+                                .select("*")
+                                .eq("email", email_norm)
+                                .execute()
+                            )
+
                             if existing_profile.data:
-                                st.warning(f"⚠️ Já existe um perfil para o email {email}. Atualizando perfil existente...")
-                                
-                                # Atualiza perfil existente
-                                profile_data = {
-                                    "role": role,
-                                    "status": "ativo" if is_active else "inativo"
-                                }
-                                
-                                result = supabase.table("profiles").update(profile_data).eq("email", email).execute()
-                                
+                                st.warning(
+                                    f"⚠️ Já existe um perfil para o email {email_norm}. Atualizando..."
+                                )
+                                result = (
+                                    supabase.table("profiles")
+                                    .update({"role": role, "status": status_val, "full_name": full_name})
+                                    .eq("email", email_norm)
+                                    .execute()
+                                )
                                 if result.data:
                                     st.success("✅ Perfil atualizado com sucesso!")
+                                    if password:
+                                        st.info("Login por e-mail/senha disponível com a senha informada.")
                                     st.rerun()
                                 else:
                                     st.error("Erro ao atualizar perfil do usuário.")
                             else:
-                                # Cria usuário no Auth
-                                auth_response = supabase.auth.admin.create_user({
-                                    "email": email,
-                                    "password": "temp_password_123",  # Usuário deve alterar no primeiro login
-                                    "email_confirm": True
-                                })
-                                
-                                if auth_response.user:
-                                    # Cria perfil do usuário
-                                    # Extrai o nome do email para usar como full_name
-                                    from auth.auth_utils import extract_name_from_email
-                                    full_name = extract_name_from_email(email)
-                                    
-                                    profile_data = {
-                                        "email": email,
-                                        "full_name": full_name,
-                                        "role": role,
-                                        "status": "ativo" if is_active else "inativo"
-                                    }
-                                    
-                                    result = supabase.table("profiles").insert(profile_data).execute()
-                                    
-                                    if result.data:
-                                        st.success("✅ Usuário criado com sucesso!")
-                                        st.info("🔑 Senha temporária: temp_password_123 (usuário deve alterar no primeiro login)")
-                                        st.rerun()
+                                profile_data = {
+                                    "email": email_norm,
+                                    "full_name": full_name,
+                                    "role": role,
+                                    "status": status_val,
+                                }
+                                result = supabase.table("profiles").insert(profile_data).execute()
+
+                                if result.data:
+                                    st.success("✅ Usuário criado com sucesso!")
+                                    if password:
+                                        st.info(
+                                            "O usuário pode entrar com e-mail/senha ou com Google "
+                                            "(se o e-mail for o mesmo)."
+                                        )
                                     else:
-                                        st.error("Erro ao criar perfil do usuário.")
+                                        st.info(
+                                            "Sem senha: o usuário acessa apenas via Google "
+                                            "com este e-mail."
+                                        )
+                                    st.rerun()
                                 else:
-                                    st.error("Erro ao criar usuário no sistema de autenticação.")
+                                    st.error("Erro ao criar perfil do usuário.")
                             
                     except Exception as e:
                         # Se o erro for de chave duplicada, tenta atualizar o perfil existente
@@ -212,14 +360,15 @@ def app(filters=None):
                                 from managers.supabase_config import get_service_role_client
                                 supabase = get_service_role_client()
                                 if supabase:
-                                    st.warning(f"⚠️ Perfil já existe para {email}. Atualizando perfil existente...")
+                                    email_norm = email.lower().strip()
+                                    st.warning(f"⚠️ Perfil já existe para {email_norm}. Atualizando perfil existente...")
                                     
                                     profile_data = {
                                         "role": role,
                                         "status": "ativo" if is_active else "inativo"
                                     }
                                     
-                                    result = supabase.table("profiles").update(profile_data).eq("email", email).execute()
+                                    result = supabase.table("profiles").update(profile_data).eq("email", email_norm).execute()
                                 
                                 if result.data:
                                     st.success("✅ Perfil atualizado com sucesso!")
@@ -517,6 +666,26 @@ def get_users():
         return response.data
     except:
         return []
+
+
+def _update_user_status(email: str, status: str) -> bool:
+    """Atualiza o status de um perfil (aprovar/rejeitar solicitação)."""
+    try:
+        from managers.supabase_config import get_service_role_client
+        supabase = get_service_role_client()
+        if not supabase:
+            st.error("Erro ao conectar com o banco de dados")
+            return False
+        result = (
+            supabase.table("profiles")
+            .update({"status": status})
+            .eq("email", email.lower().strip())
+            .execute()
+        )
+        return bool(result.data)
+    except Exception as e:
+        st.error(f"Erro ao atualizar status: {str(e)}")
+        return False
 
 if __name__ == "__main__":
     app({})

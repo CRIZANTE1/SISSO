@@ -131,7 +131,7 @@ def app():
         
         2. **CPF/Documento**: (Opcional) Informe o CPF ou número de documento
         
-        3. **E-mail**: Informe o e-mail de contato do funcionário (*obrigatório*)
+        3. **E-mail**: (Opcional) Informe o e-mail de contato do funcionário
         
         4. **Cargo**: Informe o cargo ou função do funcionário
         
@@ -146,7 +146,7 @@ def app():
         **💡 Importante**: 
         - O funcionário será vinculado automaticamente à sua conta
         - Você só verá os funcionários que você cadastrou
-        - Campos obrigatórios: **Nome Completo** e **E-mail**
+        - Campos obrigatórios: **Nome Completo**
         
         **📋 Dica**: Cadastre seus funcionários antes de registrar acidentes para facilitar a seleção posteriormente nos formulários.
         """)
