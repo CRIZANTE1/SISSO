@@ -1337,6 +1337,11 @@ def app(filters=None):
                 "calcula as taxas de frequência e gravidade, e salva na tabela `kpi_monthly`.")
         
         # Verifica se há dados antes de permitir recalcular
+        accidents_count = 0
+        hours_count = 0
+        kpis_count = 0
+        user_id = None
+        supabase = None
         try:
             from managers.supabase_config import get_service_role_client
             from auth.auth_utils import get_user_id
@@ -1365,15 +1370,127 @@ def app(filters=None):
                 elif accidents_count == 0:
                     st.warning("⚠️ **Sem acidentes**: Cadastre acidentes para calcular KPIs!")
                 elif hours_count == 0:
-                    st.warning("⚠️ **Sem horas trabalhadas**: Cadastre horas trabalhadas para calcular KPIs!")
+                    st.warning(
+                        "⚠️ **Sem horas trabalhadas**: Os KPIs (Taxa de Frequência e Gravidade) "
+                        "precisam das horas-homem trabalhadas no mesmo mês dos acidentes. "
+                        "Cadastre abaixo e depois clique em **Calcular Meus KPIs**."
+                    )
                 elif kpis_count == 0:
                     st.info("ℹ️ **KPIs não calculados**: Clique no botão abaixo para calcular os KPIs baseados nos seus dados existentes.")
                 else:
                     st.success(f"✅ **KPIs já calculados**: Existem {kpis_count} registros de KPI calculados para seus dados.")
+                
+                # Meses com acidentes sem horas (ajuda o usuário a preencher o período certo)
+                if accidents_count > 0:
+                    acc_periods_resp = supabase.table("accidents").select("occurred_at").eq("created_by", user_id).execute()
+                    hours_periods_resp = supabase.table("hours_worked_monthly").select("year, month").eq("created_by", user_id).execute()
+                    acc_periods = set()
+                    for acc in (acc_periods_resp.data or []):
+                        if acc.get("occurred_at"):
+                            dt = pd.to_datetime(acc["occurred_at"])
+                            acc_periods.add(f"{dt.year}-{dt.month:02d}")
+                    hours_periods = {
+                        f"{h['year']}-{int(h['month']):02d}"
+                        for h in (hours_periods_resp.data or [])
+                    }
+                    missing_periods = sorted(acc_periods - hours_periods)
+                    if missing_periods:
+                        st.info(
+                            "📅 **Meses com acidentes sem horas cadastradas:** "
+                            + ", ".join(missing_periods)
+                            + ". Cadastre horas nesses períodos para o cálculo funcionar."
+                        )
         except Exception as e:
             st.error(f"Erro ao verificar dados: {str(e)}")
         
-        if st.button("🔄 Calcular Meus KPIs", type="primary", key="btn_calculate_my_kpis"):
+        # Formulário para cadastrar horas trabalhadas (necessário para TF/TG)
+        st.markdown("---")
+        st.subheader("⏱️ Cadastrar Horas Trabalhadas")
+        st.caption(
+            "Informe o total de horas-homem trabalhadas no mês (ex.: 176 horas por colaborador × nº de colaboradores). "
+            "Use o mesmo mês/ano dos acidentes."
+        )
+        
+        if user_id and supabase:
+            with st.form("form_register_hours", clear_on_submit=True):
+                hcol1, hcol2, hcol3 = st.columns(3)
+                with hcol1:
+                    hours_year = st.number_input("Ano", min_value=2000, max_value=2100, value=pd.Timestamp.now().year, step=1)
+                with hcol2:
+                    hours_month = st.number_input("Mês", min_value=1, max_value=12, value=pd.Timestamp.now().month, step=1)
+                with hcol3:
+                    hours_value = st.number_input(
+                        "Horas trabalhadas",
+                        min_value=0.0,
+                        value=176.0,
+                        step=1.0,
+                        help="Total de horas-homem do mês (horas reais, não em centenas)"
+                    )
+                
+                save_hours = st.form_submit_button("💾 Salvar Horas", type="primary")
+                
+                if save_hours:
+                    try:
+                        if hours_value <= 0:
+                            st.error("Informe um total de horas maior que zero.")
+                        else:
+                            payload = {
+                                "year": int(hours_year),
+                                "month": int(hours_month),
+                                "hours": float(hours_value),
+                                "created_by": user_id,
+                            }
+                            existing = (
+                                supabase.table("hours_worked_monthly")
+                                .select("id")
+                                .eq("created_by", user_id)
+                                .eq("year", int(hours_year))
+                                .eq("month", int(hours_month))
+                                .execute()
+                            )
+                            if existing.data:
+                                supabase.table("hours_worked_monthly").update(
+                                    {"hours": float(hours_value)}
+                                ).eq("id", existing.data[0]["id"]).execute()
+                                st.success(
+                                    f"✅ Horas atualizadas: {hours_value:,.0f}h em "
+                                    f"{int(hours_month):02d}/{int(hours_year)}."
+                                )
+                            else:
+                                supabase.table("hours_worked_monthly").insert(payload).execute()
+                                st.success(
+                                    f"✅ Horas cadastradas: {hours_value:,.0f}h em "
+                                    f"{int(hours_month):02d}/{int(hours_year)}."
+                                )
+                            st.rerun()
+                    except Exception as e:
+                        st.error(f"Erro ao salvar horas: {str(e)}")
+            
+            # Lista registros existentes do usuário
+            try:
+                my_hours = (
+                    supabase.table("hours_worked_monthly")
+                    .select("year, month, hours")
+                    .eq("created_by", user_id)
+                    .order("year", desc=True)
+                    .order("month", desc=True)
+                    .execute()
+                )
+                if my_hours.data:
+                    hours_df = pd.DataFrame(my_hours.data)
+                    hours_df = hours_df.rename(columns={"year": "Ano", "month": "Mês", "hours": "Horas"})
+                    st.dataframe(hours_df, width="stretch", hide_index=True)
+            except Exception:
+                pass
+        else:
+            st.warning("Faça login para cadastrar horas trabalhadas.")
+        
+        st.markdown("---")
+        can_calculate = bool(user_id and accidents_count > 0 and hours_count > 0)
+        if not can_calculate and user_id:
+            st.caption("O botão de cálculo fica disponível após cadastrar acidentes e horas no mesmo período.")
+        
+        if st.button("🔄 Calcular Meus KPIs", type="primary", key="btn_calculate_my_kpis", disabled=not can_calculate):
             with st.spinner("Calculando seus KPIs..."):
                 try:
                     from services.kpi import calculate_frequency_rate, calculate_severity_rate
