@@ -107,6 +107,27 @@ def app(filters=None):
     with tab2:
         st.subheader("Gerenciar Usuários")
 
+        with st.expander("ℹ️ O que significa cada papel?", expanded=False):
+            st.markdown(
+                """
+**Visualizador (`viewer`)** — padrão para novos usuários
+- Pode **consultar** dashboards e registros.
+- **Não pode** criar nem editar acidentes, quase acidentes, não conformidades etc.
+- Ideal para quem só precisa acompanhar indicadores.
+
+**Editor (`editor`)**
+- Pode **criar e editar** registros operacionais (acidentes, NCs, ações, etc.).
+- Em geral vê e gerencia **os próprios dados**.
+- **Não acessa** a área Admin (sites, usuários, importações, logs).
+
+**Administrador (`admin`)**
+- Acesso **total** ao sistema.
+- Gerencia usuários, sites, importações, KPIs e logs.
+- Visualiza dados de **todos** os usuários.
+- Sem restrições de trial.
+                """
+            )
+
         # Solicitações pendentes de aprovação
         pending_users = [u for u in (get_users() or []) if (u.get("status") or "").lower() == "pendente"]
         if pending_users:
@@ -138,7 +159,10 @@ def app(filters=None):
 
         if users:
             st.write("**Usuários Cadastrados:**")
-            st.caption("Edite o **Papel** ou **Status** diretamente na tabela e clique em 'Salvar Alterações'.")
+            st.caption(
+                "Edite o **Papel** ou **Status** na tabela e clique em **Salvar Alterações**. "
+                "Veja o significado de cada papel no expander acima."
+            )
 
             # Preparar dataframe para exibição e edição
             users_df = pd.DataFrame(users)
@@ -165,6 +189,7 @@ def app(filters=None):
                             "viewer": "Visualizador"
                         }.get(x, x),
                         required=True,
+                        help="viewer=só consulta · editor=cria/edita · admin=acesso total",
                     ),
                     "status": st.column_config.SelectboxColumn(
                         "Status",
@@ -255,7 +280,12 @@ def app(filters=None):
                         "viewer": "Visualizador",
                         "editor": "Editor", 
                         "admin": "Administrador"
-                    }[x]
+                    }[x],
+                    help=(
+                        "Visualizador: só consulta. "
+                        "Editor: cria/edita registros. "
+                        "Administrador: acesso total (usuários, sites, logs)."
+                    ),
                 )
             
             with col2:
