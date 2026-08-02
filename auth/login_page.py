@@ -1,5 +1,12 @@
 import html
+import json
+from functools import lru_cache
+from pathlib import Path
+from typing import Optional
+
 import streamlit as st
+from streamlit_lottie import st_lottie
+
 from .auth_utils import (
     get_user_display_name,
     get_user_email,
@@ -8,6 +15,26 @@ from .auth_utils import (
     sign_up_with_supabase,
     logout_user,
 )
+
+_LOTTIE_PATH = Path(__file__).resolve().parent.parent / "assets" / "gradient_loader.json"
+
+
+@lru_cache(maxsize=1)
+def _load_login_lottie() -> Optional[dict]:
+    """Carrega a animação Lottie do login."""
+    try:
+        with open(_LOTTIE_PATH, encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return None
+
+
+def _render_login_lottie(key: str = "login_lottie") -> None:
+    """Exibe o Lottie na coluna direita."""
+    animation = _load_login_lottie()
+    if not animation:
+        return
+    st_lottie(animation, height=340, key=key, loop=True, quality="high")
 
 
 def _inject_login_css() -> None:
@@ -27,7 +54,7 @@ def _inject_login_css() -> None:
         --sisso-accent: #2563EB;
         --sisso-accent-hover: #1D4ED8;
         --sisso-warn: #F59E0B;
-        --sisso-card-max: 440px;
+        --sisso-card-max: 920px;
     }
 
     html, body, [class*="css"] {
@@ -73,11 +100,30 @@ def _inject_login_css() -> None:
     }
 
     .sisso-brand {
-        background: var(--sisso-brand);
-        color: #ffffff;
-        padding: 1.75rem 1.5rem;
+        background: transparent;
+        color: var(--sisso-text);
+        padding: 1.5rem 0 0.5rem 0;
         text-align: left;
-        margin: 0 -1.5rem 0 -1.5rem;
+        margin: 0;
+    }
+
+    .sisso-lottie-wrap {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 360px;
+        padding: 1rem 0.5rem;
+    }
+
+    .sisso-lottie-wrap > div {
+        width: 100%;
+    }
+
+    @media (max-width: 768px) {
+        .sisso-lottie-wrap {
+            min-height: 220px;
+            padding: 0.5rem 0 1rem 0;
+        }
     }
 
     .sisso-brand-mark {
@@ -92,7 +138,7 @@ def _inject_login_css() -> None:
         font-weight: 600;
         letter-spacing: 0.04em;
         margin: 0;
-        color: #ffffff;
+        color: var(--sisso-brand);
     }
 
     .sisso-brand-title {
@@ -100,13 +146,13 @@ def _inject_login_css() -> None:
         font-weight: 600;
         line-height: 1.25;
         margin: 0 0 0.35rem 0;
-        color: #ffffff;
+        color: var(--sisso-text);
     }
 
     .sisso-brand-sub {
         font-size: 0.8125rem;
         font-weight: 400;
-        color: #94A3B8;
+        color: var(--sisso-muted);
         margin: 0;
         line-height: 1.4;
     }
@@ -333,8 +379,8 @@ def _render_brand_header(subtitle: str = "Gestão de Segurança e Saúde Ocupaci
 <div class="sisso-brand">
   <div class="sisso-brand-mark">
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-      <path d="M12 3l7 3v5c0 4.5-3 8.2-7 9.5C8 19.2 5 15.5 5 11V6l7-3z" stroke="#60A5FA" stroke-width="1.75" fill="none"/>
-      <path d="M9.5 12.2l1.8 1.8 3.7-4" stroke="#93C5FD" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M12 3l7 3v5c0 4.5-3 8.2-7 9.5C8 19.2 5 15.5 5 11V6l7-3z" stroke="#2563EB" stroke-width="1.75" fill="none"/>
+      <path d="M9.5 12.2l1.8 1.8 3.7-4" stroke="#3B82F6" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
     </svg>
     <p class="sisso-brand-name">SISSO</p>
   </div>
@@ -349,66 +395,71 @@ def _render_brand_header(subtitle: str = "Gestão de Segurança e Saúde Ocupaci
 def show_login_page():
     """Página de login: Google OIDC ou e-mail/senha (Supabase Auth)."""
     _inject_login_css()
-    _render_brand_header()
 
-    st.markdown('<div class="sisso-spacer-top"></div>', unsafe_allow_html=True)
+    col_left, col_right = st.columns([1.05, 0.95], gap="large")
 
-    if st.button("Entrar com Google", type="secondary", width="stretch"):
-        try:
-            st.login()
-        except Exception as e:
-            st.error(f"Erro ao iniciar login: {e}")
+    with col_left:
+        _render_brand_header()
+        st.markdown('<div class="sisso-spacer-top"></div>', unsafe_allow_html=True)
 
-    st.markdown('<div class="sisso-divider">ou</div>', unsafe_allow_html=True)
+        if st.button("Entrar com Google", type="secondary", width="stretch"):
+            try:
+                st.login()
+            except Exception as e:
+                st.error(f"Erro ao iniciar login: {e}")
 
-    tab_login, tab_signup = st.tabs(["Entrar", "Criar conta"])
+        st.markdown('<div class="sisso-divider">ou</div>', unsafe_allow_html=True)
 
-    with tab_login:
-        with st.form("supabase_login_form"):
-            email = st.text_input("E-mail", placeholder="seu@email.com")
-            password = st.text_input("Senha", type="password")
-            submitted = st.form_submit_button("Entrar", type="primary", width="stretch")
-            if submitted:
-                ok, err = login_with_supabase(email, password)
-                if ok:
-                    st.success("Login realizado.")
-                    st.rerun()
-                else:
-                    st.error(err)
+        tab_login, tab_signup = st.tabs(["Entrar", "Criar conta"])
 
-    with tab_signup:
-        st.caption("A conta fica pendente até um administrador aprovar o acesso.")
-        with st.form("supabase_signup_form"):
-            full_name = st.text_input("Nome completo", placeholder="Seu nome")
-            email_new = st.text_input("E-mail", key="signup_email", placeholder="seu@email.com")
-            password_new = st.text_input(
-                "Senha",
-                type="password",
-                key="signup_password",
-                help="Mínimo de 6 caracteres",
-            )
-            password_confirm = st.text_input(
-                "Confirmar senha",
-                type="password",
-                key="signup_password_confirm",
-            )
-            signed = st.form_submit_button("Criar conta", type="primary", width="stretch")
-            if signed:
-                if password_new != password_confirm:
-                    st.error("As senhas não coincidem.")
-                else:
-                    ok, msg = sign_up_with_supabase(email_new, password_new, full_name)
+        with tab_login:
+            with st.form("supabase_login_form"):
+                email = st.text_input("E-mail", placeholder="seu@email.com")
+                password = st.text_input("Senha", type="password")
+                submitted = st.form_submit_button("Entrar", type="primary", width="stretch")
+                if submitted:
+                    ok, err = login_with_supabase(email, password)
                     if ok:
-                        st.success(msg)
+                        st.success("Login realizado.")
                         st.rerun()
                     else:
-                        st.error(msg)
+                        st.error(err)
+
+        with tab_signup:
+            st.caption("A conta fica pendente até um administrador aprovar o acesso.")
+            with st.form("supabase_signup_form"):
+                full_name = st.text_input("Nome completo", placeholder="Seu nome")
+                email_new = st.text_input("E-mail", key="signup_email", placeholder="seu@email.com")
+                password_new = st.text_input(
+                    "Senha",
+                    type="password",
+                    key="signup_password",
+                    help="Mínimo de 6 caracteres",
+                )
+                password_confirm = st.text_input(
+                    "Confirmar senha",
+                    type="password",
+                    key="signup_password_confirm",
+                )
+                signed = st.form_submit_button("Criar conta", type="primary", width="stretch")
+                if signed:
+                    if password_new != password_confirm:
+                        st.error("As senhas não coincidem.")
+                    else:
+                        ok, msg = sign_up_with_supabase(email_new, password_new, full_name)
+                        if ok:
+                            st.success(msg)
+                            st.rerun()
+                        else:
+                            st.error(msg)
+
+    with col_right:
+        _render_login_lottie(key="login_lottie")
 
 
 def show_pending_approval_page():
     """Página para usuários com solicitação pendente de aprovação."""
     _inject_login_css()
-    _render_brand_header()
 
     user_name = get_user_display_name()
     user_email = get_user_email()
@@ -416,8 +467,12 @@ def show_pending_approval_page():
     full_name = html.escape(str(user_info.get("full_name") or user_name or ""))
     email_safe = html.escape(str(user_email or "—"))
 
-    st.markdown(
-        f"""
+    col_left, col_right = st.columns([1.05, 0.95], gap="large")
+
+    with col_left:
+        _render_brand_header()
+        st.markdown(
+            f"""
 <div class="sisso-status">
   <div class="sisso-status-icon">
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
@@ -441,25 +496,30 @@ def show_pending_approval_page():
   </div>
 </div>
 <p class="sisso-hint">Assim que o acesso for aprovado, entre novamente com Google ou e-mail e senha.</p>
-        """,
-        unsafe_allow_html=True,
-    )
+            """,
+            unsafe_allow_html=True,
+        )
+        if st.button("Sair / Trocar de conta", type="secondary", width="stretch"):
+            logout_user()
 
-    if st.button("Sair / Trocar de conta", type="secondary", width="stretch"):
-        logout_user()
+    with col_right:
+        _render_login_lottie(key="pending_lottie")
 
 
 def show_access_denied_page():
     """Página para usuários não autorizados, com formulário de solicitação."""
     _inject_login_css()
-    _render_brand_header()
 
     user_name = html.escape(str(get_user_display_name() or ""))
     user_email = get_user_email()
     email_safe = html.escape(str(user_email or "—"))
 
-    st.markdown(
-        f"""
+    col_left, col_right = st.columns([1.05, 0.95], gap="large")
+
+    with col_left:
+        _render_brand_header()
+        st.markdown(
+            f"""
 <div class="sisso-status">
   <div class="sisso-status-icon warn">
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
@@ -484,41 +544,43 @@ def show_access_denied_page():
 </div>
 <p class="sisso-section-label">Solicitar acesso</p>
 <p class="sisso-hint">Preencha os dados. Um administrador analisará sua solicitação.</p>
-        """,
-        unsafe_allow_html=True,
-    )
-
-    default_name = extract_name_from_email(user_email) if user_email else ""
-    with st.form("access_request_form"):
-        full_name = st.text_input(
-            "Nome completo",
-            value=default_name,
-            placeholder="Seu nome completo",
+            """,
+            unsafe_allow_html=True,
         )
-        st.text_input(
-            "E-mail",
-            value=user_email or "",
-            disabled=True,
-            help="O e-mail vem da sua conta de login e não pode ser alterado.",
-        )
-        submitted = st.form_submit_button("Enviar solicitação", type="primary", width="stretch")
 
-        if submitted:
-            if not user_email:
-                st.error("Não foi possível identificar seu e-mail. Faça login novamente.")
-            elif not (full_name or "").strip():
-                st.error("Informe seu nome completo.")
-            else:
-                _submit_access_request(user_email, full_name.strip())
+        default_name = extract_name_from_email(user_email) if user_email else ""
+        with st.form("access_request_form"):
+            full_name = st.text_input(
+                "Nome completo",
+                value=default_name,
+                placeholder="Seu nome completo",
+            )
+            st.text_input(
+                "E-mail",
+                value=user_email or "",
+                disabled=True,
+                help="O e-mail vem da sua conta de login e não pode ser alterado.",
+            )
+            submitted = st.form_submit_button("Enviar solicitação", type="primary", width="stretch")
 
-    col_btn1, col_btn2 = st.columns(2)
-    with col_btn1:
-        if st.button("Tentar novamente", type="secondary", width="stretch"):
-            st.rerun()
-    with col_btn2:
-        if st.button("Sair / Trocar de conta", type="secondary", width="stretch"):
-            logout_user()
+            if submitted:
+                if not user_email:
+                    st.error("Não foi possível identificar seu e-mail. Faça login novamente.")
+                elif not (full_name or "").strip():
+                    st.error("Informe seu nome completo.")
+                else:
+                    _submit_access_request(user_email, full_name.strip())
 
+        col_btn1, col_btn2 = st.columns(2)
+        with col_btn1:
+            if st.button("Tentar novamente", type="secondary", width="stretch"):
+                st.rerun()
+        with col_btn2:
+            if st.button("Sair / Trocar de conta", type="secondary", width="stretch"):
+                logout_user()
+
+    with col_right:
+        _render_login_lottie(key="denied_lottie")
 
 def _submit_access_request(email: str, full_name: str) -> None:
     """Cria (ou reativa) perfil com status pendente para aprovação do admin."""
