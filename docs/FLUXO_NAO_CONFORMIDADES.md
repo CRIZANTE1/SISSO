@@ -130,13 +130,21 @@ CREATE TABLE public.attachments (
 
 ---
 
-## 🔍 6. Diferença: Não Conformidades vs. Investigação Formal (FTA)
+## 🔍 6. Integração: Não Conformidades & Investigação Formal (FTA)
 
-| Característica | Módulo Não Conformidades (`4_Nao_Conformidades.py`) | Módulo Investigação Avançada (`investigation.py`) |
+O módulo de Não Conformidades está totalmente integrado ao assistente de **Investigação Formal por Árvore de Falhas (FTA)**.
+
+### 🌟 Benefícios da Integração
+* **Investigação de Causa Raiz para N/Cs Críticas:** Para desvios graves ou de alto potencial de dano, o usuário pode iniciar uma investigação formal pericial diretamente a partir da N/C.
+* **Criação Automática da Árvore de Falhas:** O sistema gera automaticamente o nó raiz do desvio na tabela `fault_tree_nodes` e migra as evidências fotográficas anexadas.
+* **Geração de Laudo Pericial (PDF e Word):** Emissão de laudo técnico completo nos padrões corporativos e NBR 14280.
+* **Transição Fluida (Deep Linking):** Botões integrados nas abas **Registros**, **Nova Não Conformidade** e **Ações Corretivas** direcionam instantaneamente para o assistente FTA com contexto ativo no session state.
+
+| Característica | Fluxo Padrão (5W2H) | Fluxo Expandido (Investigação Formal FTA) |
 | :--- | :--- | :--- |
-| **Foco Principal** | Desvios normativos e condições inseguras | Acidentes com/sem afastamento ou graves |
-| **Metodologia de Causa** | Análise direta / Justificativa 5W2H | **Árvore de Causas (FTA - Fault Tree Analysis)** |
-| **Cronologia** | Data de ocorrência e abertura | **Linha do Tempo detalhada minuto a minuto** |
-| **Classificação Normativa** | NR-12, NR-18, NR-35, ISO 45001 | **NBR 14280** e Padrão Corporativo Vibra |
-| **Comissão** | Responsável único por ação | Ações da Comissão de Investigação |
-| **Emissão de Laudo** | Planilha / Histórico na tela | **Relatório Pericial Completo em PDF / Word** |
+| **Foco** | Desvios rotineiros e planos rápidos | Desvios graves, riscos críticos e auditorias |
+| **Metodologia de Causa** | Análise direta / Justificativa 5W2H | **Árvore de Falhas (FTA - Fault Tree Analysis)** |
+| **Cronologia** | Data de ocorrência e abertura | **Linha do Tempo detalhada de eventos** |
+| **Classificação Normativa** | NR-12, NR-18, NR-35, ISO 45001 | **NBR 14280** e Catálogo Normativo |
+| **Comissão & Pessoas** | Responsável único por ação | Pessoas Envolvidas e Comissão de Investigação |
+| **Emissão de Laudo** | Registros e Ações em tela | **Laudo Pericial Oficial em PDF e Word** |

@@ -4,12 +4,13 @@ Sistema completo de monitoramento de Segurança e Saúde Ocupacional (SSO) com a
 
 ## 🚀 Funcionalidades
 
-### 📊 Análise de Dados
+### 📊 Análise de Dados & Investigação
 - **Acidentes**: Registro e análise de acidentes fatais, com e sem lesão
 - **Quase-Acidentes**: Monitoramento de eventos de quase-acidente por severidade potencial
 - **Não Conformidades**: Controle de N/C com referência normativa (NR-12, NR-20, ISO 45001, etc.)
-- **Ações 5W2H**: Plano de ações para correção de problemas
-- **Evidências**: Upload e gerenciamento de fotos, PDFs e documentos
+- **Investigação Formal (FTA)**: Análise de Causa Raiz com Árvore de Falhas (Fault Tree Analysis) e emissão de laudo pericial (PDF e Word) para Acidentes e Não Conformidades
+- **Ações 5W2H**: Plano de ações para correção e mitigação de desvios
+- **Evidências**: Upload e gerenciamento de fotos, PDFs e documentos periciais
 
 ### 📈 KPIs e Controles Estatísticos
 - **Taxa de Frequência**: (nº acidentes / horas trabalhadas) × 1.000.000

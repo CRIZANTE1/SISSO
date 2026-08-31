@@ -371,7 +371,7 @@ def get_accidents() -> List[Dict[str, Any]]:
             return []
         
         # Busca acidentes (filtra por usuário se não for admin)
-        query = supabase.table("accidents").select("id, title, description, occurrence_date, occurred_at, status, created_at, type, classification, created_by")
+        query = supabase.table("accidents").select("id, title, description, occurrence_date, occurred_at, status, created_at, type, classification, created_by, registry_number")
         
         # Aplica filtro de segurança no código (não confia apenas em RLS)
         if not is_admin_user and user_id:
@@ -408,7 +408,8 @@ def get_accidents() -> List[Dict[str, Any]]:
                     "created_at": acc.get("created_at"),
                     "type": acc.get("type"),
                     "classification": acc.get("classification"),
-                    "created_by": acc.get("created_by")
+                    "created_by": acc.get("created_by"),
+                    "registry_number": acc.get("registry_number", "")
                 }
                 normalized_data.append(normalized)
             
@@ -518,42 +519,143 @@ def get_accident(accident_id: str) -> Optional[Dict[str, Any]]:
         import traceback
         st.code(traceback.format_exc())
         return None
+
+
+def get_nc_investigation_id(nc_id: str) -> Optional[str]:
+    """Busca o ID da investigação formal (FTA) vinculada a uma Não Conformidade"""
+    try:
+        from managers.supabase_config import get_service_role_client
+        supabase = get_service_role_client()
+        if not supabase or not nc_id:
+            return None
         
-        if response.data and len(response.data) > 0:
-            acc = response.data[0]
-            # Normaliza os dados para compatibilidade
-            normalized = {
-                "id": acc.get("id"),
-                "title": acc.get("title") or acc.get("description", "Acidente sem título"),
-                "description": acc.get("description", ""),
-                "occurrence_date": acc.get("occurrence_date") or acc.get("occurred_at"),
-                # Normaliza status: 'aberto'/'fechado' -> 'Open'/'Closed'
-                "status": "Open" if acc.get("status", "aberto").lower() in ["aberto", "open"] else "Closed",
-                "created_at": acc.get("created_at"),
-                "type": acc.get("type"),
-                "classification": acc.get("classification"),
-                # Campos expandidos do relatório Vibra
-                "registry_number": acc.get("registry_number"),
-                "base_location": acc.get("base_location"),
-                "class_injury": acc.get("class_injury"),
-                "class_community": acc.get("class_community"),
-                "class_environment": acc.get("class_environment"),
-                "class_process_safety": acc.get("class_process_safety"),
-                "class_asset_damage": acc.get("class_asset_damage"),
-                "class_near_miss": acc.get("class_near_miss"),
-                "severity_level": acc.get("severity_level"),
-                "estimated_loss_value": acc.get("estimated_loss_value"),
-                "product_released": acc.get("product_released"),
-                "volume_released": acc.get("volume_released"),
-                "volume_recovered": acc.get("volume_recovered"),
-                "release_duration_hours": acc.get("release_duration_hours"),
-                "equipment_involved": acc.get("equipment_involved"),
-                "area_affected": acc.get("area_affected")
-            }
-            return normalized
+        nc_id_str = str(nc_id).strip()
+        reg_num = f"NC-{nc_id_str[:8].upper()}"
+        
+        # 1. Busca por registry_number
+        resp = supabase.table("accidents").select("id").eq("registry_number", reg_num).limit(1).execute()
+        if resp.data and len(resp.data) > 0:
+            return resp.data[0]["id"]
+        
+        # 2. Busca por descrição contendo o ID da NC
+        resp = supabase.table("accidents").select("id").ilike("description", f"%{nc_id_str}%").limit(1).execute()
+        if resp.data and len(resp.data) > 0:
+            return resp.data[0]["id"]
+            
         return None
     except Exception as e:
-        st.error(f"Erro ao buscar acidente: {str(e)}")
+        return None
+
+
+def get_or_create_nc_investigation(nc_id: str, nc_data: Optional[Dict[str, Any]] = None) -> Optional[str]:
+    """
+    Busca ou cria uma investigação formal (FTA) vinculada a uma Não Conformidade.
+    Cria automaticamente o registro na tabela accidents, o nó raiz da Árvore de Falhas (FTA)
+    e vincula as evidências existentes da N/C.
+    """
+    import pandas as pd
+    from datetime import datetime
+    try:
+        from managers.supabase_config import get_service_role_client
+        from auth.auth_utils import get_user_id
+        
+        supabase = get_service_role_client()
+        if not supabase:
+            st.error("Erro ao conectar com o banco de dados")
+            return None
+            
+        # 1. Verifica se já existe investigação
+        existing_id = get_nc_investigation_id(nc_id)
+        if existing_id:
+            return existing_id
+            
+        # 2. Se nc_data não foi fornecido, busca no banco
+        if not nc_data:
+            nc_resp = supabase.table("nonconformities").select("*").eq("id", nc_id).limit(1).execute()
+            if nc_resp.data and len(nc_resp.data) > 0:
+                nc_data = nc_resp.data[0]
+            else:
+                nc_data = {}
+                
+        user_id = get_user_id() or nc_data.get('created_by')
+        if not user_id:
+            st.error("Usuário não autenticado")
+            return None
+            
+        standard_ref = nc_data.get('standard_ref') or nc_data.get('norm_reference') or 'Geral'
+        raw_desc = nc_data.get('description') or 'Não conformidade sem descrição'
+        desc_short = raw_desc[:45] + "..." if len(raw_desc) > 45 else raw_desc
+        
+        title = f"N/C [{standard_ref}] - {desc_short}"
+        severity = nc_data.get('severity', 'moderada')
+        
+        sev_map = {
+            'leve': 'Low', 'low': 'Low',
+            'moderada': 'Medium', 'medium': 'Medium',
+            'grave': 'High', 'high': 'High',
+            'critica': 'Catastrophic', 'critical': 'Catastrophic'
+        }
+        severity_level = sev_map.get(str(severity).lower(), 'Medium')
+        
+        occ_val = nc_data.get('occurred_at') or nc_data.get('opened_at') or datetime.now().date().isoformat()
+        try:
+            occ_dt = pd.to_datetime(occ_val)
+        except Exception:
+            occ_dt = datetime.now()
+            
+        reg_num = f"NC-{str(nc_id)[:8].upper()}"
+        full_desc = (
+            f"[Investigação Formal FTA - Não Conformidade]\n"
+            f"ID da N/C: {nc_id}\n"
+            f"Norma de Referência: {standard_ref}\n"
+            f"Gravidade: {severity.capitalize() if severity else 'N/A'}\n\n"
+            f"Descrição do Desvio:\n{raw_desc}"
+        )
+        
+        # Cria registro na tabela accidents
+        accident_id = create_accident(
+            title=title,
+            description=full_desc,
+            occurrence_date=occ_dt,
+            type="sem_lesao",
+            classification="Não Conformidade",
+            registry_number=reg_num,
+            severity_level=severity_level,
+            class_near_miss=False
+        )
+        
+        if not accident_id:
+            return None
+            
+        # 3. Cria nó raiz na Árvore de Falhas (Fault Tree)
+        root_label = f"Desvio N/C ({standard_ref}): {desc_short}"
+        create_root_node(accident_id, root_label)
+        
+        # 4. Importa evidências/anexos cadastrados na N/C para a tabela evidence da investigação
+        try:
+            att_resp = supabase.table("attachments").select("*").eq("entity_type", "nonconformity").eq("entity_id", str(nc_id)).execute()
+            if att_resp.data:
+                for att in att_resp.data:
+                    bucket = att.get('bucket', 'evidencias')
+                    path = att.get('path')
+                    filename = att.get('filename') or 'evidencia'
+                    if path:
+                        try:
+                            public_url = supabase.storage.from_(bucket).get_public_url(path)
+                        except Exception:
+                            public_url = f"{bucket}/{path}"
+                            
+                        supabase.table("evidence").insert({
+                            "accident_id": accident_id,
+                            "image_url": public_url,
+                            "description": f"Evidência importada da N/C: {filename}"
+                        }).execute()
+        except Exception:
+            pass  # Continua caso não consiga importar anexos
+            
+        return accident_id
+    except Exception as e:
+        st.error(f"Erro ao criar investigação da Não Conformidade: {str(e)}")
         return None
 
 

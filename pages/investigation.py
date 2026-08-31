@@ -369,39 +369,56 @@ def render_fault_tree_graph_from_json(tree_json: Dict[str, Any]):
 def main():
     require_login()
     
-    st.title("🔍 Investigação de Acidentes")
-    st.markdown("**Assistente de Análise de Árvore de Falhas (FTA) - NBR 14280**")
+    st.title("🔍 Investigação Formal (FTA)")
+    st.markdown("**Assistente de Análise de Causa Raiz por Árvore de Falhas (FTA) - Acidentes e Não Conformidades**")
     
     # ========== SIDEBAR - CONTEXT MANAGER ==========
     with st.sidebar:
         st.header("📋 Gerenciamento de Investigação")
         
-        # Seleção de acidente para investigação
-        st.subheader("Selecionar Acidente para Investigação")
-        st.info("💡 **Crie o acidente na página 'Acidentes' primeiro, depois selecione aqui para iniciar a investigação.**")
+        # Seleção de evento/não conformidade para investigação
+        st.subheader("Selecionar Evento para Investigação")
         
         # Botão de refresh para forçar atualização
-        if st.button("🔄 Atualizar Lista de Acidentes", help="Clique se o acidente não aparecer"):
+        if st.button("🔄 Atualizar Lista de Investigações", help="Clique se a investigação não aparecer"):
             st.session_state['current_accident'] = None
             st.rerun()
+            
+        tipo_filtro = st.radio(
+            "Filtrar por Tipo:",
+            options=["Todas", "🚨 Acidentes", "📋 Não Conformidades"],
+            horizontal=True,
+            key="inv_type_filter"
+        )
         
         investigations = get_accidents()
         
         if investigations:
-            # Cria opções com informações do acidente
+            # Cria opções com informações do evento / não conformidade
             investigation_options = {}
             for inv in investigations:
-                # Formata a label com informações relevantes
-                acc_type = inv.get('type', 'N/A')
+                is_nc = (
+                    inv.get('classification') == 'Não Conformidade' or 
+                    str(inv.get('registry_number', '')).startswith('NC-') or
+                    str(inv.get('title', '')).startswith('N/C')
+                )
                 
-                # Pega título ou descrição (já normalizado em get_accidents)
-                title_text = inv.get('title', 'Acidente sem título')
-                if not title_text or title_text == 'Acidente sem título':
-                    title_text = inv.get('description', 'Acidente sem título')
+                if tipo_filtro == "🚨 Acidentes" and is_nc:
+                    continue
+                if tipo_filtro == "📋 Não Conformidades" and not is_nc:
+                    continue
+                
+                # Formata a label com informações relevantes
+                prefix = "📋 [N/C]" if is_nc else "🚨 [Acidente]"
+                
+                # Pega título ou descrição
+                title_text = inv.get('title', 'Sem título')
+                if not title_text or title_text == 'Sem título':
+                    title_text = inv.get('description', 'Sem título')
                 
                 # Limita tamanho do título
-                if len(title_text) > 35:
-                    title_text = title_text[:35] + "..."
+                if len(title_text) > 30:
+                    title_text = title_text[:30] + "..."
                 
                 # Formata data
                 acc_date = ""
@@ -424,48 +441,56 @@ def main():
                 
                 # Cria label
                 if acc_date:
-                    label = f"{title_text} | {acc_type} | {acc_date}"
+                    label = f"{prefix} {title_text} | {acc_date}"
                 else:
-                    label = f"{title_text} | {acc_type}"
+                    label = f"{prefix} {title_text}"
                 
                 investigation_options[label] = inv['id']
             
-            investigation_options["-- Selecione um acidente --"] = None
+            investigation_options["-- Selecione uma investigação --"] = None
+            
+            options_keys = list(investigation_options.keys())
+            options_values = list(investigation_options.values())
+            
+            current_id = st.session_state.get('current_accident')
+            default_idx = 0
+            if current_id and current_id in options_values:
+                default_idx = options_values.index(current_id)
+            elif "-- Selecione uma investigação --" in options_keys:
+                default_idx = options_keys.index("-- Selecione uma investigação --")
             
             selected_label = st.selectbox(
-                "Acidente:",
-                options=list(investigation_options.keys()),
+                "Investigação Ativa:",
+                options=options_keys,
                 key="investigation_selector",
-                index=0 if not st.session_state.get('current_accident') else None,
-                help="Selecione um acidente criado na página 'Acidentes' para iniciar a investigação"
+                index=default_idx,
+                help="Selecione um Acidente ou Não Conformidade para iniciar/continuar a investigação FTA"
             )
             
-            # Obtém o ID do acidente selecionado (NUNCA usa nome/título)
+            # Obtém o ID da investigação selecionada
             selected_id = investigation_options.get(selected_label)
             
             # Valida que selected_id é um UUID válido
             if selected_id:
                 selected_id = str(selected_id).strip()
-                # UUID tem 36 caracteres, mas vamos aceitar qualquer string não vazia
                 if len(selected_id) < 10:
-                    st.error(f"❌ ID de acidente inválido: {selected_id}")
+                    st.error(f"❌ ID de investigação inválido: {selected_id}")
                     selected_id = None
             
             if selected_id and selected_id != st.session_state.get('current_accident'):
-                # Armazena o ID (UUID) no session_state
                 st.session_state['current_accident'] = selected_id
                 st.session_state['current_step'] = 0  # Reset step ao mudar investigação
                 st.rerun()
-            elif selected_id is None:
+            elif selected_id is None and selected_label == "-- Selecione uma investigação --":
                 st.session_state['current_accident'] = None
                 st.session_state['current_step'] = 0
         else:
-            st.warning("⚠️ Nenhum acidente encontrado.")
+            st.warning("⚠️ Nenhuma investigação encontrada.")
             st.info("""
             **Como iniciar uma investigação:**
-            1. Vá para a página **"Acidentes"** no menu
-            2. Crie um novo acidente usando o formulário
-            3. Volte para esta página e selecione o acidente criado
+            1. Crie um Acidente na página **"Acidentes"** ou uma Não Conformidade na página **"Não Conformidades"**
+            2. Clique no botão **"🔍 Iniciar Investigação Formal (FTA)"**
+            3. Acompanhe a árvore de falhas e gere o laudo pericial
             """)
             st.session_state['current_accident'] = None
             st.session_state['current_step'] = 0
@@ -473,9 +498,9 @@ def main():
         st.divider()
         st.markdown("""
         **📋 Fluxo de Investigação:**
-        1. **Criar Acidente** → Página "Acidentes"
-        2. **Selecionar Acidente** → Esta página (sidebar)
-        3. **Preencher Investigação** → Passos 1-4 abaixo
+        1. **Registrar Evento** → "Acidentes" ou "Não Conformidades"
+        2. **Selecionar Registro** → Barra lateral
+        3. **Preencher Investigação** → Passos 1-4 (Fatos, Timeline, FTA, Laudo)
         """)
     
     # ========== VERIFICAÇÃO DE ACCIDENT_ID ==========
@@ -523,6 +548,12 @@ def main():
     st.divider()
     
     # ========== HEADER DA INVESTIGAÇÃO ==========
+    is_nc = (
+        investigation.get('classification') == 'Não Conformidade' or 
+        str(investigation.get('registry_number', '')).startswith('NC-') or
+        str(investigation.get('title', '')).startswith('N/C')
+    )
+    
     col_status, col_info = st.columns([1, 3])
     
     with col_status:
@@ -535,9 +566,18 @@ def main():
             status_color = "🔴"
             status_text = "Fechado"
         st.markdown(f"**Status:** {status_color} {status_text}")
+        if is_nc:
+            st.caption("📋 **Tipo:** Não Conformidade")
+        else:
+            st.caption(f"🚨 **Tipo:** {investigation.get('type', 'Acidente')}")
     
     with col_info:
-        st.markdown(f"**📋 Investigação:** {investigation.get('title', 'N/A')}")
+        if is_nc:
+            st.markdown(f"### 📋 Investigação de Não Conformidade: {investigation.get('title', 'N/A')}")
+            st.caption(f"**Registro:** `{investigation.get('registry_number', 'N/A')}` | **Metodologia:** Árvore de Falhas (FTA) / NBR 14280 / ISO 45001")
+        else:
+            st.markdown(f"### 🚨 Investigação de Acidente: {investigation.get('title', 'N/A')}")
+            st.caption(f"**Registro:** `{investigation.get('registry_number', 'N/A')}` | **Metodologia:** Árvore de Falhas (FTA) / NBR 14280")
         if investigation.get('description'):
             st.caption(f"{investigation['description']}")
     

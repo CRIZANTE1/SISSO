@@ -7,6 +7,7 @@ from services.uploads import upload_evidence, get_attachments, download_attachme
 from components.cards import create_metric_row, create_bar_chart, create_pie_chart
 from components.filters import apply_filters_to_df
 from managers.supabase_config import get_supabase_client
+from services.investigation import get_nc_investigation_id, get_or_create_nc_investigation
 
 def fetch_nonconformities(start_date=None, end_date=None):
     """Busca dados de não conformidades - filtra por usuário logado"""
@@ -360,6 +361,57 @@ def app(filters=None):
                 )
             else:
                 st.dataframe(filtered_df, width='stretch', hide_index=True)
+                
+            st.markdown("---")
+            st.markdown("### 🔍 Investigação Formal e Árvore de Falhas (FTA)")
+            st.caption("Selecione uma Não Conformidade para gerenciar ou iniciar uma investigação profunda com Árvore de Causas e Laudo Pericial.")
+            
+            nc_detail_options = {}
+            for idx, row in filtered_df.iterrows():
+                nc_id_val = row.get('id', idx)
+                desc_val = str(row.get('description', ''))[:45]
+                norm_val = row.get('norm_reference', row.get('standard_ref', 'Geral'))
+                date_val = str(row.get('occurred_at', row.get('opened_at', '')))[:10]
+                sev_val = str(row.get('severity', '')).upper()
+                nc_detail_options[f"[{date_val}] {norm_val} ({sev_val}) - {desc_val}..."] = row.to_dict()
+                
+            if nc_detail_options:
+                selected_detail_label = st.selectbox(
+                    "Selecione a Não Conformidade para Investigação FTA:",
+                    options=list(nc_detail_options.keys()),
+                    key="nc_detail_selector"
+                )
+                
+                if selected_detail_label:
+                    selected_nc_data = nc_detail_options[selected_detail_label]
+                    sel_nc_id = selected_nc_data.get('id')
+                    
+                    inv_id = get_nc_investigation_id(sel_nc_id)
+                    
+                    card_c1, card_c2 = st.columns([3, 2])
+                    with card_c1:
+                        st.markdown(f"**Norma:** `{selected_nc_data.get('norm_reference', selected_nc_data.get('standard_ref', '-'))}` | **Gravidade:** `{str(selected_nc_data.get('severity', '-')).upper()}` | **Status:** `{str(selected_nc_data.get('status', '-')).upper()}`")
+                        st.markdown(f"**Descrição:** {selected_nc_data.get('description', '-')}")
+                    
+                    with card_c2:
+                        if inv_id:
+                            st.success("🌳 **Investigação Formal (FTA) Ativa**")
+                            if st.button("🔍 Abrir Árvore de Causas (FTA)", type="primary", use_container_width=True, key=f"btn_open_fta_{sel_nc_id}"):
+                                st.session_state['current_accident'] = inv_id
+                                st.session_state['current_step'] = 2  # Passo 3: Árvore de Porquês
+                                st.switch_page("pages/investigation.py")
+                        else:
+                            st.info("ℹ️ Investigação FTA ainda não iniciada.")
+                            if st.button("🔍 Iniciar Investigação Formal (FTA)", type="primary", use_container_width=True, key=f"btn_start_fta_{sel_nc_id}"):
+                                with st.spinner("Estruturando Árvore de Causas (FTA)..."):
+                                    new_inv_id = get_or_create_nc_investigation(sel_nc_id, selected_nc_data)
+                                    if new_inv_id:
+                                        st.session_state['current_accident'] = new_inv_id
+                                        st.session_state['current_step'] = 0
+                                        st.success("✅ Investigação FTA iniciada!")
+                                        st.switch_page("pages/investigation.py")
+                                    else:
+                                        st.error("Erro ao criar investigação FTA.")
         else:
             st.info("Nenhuma não conformidade encontrada.")
     
@@ -508,6 +560,12 @@ def app(filters=None):
                 type=['jpg', 'jpeg', 'png', 'pdf', 'doc', 'docx']
             )
             
+            start_fta_immediately = st.checkbox(
+                "🔍 Iniciar Investigação Formal (FTA) imediatamente após o registro",
+                value=(severity in ["grave", "critica"]),
+                help="Cria automaticamente a estrutura de Árvore de Causas / Falhas (FTA) e abre o assistente pericial"
+            )
+            
             submitted = st.form_submit_button("💾 Salvar Não Conformidade", type="primary")
             
             if submitted:
@@ -568,6 +626,15 @@ def app(filters=None):
                                     )
                                 st.success(f"✅ {len(uploaded_files)} evidência(s) enviada(s)!")
                             
+                            if start_fta_immediately:
+                                with st.spinner("Iniciando Investigação Formal (FTA)..."):
+                                    new_inv_id = get_or_create_nc_investigation(nc_id, nc_data)
+                                    if new_inv_id:
+                                        st.session_state['current_accident'] = new_inv_id
+                                        st.session_state['current_step'] = 0
+                                        st.success("✅ Redirecionando para a Investigação Formal (FTA)...")
+                                        st.switch_page("pages/investigation.py")
+                            
                             st.rerun()
                         else:
                             st.error("Erro ao salvar não conformidade.")
@@ -595,6 +662,27 @@ def app(filters=None):
             
             if selected_nc_id:
                 nc_id = nc_options[selected_nc_id]
+                
+                # Link com FTA
+                inv_id = get_nc_investigation_id(nc_id)
+                col_5w2h_header, col_5w2h_fta = st.columns([3, 2])
+                with col_5w2h_header:
+                    st.markdown("### Ações Corretivas Existentes (5W2H)")
+                with col_5w2h_fta:
+                    if inv_id:
+                        if st.button("🌳 Ver Árvore de Falhas (FTA) desta N/C", key=f"tab5_fta_open_{nc_id}", use_container_width=True):
+                            st.session_state['current_accident'] = inv_id
+                            st.session_state['current_step'] = 2
+                            st.switch_page("pages/investigation.py")
+                    else:
+                        if st.button("🔍 Iniciar Investigação Formal (FTA)", key=f"tab5_fta_start_{nc_id}", use_container_width=True):
+                            with st.spinner("Criando investigação FTA..."):
+                                nc_row_dict = df[df['id'] == nc_id].iloc[0].to_dict() if not df[df['id'] == nc_id].empty else {}
+                                new_inv_id = get_or_create_nc_investigation(nc_id, nc_row_dict)
+                                if new_inv_id:
+                                    st.session_state['current_accident'] = new_inv_id
+                                    st.session_state['current_step'] = 0
+                                    st.switch_page("pages/investigation.py")
                 
                 # Busca ações existentes
                 from services.actions import get_actions_by_entity, create_action, update_action_status, delete_action, action_form
