@@ -13,6 +13,11 @@ def upload_evidence(file_bytes: bytes,
                    description: str = "") -> Optional[str]:
     """Upload de evidência para Supabase Storage"""
     try:
+        # Se user_email não fornecido ou for texto descritivo (sem @), trata como description
+        if user_email and "@" not in user_email and not description:
+            description = user_email
+            user_email = None
+
         # Se user_email não fornecido, busca do usuário atual
         if not user_email:
             from auth.auth_utils import get_user_email
@@ -74,7 +79,19 @@ def get_attachments(entity_type: str, entity_id: str) -> List[Dict[str, Any]]:
             return []
         
         response = supabase.table("attachments").select("*").eq("entity_type", entity_type).eq("entity_id", entity_id).execute()
-        return response.data if response.data else []
+        if response.data:
+            for item in response.data:
+                if 'filename' not in item or not item['filename']:
+                    path_str = item.get('path', '')
+                    raw_filename = path_str.split('/')[-1] if '/' in path_str else path_str
+                    # Se tiver prefixo de timestamp (ex: "1234567890_nome.ext"), limpa para exibição
+                    parts = raw_filename.split('_', 1)
+                    if len(parts) == 2 and parts[0].isdigit():
+                        item['filename'] = parts[1]
+                    else:
+                        item['filename'] = raw_filename or "anexo"
+            return response.data
+        return []
     except Exception as e:
         st.error(f"Erro ao buscar anexos: {str(e)}")
         return []

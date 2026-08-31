@@ -485,7 +485,7 @@ def app(filters=None):
                                         uploaded_file.name,
                                         "near_miss",
                                         str(near_miss_id),
-                                        f"Evidência do quase-acidente de {date_input}"
+                                        description=f"Evidência do quase-acidente de {date_input}"
                                     )
                                 st.success(f"✅ {len(uploaded_files)} evidência(s) enviada(s)!")
                             

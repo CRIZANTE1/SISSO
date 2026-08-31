@@ -47,7 +47,7 @@ Tabela central de perfis de usuários do sistema.
 | `email` | `text` | ❌ | - | Email do usuário (UNIQUE) |
 | `full_name` | `text` | ✅ | - | Nome completo |
 | `role` | `text` | ❌ | - | Função: `admin`, `editor`, `viewer` |
-| `status` | `text` | ✅ | `'ativo'` | Status: `ativo`, `inativo`, `suspenso` |
+| `status` | `text` | ✅ | `'ativo'` | Status: `ativo`, `inativo`, `suspenso`, `pendente` |
 | `plan` | `text` | ✅ | `'trial'` | Plano: `trial`, `basic`, `premium`, `dev_ilimitado`, `enterprise` |
 | `company_name` | `text` | ✅ | - | Nome da empresa |
 | `employees_count` | `integer` | ✅ | - | Quantidade de funcionários |
@@ -59,7 +59,7 @@ Tabela central de perfis de usuários do sistema.
 - `PRIMARY KEY (id)`
 - `UNIQUE (email)`
 - `CHECK (role IN ('admin', 'editor', 'viewer'))`
-- `CHECK (status IN ('ativo', 'inativo', 'suspenso'))`
+- `CHECK (status IN ('ativo', 'inativo', 'suspenso', 'pendente'))`
 - `CHECK (plan IN ('trial', 'basic', 'premium', 'dev_ilimitado', 'enterprise'))`
 
 ---
@@ -218,7 +218,7 @@ Plano de ações (5W2H) vinculado a acidentes, quase acidentes ou não conformid
 | `why` | `text` | ✅ | - | Por que fazer |
 | `how` | `text` | ✅ | - | Como fazer |
 | `how_much` | `numeric` | ✅ | - | Quanto custa |
-| `status` | `text` | ✅ | `'aberta'` | Status: `aberta`, `em_execucao`, `concluida`, `cancelada` |
+| `status` | `text` | ✅ | `'aberta'` | Status: `aberta`, `em_andamento`, `em_execucao`, `fechada`, `concluida`, `cancelada` |
 | `created_by` | `uuid` | ✅ | - | **FK** → `profiles.id` |
 | `created_at` | `timestamptz` | ✅ | `now()` | Data de criação |
 
@@ -226,7 +226,7 @@ Plano de ações (5W2H) vinculado a acidentes, quase acidentes ou não conformid
 - `PRIMARY KEY (id)`
 - `FOREIGN KEY (created_by) REFERENCES profiles(id)`
 - `CHECK (entity_type IN ('accident', 'near_miss', 'nonconformity'))`
-- `CHECK (status IN ('aberta', 'em_execucao', 'concluida', 'cancelada'))`
+- `CHECK (status IN ('aberta', 'em_andamento', 'em_execucao', 'fechada', 'concluida', 'cancelada'))`
 
 ---
 

@@ -3,7 +3,7 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 from datetime import datetime, date
-from services.uploads import upload_evidence, get_attachments
+from services.uploads import upload_evidence, get_attachments, download_attachment, delete_attachment
 from components.cards import create_metric_row, create_bar_chart, create_pie_chart
 from components.filters import apply_filters_to_df
 from managers.supabase_config import get_supabase_client
@@ -564,7 +564,7 @@ def app(filters=None):
                                         uploaded_file.name,
                                         "nonconformity",
                                         str(nc_id),
-                                        f"Evidência da N/C de {date_input}"
+                                        description=f"Evidência da N/C de {date_input}"
                                     )
                                 st.success(f"✅ {len(uploaded_files)} evidência(s) enviada(s)!")
                             
