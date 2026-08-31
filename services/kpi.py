@@ -890,3 +890,185 @@ def calculate_accident_frequency_by_period(accidents_df: pd.DataFrame) -> Dict[s
         }
     
     return period_frequency
+
+
+def save_hours_worked(user_id: str, year: int, month: int, hours: float) -> Dict[str, Any]:
+    """Salva ou atualiza horas trabalhadas do usuário para o mês."""
+    from managers.supabase_config import get_service_role_client
+
+    if not user_id:
+        return {"ok": False, "error": "Usuário não autenticado"}
+    if hours is None or float(hours) <= 0:
+        return {"ok": False, "error": "Informe um total de horas maior que zero"}
+    if month < 1 or month > 12:
+        return {"ok": False, "error": "Mês inválido"}
+
+    supabase = get_service_role_client()
+    hours_value = float(hours)
+    existing = (
+        supabase.table("hours_worked_monthly")
+        .select("id")
+        .eq("created_by", user_id)
+        .eq("year", int(year))
+        .eq("month", int(month))
+        .execute()
+    )
+
+    if existing.data:
+        supabase.table("hours_worked_monthly").update({"hours": hours_value}).eq(
+            "id", existing.data[0]["id"]
+        ).execute()
+        action = "updated"
+    else:
+        supabase.table("hours_worked_monthly").insert(
+            {
+                "year": int(year),
+                "month": int(month),
+                "hours": hours_value,
+                "created_by": user_id,
+            }
+        ).execute()
+        action = "created"
+
+    return {
+        "ok": True,
+        "action": action,
+        "year": int(year),
+        "month": int(month),
+        "hours": hours_value,
+    }
+
+
+def recalculate_user_kpis(user_id: str) -> Dict[str, Any]:
+    """
+    Recalcula KPIs mensais do usuário a partir de acidentes + horas trabalhadas.
+    Horas em hours_worked_monthly estão em horas reais; kpi_monthly.hours em centenas.
+    """
+    from collections import defaultdict
+    from managers.supabase_config import get_service_role_client
+
+    if not user_id:
+        return {"ok": False, "error": "Usuário não autenticado", "kpi_count": 0}
+
+    supabase = get_service_role_client()
+
+    accidents_response = (
+        supabase.table("accidents")
+        .select("id, occurred_at, created_by, lost_days, type")
+        .eq("created_by", user_id)
+        .execute()
+    )
+    hours_response = (
+        supabase.table("hours_worked_monthly")
+        .select("id, year, month, hours, created_by")
+        .eq("created_by", user_id)
+        .execute()
+    )
+
+    accidents_data = accidents_response.data or []
+    hours_data = hours_response.data or []
+
+    if not hours_data:
+        return {
+            "ok": False,
+            "error": "Cadastre horas trabalhadas para calcular KPIs",
+            "kpi_count": 0,
+            "accidents": len(accidents_data),
+            "hours_records": 0,
+        }
+
+    accidents_by_period = defaultdict(lambda: {"count": 0, "fatalities": 0, "lost_days": 0})
+    for accident in accidents_data:
+        if not accident.get("occurred_at"):
+            continue
+        period = pd.to_datetime(accident["occurred_at"]).strftime("%Y-%m")
+        accidents_by_period[period]["count"] += 1
+        if accident.get("type") == "fatal":
+            accidents_by_period[period]["fatalities"] += 1
+        accidents_by_period[period]["lost_days"] += int(accident.get("lost_days") or 0)
+
+    hours_by_period = defaultdict(float)
+    for hour_entry in hours_data:
+        period = f"{hour_entry['year']}-{str(hour_entry['month']).zfill(2)}"
+        hours_by_period[period] += float(hour_entry.get("hours") or 0)
+
+    kpi_count = 0
+    periods_with_accidents = 0
+
+    for period, acc_data in accidents_by_period.items():
+        if period not in hours_by_period:
+            continue
+        periods_with_accidents += 1
+        hours = hours_by_period[period]
+        debited_days = acc_data["fatalities"] * 6000
+        hours_in_hundreds = hours / 100
+        freq_rate = calculate_frequency_rate(acc_data["count"], hours_in_hundreds)
+        sev_rate = calculate_severity_rate(acc_data["lost_days"], hours_in_hundreds, debited_days)
+
+        kpi_data = {
+            "period": f"{period}-01",
+            "created_by": user_id,
+            "accidents_total": acc_data["count"],
+            "fatalities": acc_data["fatalities"],
+            "lost_days_total": acc_data["lost_days"],
+            "hours": hours_in_hundreds,
+            "frequency_rate": freq_rate,
+            "severity_rate": sev_rate,
+            "debited_days": debited_days,
+        }
+
+        existing_kpi = (
+            supabase.table("kpi_monthly")
+            .select("id")
+            .eq("period", f"{period}-01")
+            .eq("created_by", user_id)
+            .execute()
+        )
+        if existing_kpi.data:
+            supabase.table("kpi_monthly").update(kpi_data).eq("period", f"{period}-01").eq(
+                "created_by", user_id
+            ).execute()
+        else:
+            supabase.table("kpi_monthly").insert(kpi_data).execute()
+        kpi_count += 1
+
+    periods_hours_only = 0
+    for period, hours in hours_by_period.items():
+        if period in accidents_by_period:
+            continue
+        periods_hours_only += 1
+        existing_kpi = (
+            supabase.table("kpi_monthly")
+            .select("id")
+            .eq("period", f"{period}-01")
+            .eq("created_by", user_id)
+            .execute()
+        )
+        kpi_data = {
+            "period": f"{period}-01",
+            "created_by": user_id,
+            "accidents_total": 0,
+            "fatalities": 0,
+            "lost_days_total": 0,
+            "hours": hours / 100,
+            "frequency_rate": 0,
+            "severity_rate": 0,
+            "debited_days": 0,
+        }
+        if existing_kpi.data:
+            supabase.table("kpi_monthly").update(kpi_data).eq("period", f"{period}-01").eq(
+                "created_by", user_id
+            ).execute()
+        else:
+            supabase.table("kpi_monthly").insert(kpi_data).execute()
+        kpi_count += 1
+
+    return {
+        "ok": True,
+        "kpi_count": kpi_count,
+        "periods_with_accidents": periods_with_accidents,
+        "periods_hours_only": periods_hours_only,
+        "accidents": len(accidents_data),
+        "hours_records": len(hours_data),
+        "missing_hours_periods": sorted(set(accidents_by_period.keys()) - set(hours_by_period.keys())),
+    }

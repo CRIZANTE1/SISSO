@@ -58,14 +58,14 @@ def app(filters=None):
         df = apply_filters_to_df(df, filters)
     
     # Tabs para diferentes análises (sempre mostra as tabs, mesmo sem dados)
-    tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9 = st.tabs(["📊 KPIs Básicos", "📈 Controles Estatísticos", "📊 Monitoramento de Tendências", "🔮 Previsões", "📋 Relatórios", "📚 Metodologia", "🔧 Configurações", "🔄 Calcular KPIs", "📖 Instruções"])
+    tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9 = st.tabs(["📊 KPIs Básicos", "📈 Controles Estatísticos", "📊 Monitoramento de Tendências", "🔮 Previsões", "📋 Relatórios", "📚 Metodologia", "🔧 Configurações", "⏱️ Horas e KPIs", "📖 Instruções"])
     
     with tab1:
         st.subheader("KPIs Básicos de Segurança")
         
         if df.empty:
             st.warning("Nenhum dado de KPI encontrado com os filtros aplicados.")
-            st.info("💡 **Dica**: Acesse a aba '🔄 Calcular KPIs' para calcular seus KPIs baseados nos seus acidentes e horas trabalhadas cadastrados.")
+            st.info("💡 **Dica**: Na aba **⏱️ Horas e KPIs**, informe as horas do mês — os indicadores são calculados automaticamente.")
         else:
             # Calcula KPIs se não existirem
             if 'freq_rate_per_million' not in df.columns:
@@ -1326,170 +1326,276 @@ def app(filters=None):
             st.info("ℹ️ As configurações serão aplicadas na próxima análise.")
     
     with tab8:
-        st.subheader("🔄 Calcular KPIs")
-        
-        st.info("💡 **Importante**: Os KPIs precisam ser calculados manualmente através do botão abaixo.\n\n"
-                "📋 **Requisitos para calcular KPIs:**\n"
-                "1. Ter acidentes cadastrados na tabela `accidents`\n"
-                "2. Ter horas trabalhadas cadastradas na tabela `hours_worked_monthly`\n"
-                "3. Os dados devem estar no mesmo período (mês/ano) e vinculados ao seu usuário\n\n"
-                "**Como funciona:** O sistema agrupa acidentes e horas por período (mês) para seu usuário, "
-                "calcula as taxas de frequência e gravidade, e salva na tabela `kpi_monthly`.")
-        
-        # Verifica se há dados antes de permitir recalcular
-        try:
-            from managers.supabase_config import get_service_role_client
-            from auth.auth_utils import get_user_id
-            
+        from managers.supabase_config import get_service_role_client
+        from auth.auth_utils import get_user_id
+        from services.kpi import save_hours_worked, recalculate_user_kpis
+
+        MESES_PT = {
+            1: "Janeiro", 2: "Fevereiro", 3: "Março", 4: "Abril",
+            5: "Maio", 6: "Junho", 7: "Julho", 8: "Agosto",
+            9: "Setembro", 10: "Outubro", 11: "Novembro", 12: "Dezembro",
+        }
+
+        st.subheader("⏱️ Horas trabalhadas → KPIs automáticos")
+        st.caption(
+            "Informe quantas pessoas trabalharam no mês. Os indicadores (TF e TG) são calculados sozinhos ao salvar."
+        )
+
+        user_id = get_user_id()
+        if not user_id:
+            st.error("Faça login para continuar.")
+        else:
             supabase = get_service_role_client()
-            user_id = get_user_id()
-            
-            if not user_id:
-                st.error("❌ **Erro**: Usuário não autenticado. Faça login novamente.")
+
+            # Feedback pós-salvamento
+            if st.session_state.get("hours_kpi_toast"):
+                toast = st.session_state.pop("hours_kpi_toast")
+                st.success(toast)
+
+            # Carrega dados do usuário
+            accidents_resp = (
+                supabase.table("accidents")
+                .select("id, occurred_at, type, lost_days")
+                .eq("created_by", user_id)
+                .execute()
+            )
+            hours_resp = (
+                supabase.table("hours_worked_monthly")
+                .select("id, year, month, hours")
+                .eq("created_by", user_id)
+                .execute()
+            )
+            kpis_resp = (
+                supabase.table("kpi_monthly")
+                .select("id, period, accidents_total, frequency_rate, severity_rate, hours")
+                .eq("created_by", user_id)
+                .order("period", desc=True)
+                .execute()
+            )
+
+            accidents_data = accidents_resp.data or []
+            hours_data = hours_resp.data or []
+            kpis_data = kpis_resp.data or []
+
+            # Períodos
+            acc_by_period = {}
+            for acc in accidents_data:
+                if not acc.get("occurred_at"):
+                    continue
+                dt = pd.to_datetime(acc["occurred_at"])
+                key = f"{dt.year}-{dt.month:02d}"
+                acc_by_period.setdefault(key, 0)
+                acc_by_period[key] += 1
+
+            hours_by_period = {
+                f"{h['year']}-{int(h['month']):02d}": float(h.get("hours") or 0)
+                for h in hours_data
+            }
+            missing_periods = sorted(set(acc_by_period.keys()) - set(hours_by_period.keys()))
+
+            m1, m2, m3 = st.columns(3)
+            m1.metric("Acidentes", len(accidents_data))
+            m2.metric("Meses com horas", len(hours_by_period))
+            m3.metric("KPIs prontos", len(kpis_data))
+
+            # Recalcula automaticamente quando há horas e os dados mudaram desde o último cálculo
+            data_fingerprint = (
+                f"{len(accidents_data)}_{len(hours_data)}_"
+                f"{sum(hours_by_period.values()):.0f}_{sum(acc_by_period.values())}"
+            )
+            auto_key = f"auto_kpi_done_{user_id}_{data_fingerprint}"
+            if hours_by_period and not st.session_state.get(auto_key):
+                with st.spinner("Atualizando KPIs automaticamente..."):
+                    result = recalculate_user_kpis(user_id)
+                st.session_state[auto_key] = True
+                if result.get("ok") and result.get("kpi_count", 0) > 0:
+                    # Só faz rerun se ainda não tínhamos KPIs alinhados
+                    if len(kpis_data) != result.get("kpi_count", 0):
+                        st.session_state["hours_kpi_toast"] = (
+                            f"KPIs atualizados automaticamente ({result.get('kpi_count', 0)} período(s))."
+                        )
+                        st.rerun()
+                    # Atualiza lista local sem rerun se já estava ok
+                    kpis_resp = (
+                        supabase.table("kpi_monthly")
+                        .select("id, period, accidents_total, frequency_rate, severity_rate, hours")
+                        .eq("created_by", user_id)
+                        .order("period", desc=True)
+                        .execute()
+                    )
+                    kpis_data = kpis_resp.data or []
+            if missing_periods:
+                nomes = []
+                for p in missing_periods:
+                    y, m = p.split("-")
+                    nomes.append(f"{MESES_PT[int(m)]}/{y} ({acc_by_period[p]} acidente(s))")
+                st.warning(
+                    "**Falta informar horas nestes meses:** " + " · ".join(nomes)
+                )
+            elif hours_by_period and kpis_data:
+                st.success("Tudo certo: horas cadastradas e KPIs atualizados.")
+            elif not accidents_data and not hours_by_period:
+                st.info("Cadastre acidentes e as horas do mês para ver os indicadores.")
+
+            st.markdown("### 1. Informe as horas do mês")
+
+            # Opções de mês: pendentes primeiro, depois mês atual, depois demais
+            now = pd.Timestamp.now()
+            option_keys = []
+            for p in missing_periods:
+                option_keys.append(p)
+            current_key = f"{now.year}-{now.month:02d}"
+            if current_key not in option_keys:
+                option_keys.append(current_key)
+            for h in sorted(hours_by_period.keys(), reverse=True):
+                if h not in option_keys:
+                    option_keys.append(h)
+            # Últimos 12 meses como fallback
+            for i in range(12):
+                dt = now - pd.DateOffset(months=i)
+                key = f"{dt.year}-{dt.month:02d}"
+                if key not in option_keys:
+                    option_keys.append(key)
+
+            def _label(period_key: str) -> str:
+                y, m = period_key.split("-")
+                base = f"{MESES_PT[int(m)]} / {y}"
+                if period_key in missing_periods:
+                    return f"⚠️ {base} — falta horas ({acc_by_period[period_key]} acidente(s))"
+                if period_key in hours_by_period:
+                    return f"✅ {base} — {hours_by_period[period_key]:,.0f} h"
+                if period_key in acc_by_period:
+                    return f"{base} — {acc_by_period[period_key]} acidente(s)"
+                return base
+
+            selected_period = st.selectbox(
+                "Mês de referência",
+                options=option_keys,
+                format_func=_label,
+                key="hours_period_select",
+            )
+            sel_year, sel_month = map(int, selected_period.split("-"))
+
+            st.markdown("**Como você prefere informar?**")
+            mode = st.radio(
+                "Modo de cálculo",
+                ["Calculadora (recomendado)", "Total direto"],
+                horizontal=True,
+                label_visibility="collapsed",
+                key="hours_input_mode",
+            )
+
+            total_hours = 0.0
+            if mode.startswith("Calculadora"):
+                c1, c2, c3 = st.columns(3)
+                with c1:
+                    n_people = st.number_input(
+                        "Nº de colaboradores",
+                        min_value=1,
+                        value=10,
+                        step=1,
+                        help="Quantas pessoas trabalharam no mês",
+                    )
+                with c2:
+                    h_day = st.number_input(
+                        "Horas por dia",
+                        min_value=1.0,
+                        value=8.0,
+                        step=0.5,
+                        help="Jornada média diária",
+                    )
+                with c3:
+                    days = st.number_input(
+                        "Dias trabalhados",
+                        min_value=1,
+                        value=22,
+                        step=1,
+                        help="Dias úteis do mês (em geral 20–23)",
+                    )
+                total_hours = float(n_people) * float(h_day) * float(days)
+                st.info(
+                    f"**Total do mês:** {int(n_people)} × {h_day:g} h × {int(days)} dias = "
+                    f"**{total_hours:,.0f} horas-homem**"
+                )
             else:
-                # Filtra apenas dados do usuário logado
-                accidents_count = supabase.table("accidents").select("id", count="exact").eq("created_by", user_id).execute().count or 0
-                hours_count = supabase.table("hours_worked_monthly").select("id", count="exact").eq("created_by", user_id).execute().count or 0
-                kpis_count = supabase.table("kpi_monthly").select("id", count="exact").eq("created_by", user_id).execute().count or 0
-                
-                col1, col2, col3 = st.columns(3)
-                with col1:
-                    st.metric("Meus Acidentes", accidents_count)
-                with col2:
-                    st.metric("Meus Registros de Horas", hours_count)
-                with col3:
-                    st.metric("Meus KPIs Calculados", kpis_count)
-                
-                if accidents_count == 0 and hours_count == 0:
-                    st.warning("⚠️ **Nenhum dado encontrado**: Cadastre acidentes e/ou horas trabalhadas primeiro!")
-                elif accidents_count == 0:
-                    st.warning("⚠️ **Sem acidentes**: Cadastre acidentes para calcular KPIs!")
-                elif hours_count == 0:
-                    st.warning("⚠️ **Sem horas trabalhadas**: Cadastre horas trabalhadas para calcular KPIs!")
-                elif kpis_count == 0:
-                    st.info("ℹ️ **KPIs não calculados**: Clique no botão abaixo para calcular os KPIs baseados nos seus dados existentes.")
-                else:
-                    st.success(f"✅ **KPIs já calculados**: Existem {kpis_count} registros de KPI calculados para seus dados.")
-        except Exception as e:
-            st.error(f"Erro ao verificar dados: {str(e)}")
-        
-        if st.button("🔄 Calcular Meus KPIs", type="primary", key="btn_calculate_my_kpis"):
-            with st.spinner("Calculando seus KPIs..."):
-                try:
-                    from services.kpi import calculate_frequency_rate, calculate_severity_rate
-                    from managers.supabase_config import get_service_role_client
-                    from auth.auth_utils import get_user_id
-                    from collections import defaultdict
-                    
-                    supabase = get_service_role_client()
-                    user_id = get_user_id()
-                    
-                    if not user_id:
-                        st.error("❌ Usuário não autenticado.")
-                        return
-                    
-                    # Busca apenas dados do usuário logado
-                    accidents_response = supabase.table("accidents").select(
-                        "id, occurred_at, created_by, lost_days, type"
-                    ).eq("created_by", user_id).execute()
-                    
-                    hours_response = supabase.table("hours_worked_monthly").select(
-                        "id, year, month, hours, created_by"
-                    ).eq("created_by", user_id).execute()
-                    
-                    accidents_data = accidents_response.data if accidents_response and hasattr(accidents_response, 'data') else []
-                    hours_data = hours_response.data if hours_response and hasattr(hours_response, 'data') else []
-                    
-                    # Agrupa acidentes por mês
-                    accidents_by_period = defaultdict(lambda: {'count': 0, 'fatalities': 0, 'lost_days': 0})
-                    
-                    for accident in accidents_data:
-                        period = pd.to_datetime(accident['occurred_at']).strftime('%Y-%m')
-                        accidents_by_period[period]['count'] += 1
-                        if accident.get('type') == 'fatal':
-                            accidents_by_period[period]['fatalities'] += 1
-                        accidents_by_period[period]['lost_days'] += int(accident.get('lost_days', 0))
-                    
-                    # Agrupa horas por mês
-                    hours_by_period = defaultdict(lambda: 0)
-                    
-                    for hour_entry in hours_data:
-                        period = f"{hour_entry['year']}-{str(hour_entry['month']).zfill(2)}"
-                        hours_by_period[period] += float(hour_entry.get('hours', 0))
-                    
-                    # Calcula KPIs mensais do usuário
-                    kpi_count = 0
-                    for period, acc_data in accidents_by_period.items():
-                        if period in hours_by_period:
-                            hours = hours_by_period[period]
-                            
-                            # Calcular dias debitados para acidentes fatais (NBR 14280)
-                            debited_days = acc_data['fatalities'] * 6000  # 6.000 dias por morte
-                            
-                            # ✅ CORRIGIDO: hours vem da tabela hours_worked_monthly em HORAS REAIS (182.0 = 182 horas reais)
-                            # A função espera receber em centenas e multiplica por 100 internamente
-                            # Então dividimos por 100 para converter para centenas antes de calcular
-                            hours_in_hundreds = hours / 100  # Converte 182.0 horas reais para 1.82 centenas
-                            freq_rate = calculate_frequency_rate(acc_data['count'], hours_in_hundreds)
-                            sev_rate = calculate_severity_rate(acc_data['lost_days'], hours_in_hundreds, debited_days)
-                            
-                            # Verifica se já existe KPI para este período e usuário
-                            existing_kpi = supabase.table("kpi_monthly").select("id").eq("period", f"{period}-01").eq("created_by", user_id).execute()
-                            
-                            kpi_data = {
-                                "period": f"{period}-01",
-                                "created_by": user_id,  # UUID do usuário
-                                "accidents_total": acc_data['count'],
-                                "fatalities": acc_data['fatalities'],
-                                "lost_days_total": acc_data['lost_days'],
-                                "hours": hours_in_hundreds,  # ✅ Armazena em centenas (182.0 → 1.82 na tabela)
-                                "frequency_rate": freq_rate,
-                                "severity_rate": sev_rate,
-                                "debited_days": debited_days
-                            }
-                            
-                            if existing_kpi.data:
-                                # Atualiza existente
-                                supabase.table("kpi_monthly").update(kpi_data).eq("period", f"{period}-01").eq("created_by", user_id).execute()
-                                kpi_count += 1
-                            else:
-                                # Insere novo
-                                supabase.table("kpi_monthly").insert(kpi_data).execute()
-                                kpi_count += 1
-                    
-                    # Processa horas sem acidentes (cria KPIs com zero acidentes)
-                    for period, hours in hours_by_period.items():
-                        if period not in accidents_by_period:
-                            # Verifica se já existe KPI para este período e usuário
-                            existing_kpi = supabase.table("kpi_monthly").select("id").eq("period", f"{period}-01").eq("created_by", user_id).execute()
-                            
-                            if not existing_kpi.data:
-                                kpi_data = {
-                                    "period": f"{period}-01",
-                                    "created_by": user_id,
-                                    "accidents_total": 0,
-                                    "fatalities": 0,
-                                    "lost_days_total": 0,
-                                    "hours": hours / 100,  # ✅ Converte horas reais para centenas
-                                    "frequency_rate": 0,
-                                    "severity_rate": 0,
-                                    "debited_days": 0
-                                }
-                                supabase.table("kpi_monthly").insert(kpi_data).execute()
-                                kpi_count += 1
-                    
-                    st.success(f"✅ Seus KPIs foram calculados com sucesso!\n\n"
-                              f"📊 **Resumo:**\n"
-                              f"- Períodos com acidentes processados: {len(accidents_by_period)}\n"
-                              f"- Períodos com horas (sem acidentes) processados: {len([p for p in hours_by_period.keys() if p not in accidents_by_period])}\n"
-                              f"- **Total de KPIs calculados/atualizados: {kpi_count}**\n\n"
-                              f"💡 **Dica**: Atualize os KPIs sempre que cadastrar novos acidentes ou horas trabalhadas.")
-                    st.rerun()
-                    
-                except Exception as e:
-                    st.error(f"Erro ao calcular KPIs: {str(e)}")
-                    import traceback
-                    st.code(traceback.format_exc())
+                existing_val = hours_by_period.get(selected_period, 1760.0)
+                total_hours = st.number_input(
+                    "Total de horas-homem do mês",
+                    min_value=1.0,
+                    value=float(existing_val),
+                    step=10.0,
+                    help="Soma de todas as horas trabalhadas por todos os colaboradores no mês",
+                )
+
+            if st.button("💾 Salvar e atualizar KPIs", type="primary", key="btn_save_hours_auto_kpi"):
+                with st.spinner("Salvando horas e calculando KPIs..."):
+                    saved = save_hours_worked(user_id, sel_year, sel_month, total_hours)
+                    if not saved.get("ok"):
+                        st.error(saved.get("error", "Erro ao salvar horas"))
+                    else:
+                        result = recalculate_user_kpis(user_id)
+                        # Limpa cache de auto para permitir novo auto se necessário
+                        for k in list(st.session_state.keys()):
+                            if isinstance(k, str) and k.startswith(f"auto_kpi_done_{user_id}"):
+                                del st.session_state[k]
+                        if result.get("ok"):
+                            mes_nome = MESES_PT[sel_month]
+                            extra = ""
+                            missing = result.get("missing_hours_periods") or []
+                            if missing:
+                                extra = f" Ainda faltam horas em: {', '.join(missing)}."
+                            st.session_state["hours_kpi_toast"] = (
+                                f"✅ {total_hours:,.0f} h em {mes_nome}/{sel_year} salvas. "
+                                f"KPIs atualizados ({result.get('kpi_count', 0)} período(s)).{extra}"
+                            )
+                            st.rerun()
+                        else:
+                            st.warning(
+                                f"Horas salvas, mas KPIs não calculados: {result.get('error', 'erro desconhecido')}"
+                            )
+
+            # Lista de horas cadastradas
+            if hours_data:
+                st.markdown("### Meses já cadastrados")
+                rows = []
+                for h in sorted(hours_data, key=lambda x: (x["year"], x["month"]), reverse=True):
+                    p = f"{h['year']}-{int(h['month']):02d}"
+                    rows.append(
+                        {
+                            "Mês": f"{MESES_PT[int(h['month'])]}/{h['year']}",
+                            "Horas": f"{float(h['hours']):,.0f}",
+                            "Acidentes": acc_by_period.get(p, 0),
+                            "Status": "Completo" if p in hours_by_period and p not in missing_periods else "OK",
+                        }
+                    )
+                st.dataframe(pd.DataFrame(rows), width="stretch", hide_index=True)
+
+            # Preview dos KPIs
+            if kpis_data:
+                st.markdown("### 2. Seus KPIs (atualizados automaticamente)")
+                kpi_rows = []
+                for k in kpis_data:
+                    period = str(k.get("period", ""))[:7]
+                    try:
+                        y, m = period.split("-")
+                        label = f"{MESES_PT[int(m)]}/{y}"
+                    except Exception:
+                        label = period
+                    hours_real = float(k.get("hours") or 0) * 100
+                    kpi_rows.append(
+                        {
+                            "Mês": label,
+                            "Acidentes": k.get("accidents_total", 0),
+                            "Horas": f"{hours_real:,.0f}",
+                            "TF": round(float(k.get("frequency_rate") or 0), 2),
+                            "TG": round(float(k.get("severity_rate") or 0), 2),
+                        }
+                    )
+                st.dataframe(pd.DataFrame(kpi_rows), width="stretch", hide_index=True)
+                st.caption("TF = Taxa de Frequência · TG = Taxa de Gravidade (NBR 14280). Veja detalhes na aba **KPIs Básicos**.")
+            else:
+                st.markdown("### 2. KPIs")
+                st.caption("Assim que houver horas salvas, os KPIs aparecem aqui automaticamente.")
     
     with tab9:
         # Importa e exibe instruções
