@@ -301,5 +301,20 @@ O sistema de investigação está **funcionalmente operacional**, mas possui **r
 
 ---
 
-**Documento atualizado em:** 2025-01-29  
-**Status:** ✅ Compatível - Nenhuma ação necessária
+## ✅ Status Atualizado (2026-08-31)
+
+**Auditoria e Sincronização Executada no Projeto Supabase (`deonjqnpxurzghnnchum`):**
+- ✅ **Tabela `profiles`**: Restrição `profiles_status_check` validada com suporte a `'pendente'` (`'ativo', 'inativo', 'suspenso', 'pendente'`).
+- ✅ **Tabela `actions` (5W2H)**: Migration aplicada com sucesso (`docs/migrations/update_actions_and_profiles_status_constraints.sql`) atualizando `actions_status_check` para aceitar `('aberta', 'em_andamento', 'em_execucao', 'fechada', 'concluida', 'cancelada')`.
+- ✅ **Tabela `attachments`**: Validada com suporte a `entity_type = 'nonconformity'`, `accident`, `near_miss` e `action`.
+- ✅ **Storage (`evidencias`)**: Bucket ativo e operacional.
+- ✅ **Tabela `hours_worked_monthly` & `kpi_monthly`**: Estrutura e constraints de cálculo validadas (1–12 meses).
+- ✅ **Tabela `fault_tree_nodes`**: Todas as colunas avançadas (`display_order`, `justification`, `recommendation`, `is_contributing_cause`) validadas.
+
+**Conclusão:** Todas as 23 tabelas e restrições estão **100% compatíveis e sincronizadas** entre o banco Supabase e os módulos de Frontend/Serviços.
+
+---
+
+**Documento atualizado em:** 2026-08-31  
+**Status:** ✅ 100% Compatível e Sincronizado
+

@@ -33,8 +33,9 @@ def _render_login_lottie(key: str = "login_lottie", height: int = 340) -> None:
     """
     Exibe o Lottie na coluna direita, isolado do tema do sistema/Streamlit.
 
-    Renderiza em iframe via components.html com color-scheme forçado para light,
+    Renderiza em iframe com color-scheme forçado para light,
     para que cores e contraste da animação não mudem com dark mode.
+    Utiliza st.iframe (Streamlit >= 1.56.0) com fallback para components.html.
     """
     animation = _load_login_lottie()
     if not animation:
@@ -44,9 +45,7 @@ def _render_login_lottie(key: str = "login_lottie", height: int = 340) -> None:
     # key evita aviso de unused; o iframe é isolado por página
     _ = key
 
-    components.html(
-        f"""
-<!DOCTYPE html>
+    html_content = f"""<!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8">
@@ -98,11 +97,20 @@ def _render_login_lottie(key: str = "login_lottie", height: int = 340) -> None:
     }})();
   </script>
 </body>
-</html>
-        """,
-        height=height,
-        scrolling=False,
-    )
+</html>"""
+
+    if hasattr(st, "iframe"):
+        st.iframe(
+            html_content,
+            height=height,
+            width="stretch",
+        )
+    else:
+        components.html(
+            html_content,
+            height=height,
+            scrolling=False,
+        )
 
 def _inject_login_css() -> None:
     """CSS e tipografia para as telas de autenticação (layout card minimalista)."""
